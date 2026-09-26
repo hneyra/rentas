@@ -116,7 +116,8 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                             + " salir su base (NEG-05 §1)");
         }
         String usuario = OrigenContext.actual().usuario();
-        Long id = insertarCabecera(determinacion, usuario);
+        Determinacion guardada = insertarCabecera(determinacion, usuario);
+        long id = exigirId(guardada);
 
         for (DetalleDeterminacionPredio fila : detalle) {
             jdbc().sql(
@@ -143,17 +144,26 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                     .update();
         }
 
-        return conId(determinacion, id, usuario);
+        return guardada;
     }
 
     @Override
     public Determinacion insertar(Determinacion determinacion) {
-        String usuario = OrigenContext.actual().usuario();
-        Long id = insertarCabecera(determinacion, usuario);
-        return conId(determinacion, id, usuario);
+        return insertarCabecera(determinacion, OrigenContext.actual().usuario());
     }
 
-    private Long insertarCabecera(Determinacion determinacion, String usuario) {
+    /**
+     * Escribe la cabecera y devuelve <b>lo que quedo en la fila</b>, no lo que se le paso (#378).
+     *
+     * <p>{@code base_imponible} y {@code monto_determinado} son {@code dinero numeric(15,2)} sin
+     * {@code CHECK} de escala: PostgreSQL <b>coacciona</b> un importe con mas decimales al
+     * guardarlo y no da error. Hasta #378 esto pedia solo {@code RETURNING id} y devolvia el objeto
+     * en memoria, asi que un importe que llegara sin redondear salia en la respuesta y en la
+     * auditoria con una cifra y quedaba en la fila con otra —que es lo que pasaba con el vehicular,
+     * la alcabala y los espectaculos—. Devolviendo las dos columnas tal como quedaron, la segunda
+     * verdad no puede volver aunque alguien vuelva a olvidar redondear.
+     */
+    private Determinacion insertarCabecera(Determinacion determinacion, String usuario) {
         return jdbc().sql(
                         "INSERT INTO determinacion"
                                 + " (municipalidad_id, ejercicio, tributo, periodo,"
@@ -167,7 +177,7 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                                 + "  :montoDeterminado,"
                                 + "  string_to_array(:reglas, ',')::varchar(200)[],"
                                 + "  :origen, :estado, :usuario, :modalidad)"
-                                + " RETURNING id")
+                                + " RETURNING id, base_imponible, monto_determinado")
                 .param("ejercicio", determinacion.ejercicio().valor())
                 .param("tributo", determinacion.tributo())
                 .param("periodo", determinacion.periodo())
@@ -187,11 +197,32 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                 .param(
                         "modalidad",
                         determinacion.modalidad() == null ? null : determinacion.modalidad().name())
-                .query(Long.class)
+                .query(
+                        (fila, numero) ->
+                                guardada(
+                                        determinacion,
+                                        fila.getLong("id"),
+                                        new Dinero(fila.getBigDecimal("base_imponible")),
+                                        new Dinero(fila.getBigDecimal("monto_determinado")),
+                                        usuario))
                 .single();
     }
 
-    private static Determinacion conId(Determinacion determinacion, Long id, String usuario) {
+    private static long exigirId(Determinacion guardada) {
+        Long id = guardada.id();
+        if (id == null) {
+            throw new IllegalStateException("Una determinacion recien insertada tiene id");
+        }
+        return id;
+    }
+
+    /** La determinacion como quedo: su id y sus dos importes, leidos de la fila (#378). */
+    private static Determinacion guardada(
+            Determinacion determinacion,
+            long id,
+            Dinero baseImponible,
+            Dinero montoDeterminado,
+            String usuario) {
         return new Determinacion(
                 id,
                 determinacion.ejercicio(),
@@ -201,8 +232,8 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                 determinacion.predioId(),
                 determinacion.vehiculoId(),
                 determinacion.conjuntoId(),
-                determinacion.baseImponible(),
-                determinacion.montoDeterminado(),
+                baseImponible,
+                montoDeterminado,
                 determinacion.reglasAplicadas(),
                 determinacion.origen(),
                 determinacion.estado(),

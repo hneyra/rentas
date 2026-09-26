@@ -279,8 +279,11 @@ class LicenciaDeEdificacionJdbcTest {
                         .en(municipalidad)
                         .conCelda(EJERCICIO_CON_CUADRO, "MUROS", 'A', "120.000000")
                         .conCelda(EJERCICIO_CON_CUADRO, "TECHOS", 'B', "80.000000")
-                        .conCelda(EJERCICIO_CON_CUADRO, "PUERTAS", 'C', "40.000000");
-        ValorizacionDelFue valorizaciones = new ValorizacionDelFue(cuadro);
+                        .conCelda(EJERCICIO_CON_CUADRO, "PUERTAS", 'C', "40.000000")
+                        // #378: la celda con centimos, la unica que distingue un papel redondeado
+                        // de uno que imprime el producto crudo. Con 120 × 40 m2 no hay decimales.
+                        .conCelda(EJERCICIO_CON_CUADRO, "MUROS", 'D', "857.430000");
+        ValorizacionDelFue valorizaciones = new ValorizacionDelFue(cuadro, parametros);
 
         presentar = envolver(new PresentarFue(expedientes, padron, auditoria, RELOJ));
         completar =
@@ -747,6 +750,57 @@ class LicenciaDeEdificacionJdbcTest {
             assertThat(new String(emitida.documento().contenido(), StandardCharsets.ISO_8859_1))
                     .as("y el papel la imprime")
                     .contains("8000.00");
+        }
+
+        /**
+         * #378 — El valor de obra que imprime la licencia es una cifra de centimos.
+         *
+         * <p>120,50 m² de MUROS categoria D a 857,43 son 103 320,315: con el producto crudo el
+         * papel —un documento oficial que queda en {@code documento_emitido}— decia «Valor de obra
+         * (S/) 103320.3150». Se redondea en {@code VALOR_DE_OBRA_DEL_FUE} con la politica del
+         * conjunto sellado (ADR-0018: escala 2, {@code HALF_UP}), cada linea y por tanto el total.
+         * La siembra de las demas pruebas —40 m² a 120,00 y a 80,00— da 8 000 con o sin redondeo.
+         */
+        @Test
+        @DisplayName("#378 — 120,50 m2 a 857,43 imprime 103320.32, no el producto crudo")
+        void elValorDeObraSaleRedondeado() {
+            String expediente =
+                    presentarFue(TipoDeTramiteDeEdificacion.LICENCIA_DE_OBRA, null, HOY);
+            enContexto(() -> completar.completarTerreno(expediente, terreno("D", "7"), PORQUE));
+            enContexto(() -> completar.completarProyecto(expediente, proyecto(), PORQUE));
+            enContexto(
+                    () ->
+                            completar.completarValorizacion(
+                                    expediente,
+                                    List.of(
+                                            new CompletarSeccionDelFue.Estructura(
+                                                    1,
+                                                    PartidaDeEdificacion.MUROS,
+                                                    'D',
+                                                    new AreaM2(new BigDecimal("120.50")))),
+                                    PORQUE));
+            completarProfesionalesYDocumentos(municipalidad, expediente);
+
+            EmitirLicenciaDeEdificacion.LicenciaEmitida emitida = emitirLicencia(expediente, HOY);
+
+            assertThat(emitida.valorizacion().obra().orElseThrow().total().valor().toPlainString())
+                    .as("el total de la valorizacion, con la escala del conjunto sellado")
+                    .isEqualTo("103320.32");
+            assertThat(
+                            emitida.valorizacion()
+                                    .obra()
+                                    .orElseThrow()
+                                    .lineas()
+                                    .get(0)
+                                    .importe()
+                                    .valor()
+                                    .toPlainString())
+                    .as("y la linea que el papel imprime en «Valor S/»")
+                    .isEqualTo("103320.32");
+            assertThat(new String(emitida.documento().contenido(), StandardCharsets.ISO_8859_1))
+                    .as("el papel imprime la cifra de centimos y no el producto crudo")
+                    .contains("103320.32")
+                    .doesNotContain("103320.315");
         }
 
         @Test
@@ -1767,7 +1821,12 @@ class LicenciaDeEdificacionJdbcTest {
                                             RELOJ_DE_LOS_ACTOS)),
                             vecinos.recibos(caja),
                             derechos(),
-                            new ValorizacionDelFue(vecinos.cuadro())));
+                            new ValorizacionDelFue(
+                                    vecinos.cuadro(),
+                                    envolver(
+                                            new kamayuk.rentas.parametros.aplicacion
+                                                    .LectorDeParametrosSellados(
+                                                    new ParametrosRepositoryJdbc(jdbc))))));
         }
 
         private RevalidarLicenciaDeEdificacion revalidacionCon(VecinosQueAnotan vecinos) {
@@ -1962,6 +2021,11 @@ class LicenciaDeEdificacionJdbcTest {
                                                 'B',
                                                 new AreaM2(new BigDecimal("40.00")))),
                                 PORQUE));
+        completarProfesionalesYDocumentos(muni, expediente);
+    }
+
+    /** Las dos secciones que no dependen de la valorizacion: con ellas el FUE queda completo. */
+    private static void completarProfesionalesYDocumentos(long muni, String expediente) {
         enContextoDe(
                 muni,
                 () ->
@@ -2224,14 +2288,20 @@ class LicenciaDeEdificacionJdbcTest {
                 // rol_carga_parametros y se nombra aqui, igual que los dos conceptos del TUPA.
                 // Cifras INVENTADAS para la prueba, y a la vista. Las reales las espera #197.
                 long edicion = publicarCuadroDeValoresUnitarios(municipalidadId + "_" + ejercicio);
-                try (PreparedStatement sentencia =
-                        app.prepareStatement(
-                                "INSERT INTO conjunto_parametro_detalle_de_prueba (municipalidad_id,"
-                                        + " conjunto_id, parametro_id) VALUES (?, ?, ?)")) {
-                    sentencia.setLong(1, municipalidadId);
-                    sentencia.setLong(2, conjunto);
-                    sentencia.setLong(3, edicion);
-                    sentencia.executeUpdate();
+                // #378: y con el cuadro, la politica con que se redondea el valor de obra. Sin ella
+                // la valorizacion no se imprime, igual que sin cuadro.
+                long redondeo = politicaDelValorDeObra(municipalidadId + "_" + ejercicio);
+                for (long parametro : new long[] {edicion, redondeo}) {
+                    try (PreparedStatement sentencia =
+                            app.prepareStatement(
+                                    "INSERT INTO conjunto_parametro_detalle_de_prueba"
+                                            + " (municipalidad_id, conjunto_id, parametro_id)"
+                                            + " VALUES (?, ?, ?)")) {
+                        sentencia.setLong(1, municipalidadId);
+                        sentencia.setLong(2, conjunto);
+                        sentencia.setLong(3, parametro);
+                        sentencia.executeUpdate();
+                    }
                 }
             }
             try (PreparedStatement sentencia =
@@ -2277,6 +2347,32 @@ class LicenciaDeEdificacionJdbcTest {
             sembrarCelda(carga, edicion, "PUERTAS", "C", "40.000000");
             carga.commit();
             return edicion;
+        }
+    }
+
+    /**
+     * La fila {@code REDONDEO:VALOR_DE_OBRA_DEL_FUE} con la politica de ADR-0018 —escala 2, {@code
+     * HALF_UP}—, que {@code normativa} todavia no publica (#378). La escala en {@code
+     * valor_numerico} y el modo en {@code valor_texto}, en la misma fila.
+     */
+    private static long politicaDelValorDeObra(String sufijo) throws SQLException {
+        try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
+                PreparedStatement sentencia =
+                        carga.prepareStatement(
+                                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
+                                        + " valor_numerico, valor_texto, vigencia_desde,"
+                                        + " documento_fuente, usuario_carga, usuario_aprueba)"
+                                        + " VALUES (NULL, 'REDONDEO', 'VALOR_DE_OBRA_DEL_FUE', 2,"
+                                        + " 'HALF_UP', DATE '2026-01-01', ?, 'siembra',"
+                                        + " 'otra persona') RETURNING id")) {
+            sentencia.setString(
+                    1, "ADR-0018 de normativa, sembrado para la prueba de #378 (" + sufijo + ")");
+            try (ResultSet resultado = sentencia.executeQuery()) {
+                resultado.next();
+                long id = resultado.getLong(1);
+                carga.commit();
+                return id;
+            }
         }
     }
 

@@ -151,6 +151,47 @@ class DeterminacionPredialJdbcTest {
                 .hasMessageContaining("det_predio_detalle_exonerado_ck");
     }
 
+    /**
+     * #378 — El repositorio devuelve lo que la fila guardo, no lo que se le paso.
+     *
+     * <p>{@code base_imponible} y {@code monto_determinado} son {@code dinero numeric(15,2)} sin
+     * {@code CHECK} de escala: PostgreSQL <b>coacciona</b> 1 234,565 a 1 234,57 y no da error.
+     * Hasta #378 el {@code INSERT} pedia solo {@code RETURNING id} y el repositorio devolvia el
+     * objeto en memoria, asi que quien olvidara redondear publicaba en la respuesta y en la
+     * auditoria una cifra que la fila no tenia. La siembra lleva tres decimales a proposito, en los
+     * dos importes: es lo que simula ese olvido, y con dos decimales no se distingue nada.
+     */
+    @Test
+    @DisplayName("#378 — insertar devuelve los importes de la fila, no los que recibio")
+    void insertarDevuelveLoQueGuardo() throws SQLException {
+        enA();
+        long organizador = crearContribuyente(municipalidadA, "DET-3780", "80378001");
+
+        Determinacion guardada =
+                transaccion.execute(
+                        estado ->
+                                repositorio.insertar(
+                                        Determinacion.nuevaEspectaculos(
+                                                EJERCICIO,
+                                                organizador,
+                                                conjuntoDeA(),
+                                                Dinero.de("12345.655"),
+                                                Dinero.de("1234.565"),
+                                                List.of("ESPECTACULO_ALICUOTA:CINEMATOGRAFICO"))));
+        Determinacion leida =
+                transaccion.execute(estado -> repositorio.findById(guardada.id()).orElseThrow());
+
+        assertThat(
+                        List.of(
+                                guardada.baseImponible().valor().toPlainString(),
+                                guardada.montoDeterminado().valor().toPlainString()))
+                .as("lo que devuelve insertar es lo que quedo en la fila")
+                .containsExactly(
+                        leida.baseImponible().valor().toPlainString(),
+                        leida.montoDeterminado().valor().toPlainString())
+                .containsExactly("12345.66", "1234.57");
+    }
+
     @Test
     @DisplayName("kamayuk_app no puede modificar ni borrar el detalle de una determinacion")
     void elDetalleNoSeEdita() throws SQLException {

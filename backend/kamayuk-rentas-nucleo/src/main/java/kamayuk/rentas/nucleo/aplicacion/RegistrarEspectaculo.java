@@ -11,6 +11,7 @@ import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.nucleo.dominio.espectaculos.ClaseDeEspectaculo;
 import kamayuk.rentas.nucleo.dominio.espectaculos.EspectaculoPublico;
 import kamayuk.rentas.nucleo.dominio.espectaculos.EspectaculoPublicoRepository;
@@ -20,6 +21,7 @@ import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
 import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +54,14 @@ import org.springframework.transaction.annotation.Transactional;
  * parámetros, se decide la clase del art. 57 (#376) y se resuelve al organizador por {@link
  * DirectorioDeContribuyentes} <b>antes</b> de escribir nada, y el borde contesta 422 o 404 según lo
  * que falte.
+ *
+ * <h2>El impuesto se redondea en su punto, con la politica del conjunto (#378)</h2>
+ *
+ * <p>La politica de {@code REDONDEO:IMPUESTO_ESPECTACULO} se lee con las demas cifras, antes de
+ * escribir nada, y se pide por {@link PoliticasDeRedondeoSelladas#en} y no sobre las politicas ya
+ * leidas: si el conjunto no la publica, el fallo sabe de que ejercicio es y el borde contesta 422
+ * nombrando la fila (#633). Hasta #378 no se redondeaba, y la respuesta y la auditoria decian el
+ * producto crudo mientras la columna guardaba otra cifra.
  */
 @Service
 public class RegistrarEspectaculo {
@@ -117,12 +127,15 @@ public class RegistrarEspectaculo {
                         sellados.exigirNumero(LlavesDelConjunto.ESPECTACULO_ALICUOTA, clase.clave())
                                 .valor()
                                 .toPlainString());
+        PoliticaDeRedondeo redondeo =
+                PoliticasDeRedondeoSelladas.en(sellados, ImpuestoDeEspectaculo.PUNTO_DE_REDONDEO);
 
         if (!padron.porIds(Set.of(organizadorId)).containsKey(organizadorId)) {
             throw new OrganizadorInexistente(organizadorId);
         }
 
-        Dinero montoDeterminado = ImpuestoDeEspectaculo.calcular(ingresoDeclarado, alicuota);
+        Dinero montoDeterminado =
+                ImpuestoDeEspectaculo.calcular(ingresoDeclarado, alicuota, redondeo);
 
         EspectaculoPublico guardado =
                 eventos.insertar(

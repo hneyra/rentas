@@ -12,10 +12,13 @@ import java.util.Objects;
  *
  * <h2>Lo que este tipo NO decide</h2>
  *
- * <p><b>Su escala ni su modo de redondeo.</b> Los recibe en {@link #redondeadoCon}, porque D-03
- * sigue abierta en sus tres partes: con cuantos decimales se trabaja (D-03a), con que modo (D-03b)
- * y en que puntos del calculo se redondea (D-03c). Un {@code setScale(2, HALF_UP)} escrito hoy
- * dentro de este tipo seria una decision tomada por descuido y repartida por todo el sistema.
+ * <p><b>Su escala ni su modo de redondeo.</b> Los recibe en {@link #redondeadoCon}. D-03 ya no esta
+ * abierta en eso: ADR-0018 de {@code normativa} (2026-08-28) cerro D-03a, D-03b y D-03c —escala 2
+ * para todo importe que se asienta, {@code HALF_UP}, al cierre de cada regla—, pero lo decidio
+ * <b>como dato</b>: cada punto es una fila {@code REDONDEO:‹punto›} del conjunto sellado, una norma
+ * puede fijar su propio modo, y un punto sin politica publicada falla en vez de no redondear. Un
+ * {@code setScale(2, HALF_UP)} escrito dentro de este tipo copiaria esa decision en el codigo,
+ * lejos de su fuente, y la aplicaria tambien donde el ADR no redondea (#378).
  *
  * <p><b>Cuanto se debe.</b> Aqui hay aritmetica —sumar, restar, comparar—, no reglas tributarias.
  * Toda operacion que devuelva un importe <i>determinado</i> (una alicuota aplicada a una base, un
@@ -69,10 +72,12 @@ public record Dinero(BigDecimal valor) implements Comparable<Dinero> {
      *
      * <p>Casi todo el calculo tributario es una multiplicacion —area por arancel, base por
      * alicuota, valor unitario por metrado— y el producto trae mas decimales que los dos operandos.
-     * Devolverlo redondeado obligaria a esta clase a elegir escala y modo, que es justo lo que
-     * D-03a y D-03b no han decidido, y a redondear en cada operacion intermedia en vez de donde
-     * toque, que es D-03c (ARQ-09 §1.4). Quien multiplica decide cuando redondear, con {@link
-     * #redondeadoCon(PoliticaDeRedondeo)} y la politica que recibio.
+     * Devolverlo redondeado obligaria a esta clase a elegir escala y modo, que son datos del
+     * conjunto sellado (ADR-0018), y a redondear en cada operacion intermedia en vez de al cierre
+     * de la regla (ARQ-09 §1.4, D-03c). Quien multiplica decide cuando redondear, con {@link
+     * #redondeadoCon(PoliticaDeRedondeo)} y la politica que recibio. <b>Y tiene que hacerlo</b>: el
+     * producto crudo de una regla que cierra aqui es la cifra que #378 encontro en la respuesta
+     * mientras la columna {@code dinero} guardaba otra.
      */
     public Dinero por(BigDecimal factor) {
         Objects.requireNonNull(factor, "Multiplicar exige su factor");

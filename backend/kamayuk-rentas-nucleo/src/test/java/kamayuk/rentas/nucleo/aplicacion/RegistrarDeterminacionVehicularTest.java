@@ -565,7 +565,37 @@ class RegistrarDeterminacionVehicularTest {
                 Observacion.de("UIT ficticia"));
         administrarParametros.agregarParametro(
                 conjunto.id(), edicion, Observacion.de("Cuadro vehicular ficticio"));
+        administrarParametros.agregarParametro(
+                conjunto.id(),
+                parametroDeRedondeo("IMPUESTO_VEHICULAR"),
+                Observacion.de("Politica de redondeo de ADR-0018 (#378)"));
         administrarParametros.sellar(conjunto.id(), Observacion.de("Sellado de prueba"));
+    }
+
+    /**
+     * La fila {@code REDONDEO:‹punto›} con la politica de ADR-0018 —escala 2, {@code HALF_UP}—, que
+     * el derivado de {@code normativa} todavia no publica (#378). La escala en {@code
+     * valor_numerico} y el modo en {@code valor_texto}, en la misma fila.
+     */
+    private static long parametroDeRedondeo(String punto) throws SQLException {
+        try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
+                PreparedStatement sentencia =
+                        carga.prepareStatement(
+                                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
+                                        + " valor_numerico, valor_texto, vigencia_desde,"
+                                        + " documento_fuente, usuario_carga, usuario_aprueba)"
+                                        + " VALUES (NULL, 'REDONDEO', ?, 2, 'HALF_UP',"
+                                        + " DATE '2026-01-01', 'ADR-0018 de normativa, sembrado"
+                                        + " para la prueba (#378)', 'carga', 'aprueba')"
+                                        + " RETURNING id")) {
+            sentencia.setString(1, punto);
+            try (ResultSet fila = sentencia.executeQuery()) {
+                fila.next();
+                long id = fila.getLong(1);
+                carga.commit();
+                return id;
+            }
+        }
     }
 
     /** La edicion nacional del cuadro vehicular: una cabecera y su unica fila ficticia. */

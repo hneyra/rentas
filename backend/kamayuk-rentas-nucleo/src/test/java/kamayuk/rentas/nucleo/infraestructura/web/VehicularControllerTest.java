@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -135,10 +136,11 @@ class VehicularControllerTest {
         assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
         String json = resultado.getResponse().getContentAsString();
         assertThat(json).contains("\"placa\":\"V1H-882\"").contains("\"ejercicio\":\"2026\"");
-        // 112 800.00 × 1 % = 1 128, por encima del minimo: el minimo no lo eleva. Viaja
-        // SIN redondear —«1128.0000»— porque el vehicular no tiene ningun punto de redondeo
-        // parametrizado y `Dinero` no elige escala por su cuenta (D-03a/D-03c, ADR-0018).
-        assertThat(json).contains("\"montoDeterminado\":\"1128.0000\"");
+        // 112 800.00 × 1 % = 1 128, por encima del minimo: el minimo no lo eleva. Viaja con la
+        // escala de REDONDEO:IMPUESTO_VEHICULAR —«1128.00»—, no con la del producto (#378).
+        // Hasta #378 este comentario decia que viajaba sin redondear citando ADR-0018, y el ADR
+        // dice lo contrario: escala 2, HALF_UP, al cierre de cada regla.
+        assertThat(json).contains("\"montoDeterminado\":\"1128.00\"");
         assertThat(determinaciones.insertadas).isZero();
     }
 
@@ -231,7 +233,8 @@ class VehicularControllerTest {
                         .andReturn();
 
         String json = resultado.getResponse().getContentAsString();
-        // 1.5 % de 5 500.00 = 82.50 —sin redondear, ver arriba—, y el conjunto con que se
+        // 1.5 % de 5 500.00 = 82.50 —el minimo es un operando y no se redondea: lo que cierra
+        // la regla es el impuesto (#378)—, y el conjunto con que se
         // calculo va escrito: sin el, esta cifra no se puede reproducir (ARQ-09 §3)
         assertThat(json).contains("\"minimoImponible\":\"82.50000\"");
         assertThat(json).contains("\"conjunto\":\"2026 v1\"").contains("\"conjuntoId\":77");
@@ -304,7 +307,7 @@ class VehicularControllerTest {
         assertThat(json)
                 .as("el minimo del cliente no llega al calculo")
                 .contains("\"minimoImponible\":\"82.50000\"")
-                .contains("\"montoDeterminado\":\"1128.0000\"")
+                .contains("\"montoDeterminado\":\"1128.00\"")
                 .doesNotContain("999999.99");
     }
 
@@ -363,9 +366,94 @@ class VehicularControllerTest {
                                         .content("{\"simulacion\":true}"))
                         .andReturn();
 
-        // 1 000.00 × 1 % = 10.00, por debajo del minimo de 82.50: manda el minimo
+        // 1 000.00 × 1 % = 10.00, por debajo del minimo de 82.50: manda el minimo, y sale con la
+        // escala de REDONDEO:IMPUESTO_VEHICULAR —el cierre de la regla es DESPUES de comparar
+        // con el minimo—, no con la de 5 500 × 1,5 % (#378)
         assertThat(resultado.getResponse().getContentAsString())
-                .contains("\"montoDeterminado\":\"82.50000\"");
+                .contains("\"montoDeterminado\":\"82.50\"");
+    }
+
+    // ------------------------------------------------- el redondeo del impuesto (#378)
+
+    /**
+     * #378 — 112 845,50 × 1 % = 1 128,455: el medio centimo que la siembra de siempre no tiene.
+     *
+     * <p>Con 112 800,00 el producto es 1 128 exacto y sale igual con o sin redondeo. Con esta base
+     * la respuesta decia «1128.4550» y la columna {@code dinero} guardaba 1128.46; la respuesta, la
+     * auditoria y la determinacion asentada tienen que decir la misma cifra, la del conjunto.
+     */
+    @Test
+    @DisplayName("#378 — 112 845,50 al 1 % se asienta y se responde como 1128.46")
+    void elMedioCentimoSeRedondeaEnSuPunto() throws Exception {
+        vehiculos.valorReferencial = Dinero.de("112845.50");
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/vehicular/calculo")
+                                        .param("placa", "V1H-882")
+                                        .param("ejercicio", "2026")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"simulacion\":false,\"observacion\":\"Calculo"
+                                                        + " del ejercicio 2026\"}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("cuerpo: %s", resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"montoDeterminado\":\"1128.46\"")
+                .doesNotContain("1128.4550");
+        Determinacion asentada = determinaciones.ultima;
+        assertThat(asentada).isNotNull();
+        assertThat(asentada.montoDeterminado().valor().toPlainString()).isEqualTo("1128.46");
+        assertThat(auditoria.registros).hasSize(1);
+        assertThat(auditoria.registros.get(0).datosNuevos())
+                .contains("\"montoDeterminado\":\"1128.46\"");
+    }
+
+    @Test
+    @DisplayName("#378 — y con DOWN sellado, 1128.45: el modo es el del conjunto")
+    void elModoEsElDelConjunto() throws Exception {
+        vehiculos.valorReferencial = Dinero.de("112845.50");
+        mvc = montar(conjuntoCompletoCon(RoundingMode.DOWN));
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/vehicular/calculo")
+                                        .param("placa", "V1H-882")
+                                        .param("ejercicio", "2026")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"simulacion\":true}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"montoDeterminado\":\"1128.45\"");
+    }
+
+    @Test
+    @DisplayName("#378 — sin REDONDEO:IMPUESTO_VEHICULAR es 422 nombrando la fila, no el crudo")
+    void sinLaPoliticaDelPuntoEs422() throws Exception {
+        mvc = montar(conjuntoSinRedondeo());
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/vehicular/calculo")
+                                        .param("placa", "V1H-882")
+                                        .param("ejercicio", "2026")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"simulacion\":true}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("cuerpo: %s", resultado.getResponse().getContentAsString())
+                .isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains(
+                        "\"parametroQueFalta\":{\"ejercicio\":2026,"
+                                + "\"llave\":\"REDONDEO:IMPUESTO_VEHICULAR\"}");
+        assertThat(determinaciones.insertadas).isZero();
     }
 
     // ------------------------------------------------- el conjunto que normativa va a sellar
@@ -743,10 +831,33 @@ class VehicularControllerTest {
     }
 
     private static ParametrosSellados conjuntoCompleto() {
+        return conjuntoCompletoCon(RoundingMode.HALF_UP);
+    }
+
+    /**
+     * El conjunto con la fila {@code REDONDEO:IMPUESTO_VEHICULAR}: escala 2 —la de ADR-0018— y el
+     * modo que se pida (#378). La escala en {@code valor_numerico} y el modo en {@code
+     * valor_texto}, en la misma fila.
+     */
+    private static ParametrosSellados conjuntoCompletoCon(RoundingMode modo) {
         return ParametrosSellados.de(EJERCICIO, 1)
                 .numero("VEHICULAR_ALICUOTA", null, ValorNormativo.de("1.0"))
                 .numero("VEHICULAR_MINIMO_UIT", null, ValorNormativo.de("1.5"))
                 .numero("UIT", null, ValorNormativo.de("5500.00"))
+                .numero("REDONDEO", "IMPUESTO_VEHICULAR", ValorNormativo.de("2"))
+                .texto("REDONDEO", "IMPUESTO_VEHICULAR", modo.name())
+                .construir();
+    }
+
+    /** Todo lo necesario para calcular salvo la politica de redondeo del impuesto (#378). */
+    private static ParametrosSellados conjuntoSinRedondeo() {
+        return ParametrosSellados.de(EJERCICIO, 1)
+                .numero("VEHICULAR_ALICUOTA", null, ValorNormativo.de("1.0"))
+                .numero("VEHICULAR_MINIMO_UIT", null, ValorNormativo.de("1.5"))
+                .numero("UIT", null, ValorNormativo.de("5500.00"))
+                // Otro punto si esta: el conjunto tiene politicas, y no la de este impuesto.
+                .numero("REDONDEO", "IMPUESTO_ALCABALA", ValorNormativo.de("2"))
+                .texto("REDONDEO", "IMPUESTO_ALCABALA", "HALF_UP")
                 .construir();
     }
 
@@ -911,6 +1022,8 @@ class VehicularControllerTest {
 
         private int insertadas;
 
+        private @Nullable Determinacion ultima;
+
         @Override
         public Optional<Determinacion> findById(long id) {
             return Optional.empty();
@@ -940,6 +1053,7 @@ class VehicularControllerTest {
         @Override
         public Determinacion insertar(Determinacion determinacion) {
             insertadas++;
+            ultima = determinacion;
             return new Determinacion(
                     900L + insertadas,
                     determinacion.ejercicio(),

@@ -20,6 +20,13 @@ package kamayuk.rentas.dominio;
  * docs/10-negocio/observaciones-srtm-mef/} es la que dice cuales redondean de verdad. Un punto de
  * mas no hace dano —queda sin politica y el calculo que lo pida falla ruidosamente—; un punto de
  * menos es una cifra equivocada en silencio.
+ *
+ * <p><b>Y desde ADR-0018 de {@code normativa} (2026-08-28), tambien con un cierre de regla.</b> El
+ * ADR cierra D-03a, D-03b y D-03c: «se redondea al cierre de cada regla, a centimo (escala 2),
+ * {@code HALF_UP}». Los cuatro ultimos puntos no salen de una observacion del SRTM sino de ese
+ * cierre, en las tres reglas de otros tributos y en la valorizacion del FUE, que hasta #378 no
+ * redondeaban: su respuesta y su auditoria decian una cifra y la columna {@code dinero} guardaba
+ * otra.
  */
 public enum PuntoDeRedondeo {
 
@@ -79,5 +86,29 @@ public enum PuntoDeRedondeo {
     REAJUSTE,
 
     /** El interes moratorio acumulado (NEG-02 §2.6, fila 19; TUO del Codigo Tributario art. 33). */
-    INTERES
+    INTERES,
+
+    /**
+     * El impuesto vehicular del vehiculo, ya comparado con el minimo imponible (TUO LTM arts. 30 a
+     * 37; #378). Es el cierre de su regla: ADR-0018 redondea ahi, y no en {@code base × alicuota}.
+     */
+    IMPUESTO_VEHICULAR,
+
+    /** El impuesto de alcabala: {@code excedente afecto × alicuota} (TUO LTM art. 25; #378). */
+    IMPUESTO_ALCABALA,
+
+    /**
+     * El impuesto de espectaculos publicos no deportivos: {@code ingreso × alicuota de la clase}
+     * (TUO LTM arts. 54 a 59; #378).
+     */
+    IMPUESTO_ESPECTACULO,
+
+    /**
+     * El importe de cada linea de la valorizacion de obra del FUE, {@code area × valor unitario}
+     * (#48, #378); el total es la suma de esas lineas ya redondeadas, que es lo que el papel
+     * imprime renglon a renglon. <b>No es {@link #VALOR_DE_OBRA}</b>: aquel es la obra
+     * complementaria del autovaluo predial (RT-005); este es la obra que autoriza una licencia de
+     * edificacion.
+     */
+    VALOR_DE_OBRA_DEL_FUE
 }

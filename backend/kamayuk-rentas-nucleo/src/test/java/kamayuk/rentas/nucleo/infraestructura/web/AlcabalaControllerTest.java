@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -24,6 +25,7 @@ import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Porcentaje;
+import kamayuk.rentas.dominio.PuntoDeRedondeo;
 import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.nucleo.aplicacion.RegistrarAlcabala;
 import kamayuk.rentas.nucleo.dominio.ObjetoDeTransferencia;
@@ -87,7 +89,14 @@ class AlcabalaControllerTest {
     private final ComprobadorDePrueba comprobador = new ComprobadorDePrueba();
     private final DeterminacionesEnMemoria determinaciones = new DeterminacionesEnMemoria();
 
-    private MockMvc mvc = montar(DerivadoPublicado.conjuntoDelEjercicio(EJERCICIO));
+    /**
+     * El conjunto que {@code normativa} sella, mas la fila {@code REDONDEO:IMPUESTO_ALCABALA} con
+     * el valor de ADR-0018, que el derivado todavia no publica (#378).
+     */
+    private MockMvc mvc =
+            montar(
+                    DerivadoPublicado.conjuntoDelEjercicioConRedondeo(
+                            EJERCICIO, RoundingMode.HALF_UP, PuntoDeRedondeo.IMPUESTO_ALCABALA));
 
     @BeforeEach
     void fijarOrigen() {
@@ -176,6 +185,11 @@ class AlcabalaControllerTest {
                                                 "ALCABALA_TRAMO_INAFECTO_UIT",
                                                 null,
                                                 ValorNormativo.de("20"))
+                                        .numero(
+                                                "REDONDEO",
+                                                "IMPUESTO_ALCABALA",
+                                                ValorNormativo.de("2"))
+                                        .texto("REDONDEO", "IMPUESTO_ALCABALA", "HALF_UP")
                                         .construir()));
 
         MvcResult resultado =
@@ -189,6 +203,60 @@ class AlcabalaControllerTest {
         assertThat(determinaciones.ultima.montoDeterminado())
                 .as("(200 000 - 20 UIT de 5 500) × 3 % = 2 700; con el 10 escrito saldria 4 350")
                 .isEqualTo(Dinero.de("2700.00"));
+    }
+
+    /**
+     * #378 — Sin la politica de redondeo del impuesto no se determina con el producto crudo.
+     *
+     * <p>El conjunto real —el derivado de {@code normativa}— no trae ninguna fila {@code REDONDEO},
+     * y ADR-0018 dice que un punto sin politica publicada <b>sigue fallando</b> en vez de no
+     * redondear. Hasta #378 esta regla no pedia politica y devolvia el producto sin tocar. Sale
+     * como 422 con el bloque que falta —ninguna fila, asi que la llave es el tipo solo—, no como
+     * 500.
+     */
+    @Test
+    @DisplayName("#378 — con el derivado sin filas REDONDEO es 422 nombrando el bloque, no 201")
+    void sinLaPoliticaDeRedondeoEs422() throws Exception {
+        mvc = montar(DerivadoPublicado.conjuntoDelEjercicio(EJERCICIO));
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/alcabala")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(CUERPO))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("cuerpo: %s", resultado.getResponse().getContentAsString())
+                .isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"parametroQueFalta\":{\"ejercicio\":2026,\"llave\":\"REDONDEO\"}");
+        assertThat(determinaciones.insertadas).isZero();
+    }
+
+    @Test
+    @DisplayName("#378 — con otros puntos y sin IMPUESTO_ALCABALA es 422 nombrando esa fila")
+    void sinLaPoliticaDelPuntoEs422() throws Exception {
+        mvc =
+                montar(
+                        DerivadoPublicado.conjuntoDelEjercicioConRedondeo(
+                                EJERCICIO,
+                                RoundingMode.HALF_UP,
+                                PuntoDeRedondeo.IMPUESTO_ESPECTACULO));
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/alcabala")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(CUERPO))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains(
+                        "\"parametroQueFalta\":{\"ejercicio\":2026,"
+                                + "\"llave\":\"REDONDEO:IMPUESTO_ALCABALA\"}");
+        assertThat(determinaciones.insertadas).isZero();
     }
 
     @Test

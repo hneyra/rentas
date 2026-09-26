@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.parametros.ParametroSinPublicar;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +39,14 @@ class FueYValorizacionTest {
     private static final Instant AHORA = Instant.parse("2026-03-02T10:00:00Z");
     private static final Observacion PORQUE = Observacion.de("Se registra para la prueba");
 
+    /**
+     * La politica de ADR-0018 —escala 2, {@code HALF_UP}— para el punto {@code
+     * VALOR_DE_OBRA_DEL_FUE}. Aqui es un dato de la prueba; en el sistema llega del conjunto
+     * sellado (#378).
+     */
+    private static final PoliticaDeRedondeo ADR_0018 =
+            new PoliticaDeRedondeo(2, RoundingMode.HALF_UP);
+
     // ==================================================================
 
     @Nested
@@ -59,7 +69,8 @@ class FueYValorizacionTest {
                             List.of(
                                     estructura(1, PartidaDeEdificacion.MUROS, 'A', "80.00"),
                                     estructura(1, PartidaDeEdificacion.TECHOS, 'B', "80.00")),
-                            tabla);
+                            tabla,
+                            ADR_0018);
 
             assertThat(obra.lineas()).hasSize(2);
             assertThat(obra.total().valor())
@@ -79,7 +90,8 @@ class FueYValorizacionTest {
             ValorizacionDeObra.Valorizacion obra =
                     ValorizacionDeObra.valorizar(
                             List.of(estructura(1, PartidaDeEdificacion.MUROS, 'A', "10.00")),
-                            tabla);
+                            tabla,
+                            ADR_0018);
 
             // 100,00 exactos. Con el incremento del 5 % de RT-002 —que D-11 marca SIN FUENTE
             // IDENTIFICADA— saldrian 105,00; con una depreciacion, menos. Los dos serian un
@@ -88,22 +100,70 @@ class FueYValorizacionTest {
             assertThat(obra.total().valor()).isEqualByComparingTo(new BigDecimal("100.00"));
         }
 
+        /**
+         * #378 — Cada linea se redondea con la politica que llega, y no con una propia.
+         *
+         * <p>33,333333 × 3,33 = 110,99999889. Hasta #378 esta prueba se llamaba «no redondea: D-03
+         * sigue abierta» y exigia esa cifra entera; ADR-0018 de {@code normativa} ya habia cerrado
+         * D-03. Con {@code HALF_UP} sale 111,00 y con {@code DOWN} 110,99: la cifra sigue al modo
+         * recibido.
+         */
         @Test
-        @DisplayName("no redondea: D-03 sigue abierta en sus tres partes")
-        void noRedondea() {
+        @DisplayName("#378 — redondea cada linea con la politica que recibe")
+        void redondeaConLaPoliticaQueRecibe() {
             TablaDeValoresUnitarios tabla =
                     TablaDeValoresUnitarios.de(
                             List.of(celda("PUERTAS", 'C', "33.333333")), EJERCICIO, 2026);
+            List<EstructuraDelProyecto> lineas =
+                    List.of(estructura(2, PartidaDeEdificacion.PUERTAS, 'C', "3.33"));
+
+            assertThat(
+                            ValorizacionDeObra.valorizar(lineas, tabla, ADR_0018)
+                                    .total()
+                                    .valor()
+                                    .toPlainString())
+                    .isEqualTo("111.00");
+            assertThat(
+                            ValorizacionDeObra.valorizar(
+                                            lineas,
+                                            tabla,
+                                            new PoliticaDeRedondeo(2, RoundingMode.DOWN))
+                                    .total()
+                                    .valor()
+                                    .toPlainString())
+                    .isEqualTo("110.99");
+        }
+
+        /**
+         * #378 — El total es la suma de lo que el papel imprime renglon a renglon.
+         *
+         * <p>Dos lineas de 0,50 m² a 0,01 son 0,005 cada una: redondeadas, 0,01 + 0,01 = 0,02. Si
+         * se sumara el producto crudo y se redondeara despues saldria 0,01, y el papel imprimiria
+         * dos renglones que no suman su total.
+         */
+        @Test
+        @DisplayName("#378 — el total es la suma de las lineas ya redondeadas")
+        void elTotalEsLaSumaDeLoQueSeImprime() {
+            TablaDeValoresUnitarios tabla =
+                    TablaDeValoresUnitarios.de(
+                            List.of(
+                                    celda("MUROS", 'A', "0.010000"),
+                                    celda("TECHOS", 'A', "0.010000")),
+                            EJERCICIO,
+                            2026);
 
             ValorizacionDeObra.Valorizacion obra =
                     ValorizacionDeObra.valorizar(
-                            List.of(estructura(2, PartidaDeEdificacion.PUERTAS, 'C', "3.33")),
-                            tabla);
+                            List.of(
+                                    estructura(1, PartidaDeEdificacion.MUROS, 'A', "0.50"),
+                                    estructura(1, PartidaDeEdificacion.TECHOS, 'A', "0.50")),
+                            tabla,
+                            ADR_0018);
 
-            assertThat(obra.total().valor().scale())
-                    .as("el producto trae mas decimales que los operandos, y salen enteros")
-                    .isGreaterThan(2);
-            assertThat(obra.total().valor()).isEqualByComparingTo(new BigDecimal("110.99999889"));
+            assertThat(obra.lineas())
+                    .extracting(linea -> linea.importe().valor().toPlainString())
+                    .containsExactly("0.01", "0.01");
+            assertThat(obra.total().valor().toPlainString()).isEqualTo("0.02");
         }
 
         @Test
@@ -122,7 +182,8 @@ class FueYValorizacionTest {
                                                             PartidaDeEdificacion.TECHOS,
                                                             'D',
                                                             "10.00")),
-                                            tabla))
+                                            tabla,
+                                            ADR_0018))
                     .isInstanceOf(TablaDeValoresUnitarios.ValorUnitarioSinParametrizar.class)
                     .hasMessageContaining("TECHOS:D")
                     .hasMessageContaining("#197")
@@ -214,7 +275,8 @@ class FueYValorizacionTest {
                                                             PartidaDeEdificacion.MUROS,
                                                             'A',
                                                             "10.00")),
-                                            tabla))
+                                            tabla,
+                                            ADR_0018))
                     .isInstanceOf(TablaDeValoresUnitarios.ValorUnitarioSinParametrizar.class);
         }
 
@@ -245,7 +307,8 @@ class FueYValorizacionTest {
                                             TablaDeValoresUnitarios.de(
                                                     List.of(celda("MUROS", 'A', "1.0")),
                                                     EJERCICIO,
-                                                    2026)))
+                                                    2026),
+                                            ADR_0018))
                     .isInstanceOf(ValorizacionDeObra.SinEstructuras.class)
                     .hasMessageContaining("no vale nada");
         }
