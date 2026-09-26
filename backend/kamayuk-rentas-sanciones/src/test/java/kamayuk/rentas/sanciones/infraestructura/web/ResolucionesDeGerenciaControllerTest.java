@@ -227,6 +227,70 @@ class ResolucionesDeGerenciaControllerTest {
         assertThat(diligencias.guardadas).isEmpty();
     }
 
+    // ---------------------------------------- #415: cada ruta notifica su familia
+
+    /**
+     * #415 — La ruta administrativa no notifica una resolucion de transito. Las dos rutas llevan
+     * dos accesos distintos y acababan en el mismo metodo, que buscaba solo por numero: con {@code
+     * NO_UBICADO} —que no lee ningun plazo— la ordinaria se diligenciaba por la puerta del otro
+     * perfil con 201. «En esta ruta no existe» es lo que es, y no revela que el numero existe.
+     */
+    @Test
+    @DisplayName(
+            "#415 — una ordinaria de transito por la ruta administrativa: 404, y nada guardado")
+    void laOrdinariaNoSeNotificaPorLaRutaAdministrativa() throws Exception {
+        resoluciones.sembrar(ORDINARIA, TipoDeResolucionDeGerencia.ORDINARIA);
+
+        MvcResult resultado = diligenciarNoUbicado(RUTA_DILIGENCIA_ADMINISTRATIVA, ORDINARIA);
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(404);
+        assertThat(diligencias.guardadas).isEmpty();
+    }
+
+    @Test
+    @DisplayName("#415 — y una administrativa por la ruta de transito, igual: 404")
+    void laAdministrativaNoSeNotificaPorLaRutaDeTransito() throws Exception {
+        resoluciones.sembrar(ADMINISTRATIVA, TipoDeResolucionDeGerencia.ADMINISTRATIVA);
+
+        MvcResult resultado = diligenciarNoUbicado(RUTA_DILIGENCIA_TRANSITO, ADMINISTRATIVA);
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(404);
+        assertThat(diligencias.guardadas).isEmpty();
+    }
+
+    @Test
+    @DisplayName("#415 — el contraste: cada una por su ruta se diligencia, 201")
+    void cadaUnaPorSuRutaSeDiligencia() throws Exception {
+        resoluciones.sembrar(ORDINARIA, TipoDeResolucionDeGerencia.ORDINARIA);
+        resoluciones.sembrar(ADMINISTRATIVA, TipoDeResolucionDeGerencia.ADMINISTRATIVA);
+
+        MvcResult deTransito = diligenciarNoUbicado(RUTA_DILIGENCIA_TRANSITO, ORDINARIA);
+        assertThat(deTransito.getResponse().getStatus())
+                .as(deTransito.getResponse().getContentAsString())
+                .isEqualTo(201);
+        assertThat(
+                        diligenciarNoUbicado(RUTA_DILIGENCIA_ADMINISTRATIVA, ADMINISTRATIVA)
+                                .getResponse()
+                                .getStatus())
+                .isEqualTo(201);
+    }
+
+    private MvcResult diligenciarNoUbicado(String ruta, String resolucion) throws Exception {
+        return borde(new ParametrosDeMentira())
+                .perform(
+                        post(ruta, resolucion)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"fechaDeNotificacion\":\"2026-03-06\","
+                                                + "\"modalidad\":\"PERSONAL\","
+                                                + "\"resultado\":\"NO_UBICADO\","
+                                                + "\"notificador\":\"NOTIFICADOR, PRUEBA\","
+                                                + "\"direccion\":\"AV. GRAU 100\","
+                                                + "\"observacion\":\"Se registra la"
+                                                + " diligencia\"}"))
+                .andReturn();
+    }
+
     // ---------------------------------------- el registro del servidor
 
     @Test

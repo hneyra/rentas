@@ -568,6 +568,9 @@ class ElPlazoQueConcedeCadaResolucionJdbcTest {
                 () ->
                         notificar.registrar(
                                 numero,
+                                java.util.EnumSet.allOf(
+                                        kamayuk.rentas.sanciones.dominio.TipoDeResolucionDeGerencia
+                                                .class),
                                 new NotificarResolucionDeGerencia.Peticion(
                                         DILIGENCIA,
                                         ModalidadDeNotificacion.PERSONAL,

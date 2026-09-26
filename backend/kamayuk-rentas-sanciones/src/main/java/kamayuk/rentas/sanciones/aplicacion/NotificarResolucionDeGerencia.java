@@ -3,6 +3,7 @@ package kamayuk.rentas.sanciones.aplicacion;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Objects;
+import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -91,20 +92,28 @@ public class NotificarResolucionDeGerencia {
      * Registra una diligencia sobre la resolución identificada por el número de su documento.
      *
      * @param numeroDeResolucion el número impreso de la resolución notificada
+     * @param admitidos los tipos que notifica la ruta que llama: tránsito las suyas y la
+     *     administrativa la suya (#415). Una de otro tipo es {@link ResolucionInexistente}: en esa
+     *     ruta no existe, y decir otra cosa le revelaría a otro perfil que el número existe
      * @param peticion los datos de la diligencia
      * @param observacion por qué se registra (regla 10, RNF-052)
-     * @throws ResolucionInexistente si no hay ninguna resolución con ese número
+     * @throws ResolucionInexistente si no hay ninguna resolución con ese número y de un tipo
+     *     admitido
      * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la diligencia es anterior a la resolución
      *     o posterior a hoy (#402)
      * @throws SinDireccion si ni el padrón ni la petición dicen dónde notificar
      */
     @Transactional
     public Diligencia registrar(
-            String numeroDeResolucion, Peticion peticion, Observacion observacion) {
+            String numeroDeResolucion,
+            Set<TipoDeResolucionDeGerencia> admitidos,
+            Peticion peticion,
+            Observacion observacion) {
 
         ResolucionDeGerencia resolucion =
                 resoluciones
                         .porNumero(numeroDeResolucion.strip())
+                        .filter(encontrada -> admitidos.contains(encontrada.tipo()))
                         .orElseThrow(() -> new ResolucionInexistente(numeroDeResolucion));
 
         OrdenDeLosActos.exigir(
