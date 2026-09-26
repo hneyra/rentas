@@ -2,7 +2,6 @@ package kamayuk.rentas.cuentacorriente.aplicacion;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -92,9 +91,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>La clave de cada obligacion se compone con el deudor <b>de su linea</b>, no con uno comun a
  * todo el cobro: un recibo de caja junta ordenes de deudores distintos. Lo que sigue siendo uno es
- * la comprobacion de #39 —sobre el total, antes de escribir— y el orden de los candados, que ahora
+ * la comprobacion de #39 —sobre el total, antes de escribir— y el orden de los candados, que
  * desempata por el deudor para seguir siendo total cuando dos condominos comparten el resto de la
- * clave.
+ * clave. Ese orden no vive aqui desde #364: es {@link SaldoRepository#bloquearEnOrden}.
  */
 @Service
 public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
@@ -147,17 +146,11 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
                             + " veces en el mismo recibo es cobrarla de mas");
         }
 
-        // 1. Bloquear TODO antes de leer nada, y en un orden que no dependa de como
-        //    llego la seleccion: dos cobranzas que se solapan tienen que pedir los
-        //    mismos candados en el mismo orden, o se abrazan y las dos esperan.
-        List<ClaveDeObligacion> aBloquear =
-                sinRepetir.stream()
-                        .map(RegistroDeAbonosCuentaCorriente::claveDe)
-                        .sorted(ORDEN_ESTABLE)
-                        .toList();
-        for (ClaveDeObligacion clave : aBloquear) {
-            saldos.bloquear(clave);
-        }
+        // 1. Bloquear TODO antes de leer nada. El orden no lo decide este servicio: lo pone
+        //    `bloquearEnOrden`, el mismo para la cobranza y para el convenio (#364), y no
+        //    depende de como llego la seleccion.
+        saldos.bloquearEnOrden(
+                sinRepetir.stream().map(RegistroDeAbonosCuentaCorriente::claveDe).toList());
 
         // 2. Ya con los candados puestos, releer el libro y PLANIFICAR. Todavia no se escribe
         //    nada, y el orden importa: el AC-2 de #39 pide comparar ANTES de asentar. Podria
@@ -229,9 +222,9 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
      * CristalizacionDelDevengo}, la misma de los otros cinco caminos; lo unico propio de este es
      * sobre que asientos se pregunta.
      *
-     * <p>Las obligaciones se bloquean antes de leerlas, en el mismo orden que la cobranza: la
-     * cuenta lee el libro y luego escribe, y otro acto que se colara en medio cristalizaria el
-     * mismo devengo dos veces.
+     * <p>Las obligaciones se bloquean antes de leerlas, con {@link SaldoRepository#bloquearEnOrden}
+     * como la cobranza: la cuenta lee el libro y luego escribe, y otro acto que se colara en medio
+     * cristalizaria el mismo devengo dos veces.
      */
     @Override
     @Transactional
@@ -297,15 +290,7 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
             cuotas.putIfAbsent(ClaveDeSaldo.de(asiento), asiento.fase());
         }
 
-        List<ClaveDeObligacion> aBloquear =
-                cuotas.keySet().stream()
-                        .map(ClaveDeObligacion::de)
-                        .distinct()
-                        .sorted(ORDEN_ESTABLE)
-                        .toList();
-        for (ClaveDeObligacion clave : aBloquear) {
-            saldos.bloquear(clave);
-        }
+        saldos.bloquearEnOrden(cuotas.keySet().stream().map(ClaveDeObligacion::de).toList());
 
         int cristalizados = 0;
         for (Map.Entry<ClaveDeSaldo, Fase> cuota : cuotas.entrySet()) {
@@ -466,24 +451,4 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
                 seleccion.predioId(),
                 seleccion.vehiculoId());
     }
-
-    /**
-     * El orden en que se piden los candados. Total y estable: no depende de nulos ni del mapa.
-     *
-     * <p>El deudor va al final, como desempate (#431): hasta que un cobro pudo llevar lineas de
-     * varios deudores todas compartian el suyo y no hacia falta. Sin el, dos condominos del mismo
-     * predio empataban y su orden quedaba al de la llegada: dos cobranzas que los marcaran al reves
-     * pedirian los mismos candados al reves. Lo muerde {@code OrdenDeLosCandadosDelCobroTest}.
-     *
-     * <p>Que vaya al final no es lo que evita el abrazo con el convenio: el convenio bloquea claves
-     * de un solo deudor, y en ellas cualquier posicion del deudor da el mismo orden. Va al final
-     * porque solo desempata.
-     */
-    private static final Comparator<ClaveDeObligacion> ORDEN_ESTABLE =
-            Comparator.comparing(ClaveDeObligacion::tributo)
-                    .thenComparingInt(clave -> clave.ejercicio().valor())
-                    .thenComparingLong(clave -> clave.predioId() == null ? 0L : clave.predioId())
-                    .thenComparingLong(
-                            clave -> clave.vehiculoId() == null ? 0L : clave.vehiculoId())
-                    .thenComparingLong(ClaveDeObligacion::contribuyenteId);
 }
