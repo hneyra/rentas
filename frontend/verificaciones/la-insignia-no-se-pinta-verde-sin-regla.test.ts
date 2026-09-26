@@ -206,7 +206,17 @@ const CONECTADAS: readonly {
   readonly bloque: number;
   readonly leLlega: string;
 }[] = [
-  { hoja: 'panel', bloque: 0, leLlega: 'etapas[].estado — un estado de verdad: «Conforme», «Observado»' },
+  // Hasta #389 decia «Conforme», «Observado», que es lo que el artboard escribe y NO lo que llega:
+  // con esas dos palabras la lista se leia cubierta, y las dos del backend salian con el tono de
+  // «no se». Desde #389 las dos estan en `tono.ts`.
+  {
+    hoja: 'panel',
+    bloque: 0,
+    leLlega:
+      'etapas[].estado — un estado de verdad, y son DOS: «OK» y «CON OBSERVACIONES» ' +
+      '(`CorridaGuardadaResource`). «OK» es conforme y «CON OBSERVACIONES» es mal: la etapa dejo ' +
+      'contribuyentes fuera de la emision',
+  },
   // `ini-parado` ESTUVO aqui, y salio con #218: su quinta columna dejo de ser de insignia. No es
   // que se conectara peor —sigue conectada y sigue dibujando su quinta columna—, es que la
   // insignia no tenia con que encenderse: le llegaba `frentes[].porQueCuestaDinero`, una FRASE, y

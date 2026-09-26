@@ -115,8 +115,13 @@ import type { TonoDeInsignia } from '@kamayuk/ui';
  * Va anclada por palabra como la lista de CONFORME: sin el ancla, `prescrit` casaria dentro de
  * cualquier palabra que lo contenga, y una lista de MALOS que se pasa de larga pinta de rojo lo que
  * esta bien.
+ *
+ * **«Con observaciones» entra con #389**, y es el estado que `panel` recibe de verdad:
+ * `CorridaGuardadaResource` publica `"CON OBSERVACIONES"` para la etapa que dejo contribuyentes
+ * fuera de la emision, y `observado` no casa dentro de «observaciones». Salia con el tono de «no
+ * se», igual que la etapa limpia. Anclada por palabra y entera: «sin observaciones» no es malo.
  */
-const MAL = /coactiva|observado|vencida|denegado|\bprescrit[ao]\b/;
+const MAL = /coactiva|observado|vencida|denegado|\bprescrit[ao]\b|\bcon observaciones\b/;
 /** Lo que va a ir mal: hay plazo, pero corre. */
 const ATENCION = /con deuda|por vencer|en tramite|en trámite/;
 /**
@@ -139,8 +144,13 @@ const ATENCION = /con deuda|por vencer|en tramite|en trámite/;
  * La salida no fue sacar la palabra de esta lista sino darle a esa columna su propia regla de
  * insignia (`columna.insignia`, en su definicion): con ella, el interprete no llama a este archivo.
  */
+/*
+ * **«ok» entra con #389**: es el otro estado de una etapa de la corrida —`"OK"`, la que no dejo a
+ * nadie fuera— y hasta entonces salia con el tono de «no se». Anclada por palabra como las demas:
+ * sin el ancla casaria dentro de «Tokio» y lo pintaria de verde.
+ */
 const CONFORME =
-  /\bconforme\b|\bvigente\b|\bactiv[ao]\b|\bal d[ií]a\b|\bcancelad[ao]\b|\bpagad[ao]\b|\binspeccionad[ao]\b|\bbajo\b/;
+  /\bconforme\b|\bvigente\b|\bactiv[ao]\b|\bal d[ií]a\b|\bcancelad[ao]\b|\bpagad[ao]\b|\binspeccionad[ao]\b|\bbajo\b|\bok\b/;
 
 /**
  * El tono de «no se»: ni conforme, ni alarma. Ver el javadoc del archivo.

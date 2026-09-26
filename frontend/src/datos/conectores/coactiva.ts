@@ -2,7 +2,12 @@ import { coordenada, type CeldaDeLaTabla } from '@kamayuk/ui';
 
 import type { Conector, Reparto } from '../conectores.ts';
 import { NO_PUBLICADO, ejercicioDeLaRespuesta } from '../conectores.ts';
-import { formatearFecha, formatearImporte } from '../../dominio/formato.ts';
+import {
+  formatearEntero,
+  formatearFecha,
+  formatearImporte,
+  formatearImporteEnColumna,
+} from '../../dominio/formato.ts';
 import type {
   ActoDelExpediente,
   LiquidacionDeCostas,
@@ -131,10 +136,11 @@ const COA_PANEL: Conector = {
       // `ejercicio: null`, y el desplegable ensenaba su primera opcion —«2026»— sobre el stock de
       // todos los anos. Ahora dice «Todos», o el ano cuando llega uno.
       [coordenada(0, 0), ejercicioDeLaRespuesta(resumen.ejercicio)],
-      [coordenada(0, 1), String(resumen.abiertos)],
-      [coordenada(0, 2), String(resumen.conRecNotificada)],
-      [coordenada(0, 3), String(resumen.conMedidaCautelar)],
-      [coordenada(0, 4), String(resumen.sinRec)],
+      // Los cuatro conteos agrupados, como el artboard escribe «1,184» (#389).
+      [coordenada(0, 1), formatearEntero(resumen.abiertos)],
+      [coordenada(0, 2), formatearEntero(resumen.conRecNotificada)],
+      [coordenada(0, 3), formatearEntero(resumen.conMedidaCautelar)],
+      [coordenada(0, 4), formatearEntero(resumen.sinRec)],
     ]),
     filas: new Map(),
     // El dia de la lectura, y no una fecha de corte: el estado es el del ultimo movimiento y el
@@ -281,8 +287,10 @@ function costaDelActo(acto: ActoDelExpediente, costas: CostasDelExpediente): Cel
   if (!costas.seSupo) return sinDato(costas.porQue);
   const tarifada = costas.porActo.get(acto.actoId);
   if (tarifada !== undefined) {
-    // Tal como llega y sin el simbolo, que lo lleva el rotulo de la columna — igual que `coa-cost`.
-    return tarifada;
+    // Sin el simbolo, que lo lleva el rotulo de la columna — igual que `coa-cost`. Y **agrupado**:
+    // hasta #389 iba tal como llegaba, «1250.00», y quitar el simbolo era una decision escrita
+    // pero perder los millares no lo era.
+    return formatearImporteEnColumna(tarifada);
   }
   return sinDato(
     'Ninguna liquidacion de costas de este expediente tarifa este acto todavia. **No es cero**: ' +
@@ -483,8 +491,9 @@ function plazoDelObligado(
  * <h2>La tabla: tres columnas de cuatro</h2>
  *
  * «Acto» ← `descripcion`, la glosa impresa; «Arancel» ← `arancelFuente`, que es la llave del
- * parametro sellado con su documento fuente —lo que explica la cifra—; «Costa S/» ← `montoS`, tal
- * como llega y sin el simbolo, que lo lleva el rotulo de la columna. **«Cantidad» dice la raya**:
+ * parametro sellado con su documento fuente —lo que explica la cifra—; «Costa S/» ← `montoS`,
+ * agrupado y sin el simbolo, que lo lleva el rotulo de la columna (`formatearImporteEnColumna`,
+ * #389). **«Cantidad» dice la raya**:
  * `CostaResource` no publica ninguna, porque el arancel tarifa el acto una vez y `costa_acto_uq`
  * impide liquidarlo dos.
  */
@@ -530,7 +539,7 @@ const COA_COST: Conector = {
                 // Desde #195 la celda dice POR QUE, y no solo que no hay: el arancel tarifa el acto
                 // una vez, asi que una cantidad no significaria nada aqui.
                 sinDato(SIN_CANTIDAD),
-                costa.montoS,
+                formatearImporteEnColumna(costa.montoS),
               ],
             })),
           },

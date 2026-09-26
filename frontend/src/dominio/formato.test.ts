@@ -6,7 +6,9 @@ import {
   formatearFecha,
   formatearFechaEnPalabras,
   formatearImporte,
+  formatearImporteEnColumna,
   formatearImporteSinRedondear,
+  formatearImporteSinRedondearEnColumna,
   formatearInstante,
 } from './formato.ts';
 
@@ -84,6 +86,54 @@ describe('un importe INTERMEDIO se escribe con todos sus decimales (#245)', () =
     for (const malo of ['', 'NaN', '790', '1,234.50', '790,0075', 'S/ 790.00']) {
       expect(() => formatearImporteSinRedondear(malo)).toThrow(/forma que el backend no sirve/);
     }
+  });
+});
+
+/**
+ * **La columna de soles**: el importe agrupado y SIN el simbolo, porque el rotulo ya lo dice (#389).
+ *
+ * Hasta #389 esta politica vivia **dos veces fuera de este archivo** —`LA_MONEDA` y
+ * `enColumnaDeSoles`, copiadas en `inicio.ts` y `fiscalizacion.ts`, que recortaban el prefijo con
+ * una expresion regular— y el resto de las columnas «… S/» elegia otra: con el simbolo repetido
+ * bajo «Total S/», o el texto crudo y sin millares bajo «Costa S/». Aqui la cifra se construye una
+ * sola vez y el simbolo se ANADE o no; no se recorta de nada.
+ */
+describe('un importe en una columna que ya dice «S/» se escribe como el artboard la escribe (#389)', () => {
+  it.each([
+    ['0', '0.00'],
+    ['412.00', '412.00'],
+    ['1842.6', '1,842.60'],
+    ['9418204.60', '9,418,204.60'],
+    ['-591.94', '-591.94'],
+    ['  1842.60  ', '1,842.60'],
+    ['0007.5', '7.50'],
+  ])('«%s» -> «%s»', (servido, mostrado) => {
+    expect(formatearImporteEnColumna(servido)).toBe(mostrado);
+  });
+
+  it('es la MISMA cifra que el campo suelto, sin el simbolo: no hay dos formas de agrupar', () => {
+    for (const servido of ['0.5', '1842.6', '1234567890.99', '999999999999999.99', '-591.94']) {
+      expect(formatearImporte(servido).replace('S/ ', '')).toBe(formatearImporteEnColumna(servido));
+    }
+  });
+
+  it('y se niega a lo mismo que `formatearImporte`: la columna no relaja la forma', () => {
+    for (const malo of ['412880.005', '1,842.60', '', 'S/ 1842.60', '1.8e3']) {
+      expect(() => formatearImporteEnColumna(malo)).toThrow(/no sirve/);
+    }
+  });
+
+  it('el aporte de un tramo, sin redondear y sin simbolo: «Aporte S/» (#245, #389)', () => {
+    expect(formatearImporteSinRedondearEnColumna('700.00750000000000000000')).toBe(
+      '700.00750000000000000000',
+    );
+    expect(formatearImporteSinRedondearEnColumna('1485.00000000')).toBe('1,485.00000000');
+    expect(formatearImporteSinRedondearEnColumna('-426.9405')).toBe('-426.9405');
+    // Y la misma cifra que su version con simbolo.
+    expect(formatearImporteSinRedondear('71156.75').replace('S/ ', '')).toBe(
+      formatearImporteSinRedondearEnColumna('71156.75'),
+    );
+    expect(() => formatearImporteSinRedondearEnColumna('790')).toThrow(/no sirve/);
   });
 });
 

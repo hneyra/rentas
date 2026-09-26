@@ -14,6 +14,7 @@ import {
   TODAVIA_SIN_EMITIR,
   TODOS_LOS_EJERCICIOS,
   ejercicioDeLaRespuesta,
+  type Reparto,
 } from './conectores.ts';
 import { CONSTANCIA_NEGADA, FICHA, SIN_CAMPANIA } from './conectores/consultasDeMuestra.ts';
 import {
@@ -54,7 +55,20 @@ import type {
  * mintiendo sobre su propia causa.
  */
 
-/** La respuesta que la instalacion da de verdad, recortada a lo que el conector usa. */
+/**
+ * **La FORMA que la instalacion da de verdad**, recortada a lo que el conector usa (#389).
+ *
+ * Hasta #389 esta muestra se presentaba asi y no lo era: traia `'28/01/2026 02:14'`, `monto: '—'`,
+ * `'Conforme'` y `'Observado'`, y **ninguna es una forma que el backend produzca**. Lo que publica
+ * `CorridaGuardadaResource` es una fecha ISO —`corrida.fechaCalculo().toString()`—, `"OK"` y `"CON
+ * OBSERVACIONES"` como estados, y `SIN_MONTO = ""` en la etapa que no mueve dinero: lo mismo que
+ * guarda `CORRIDA_MEDIDA` de `backendMedido.ts`. Con el texto del artboard dentro, la muestra ya
+ * traia hecho lo que el conector tenia que hacer, y la pantalla pasaba en verde sin formatear nada.
+ *
+ * **Y los conteos pasan del millar**: 1 204 observados, 62 418 registros. Por debajo de mil
+ * —534, que es lo que traia— `String(n)` y `formatearEntero(n)` escriben lo mismo, y `ini-panel`
+ * podia escribir «1204» donde `panel` escribe «1,204» sin que nada se pusiera rojo.
+ */
 const CORRIDA: CorridaDelPredial = {
   id: 1,
   ejercicio: '2026',
@@ -68,16 +82,24 @@ const CORRIDA: CorridaDelPredial = {
   // El sello que `V23` anadio (#312). El identificador NO es el `id` de la corrida ni ninguna de
   // sus cifras: con dos iguales, «publica el conjunto sellado» y «publica el id» pasarian lo mismo.
   conjuntoId: 77,
-  fechaCalculo: '28/01/2026 02:14',
+  // ISO y sin hora: `LocalDate.toString()`. La hora del artboard no la publica nadie (#389).
+  fechaCalculo: '2026-01-28',
   // Deliberadamente distinto de los 61 350 registros de la ultima etapa: con los dos iguales,
   // «lee el campo» y «lee la ultima fila de la tabla» pasarian la misma prueba (#271).
   determinados: 58412,
   montoEmitido: '8772431.05',
   derechoDeEmision: '4.50',
-  observados: 534,
+  observados: 1204,
+  // Los nombres, los estados y el monto vacio, como los compone `CorridaGuardadaResource.de`.
   etapas: [
-    { etapa: 'Lectura del padron', registros: 62418, monto: '—', observados: 0, estado: 'Conforme' },
-    { etapa: 'Generacion de cuponeras', registros: 61350, monto: '—', observados: 534, estado: 'Observado' },
+    { etapa: 'Padrón leído', registros: 62418, monto: '', observados: 0, estado: 'OK' },
+    {
+      etapa: 'Determinados',
+      registros: 61350,
+      monto: '9418204.60',
+      observados: 1204,
+      estado: 'CON OBSERVACIONES',
+    },
   ],
 };
 
@@ -106,19 +128,22 @@ const CORRIDA_ANTERIOR_AL_SELLO: CorridaDelPredial = {
 const RESUMEN_DE_CARTERA: ResumenDeLaCarteraCoactiva = {
   aLaFecha: '2026-09-20',
   ejercicio: null,
-  expedientes: 41,
-  abiertos: 37,
-  sinRec: 12,
-  conRecNotificada: 9,
-  conMedidaCautelar: 5,
+  // **Pasan del millar desde #389**, y las cuatro que se dibujan son distintas entre si: con 37, 12,
+  // 9 y 5 —lo de antes— `String(n)` y `formatearEntero(n)` escribian lo mismo, y `coa-panel` podia
+  // escribir «1184» donde el artboard escribe «1,184» sin que nada lo notara.
+  expedientes: 5212,
+  abiertos: 4871,
+  sinRec: 1412,
+  conRecNotificada: 1093,
+  conMedidaCautelar: 1027,
   porEtapa: [
-    { etapa: 'INICIADO', codigo: '000', etiqueta: 'INICIADO', expedientes: 12 },
-    { etapa: 'REC1_EMITIDA', codigo: '011', etiqueta: 'REC 01 EMITIDO', expedientes: 7 },
-    { etapa: 'REC1_NOTIFICADA', codigo: '012', etiqueta: 'REC 01 NOTIFICADA', expedientes: 9 },
-    { etapa: 'REC2_EMITIDA', codigo: '021', etiqueta: 'REC 02 EMITIDA', expedientes: 3 },
-    { etapa: 'MEDIDA_CAUTELAR', codigo: '031', etiqueta: 'MEDIDA CAUTELAR', expedientes: 5 },
-    { etapa: 'SUSPENDIDO', codigo: '041', etiqueta: 'SUSPENDIDO', expedientes: 1 },
-    { etapa: 'CONCLUIDO', codigo: '051', etiqueta: 'CONCLUIDO', expedientes: 4 },
+    { etapa: 'INICIADO', codigo: '000', etiqueta: 'INICIADO', expedientes: 1412 },
+    { etapa: 'REC1_EMITIDA', codigo: '011', etiqueta: 'REC 01 EMITIDO', expedientes: 731 },
+    { etapa: 'REC1_NOTIFICADA', codigo: '012', etiqueta: 'REC 01 NOTIFICADA', expedientes: 1093 },
+    { etapa: 'REC2_EMITIDA', codigo: '021', etiqueta: 'REC 02 EMITIDA', expedientes: 402 },
+    { etapa: 'MEDIDA_CAUTELAR', codigo: '031', etiqueta: 'MEDIDA CAUTELAR', expedientes: 1027 },
+    { etapa: 'SUSPENDIDO', codigo: '041', etiqueta: 'SUSPENDIDO', expedientes: 206 },
+    { etapa: 'CONCLUIDO', codigo: '051', etiqueta: 'CONCLUIDO', expedientes: 341 },
   ],
 };
 
@@ -137,8 +162,16 @@ const PROCESO = {
     costas: '96.00',
     deudaAlDia: '2026-09-06',
   },
+  // Con su `actoId` desde #389: sin el, la costa de `MUESTRAS` no casaba con ningun acto y la
+  // columna «Costa S/» no se ejercia nunca en el barrido de las columnas de soles.
   actuaciones: [
-    { numero: '1', titulo: 'RESOLUCION DE EJECUCION COACTIVA', fecha: '2026-08-04', medida: null },
+    {
+      actoId: 11,
+      numero: '1',
+      titulo: 'RESOLUCION DE EJECUCION COACTIVA',
+      fecha: '2026-08-04',
+      medida: null,
+    },
   ],
 } as unknown as ProcesoDelExpediente;
 
@@ -147,13 +180,16 @@ const COSTAS = {
   liquidacion: {
     expedCoact: '2026-0418',
     tributo: 'PREDIAL',
-    totalS: '96.00',
+    // Por encima del millar desde #389: con `18.00` el texto crudo y el agrupado coincidian, y
+    // «Costa S/» salia «1250.00» sin que nada se pusiera rojo.
+    totalS: '1250.00',
     fecha: '2026-09-06',
     costas: [
       {
+        actoId: 11,
         acto: 'REC1',
         descripcion: 'Resolucion de ejecucion coactiva',
-        montoS: '18.00',
+        montoS: '1250.00',
         arancelFuente: 'ARANCEL_COSTA:REC1',
       },
     ],
@@ -411,7 +447,8 @@ const RESUMEN_DE_PAPELETAS: ResumenDePapeletas = {
       enCoactiva: 388,
       importeEnCoactiva: '71148.00',
       conResolucionNotificada: 5884,
-      conResolucionDeMulta: 388,
+      // Por encima del millar desde #389, como las otras dos cifras que la hoja dibuja.
+      conResolucionDeMulta: 1388,
       actualizadoA: '2026-09-17',
     },
   ],
@@ -604,8 +641,9 @@ const BITACORA_DE_PRESCRIPCIONES: Paginado<PrescripcionDeclarada> = {
   ],
   pagina: 0,
   tamano: 20,
-  totalElementos: 48,
-  totalPaginas: 3,
+  // Por encima del millar desde #389: «Declaraciones» es un conteo y se agrupa como los demas.
+  totalElementos: 1184,
+  totalPaginas: 60,
   hayMas: true,
 };
 
@@ -615,7 +653,7 @@ const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   'coa-panel': RESUMEN_DE_CARTERA,
   // `coa-exp` recibe el proceso **y lo que se pudo saber de sus costas** desde #200: son dos
   // operaciones que se cruzan por `actoId`, y la del cruce puede fallar sin tumbar la tabla.
-  'coa-exp': { proceso: PROCESO, costas: { seSupo: true, porActo: new Map([[11, '18.00']]) } },
+  'coa-exp': { proceso: PROCESO, costas: { seSupo: true, porActo: new Map([[11, '1250.00']]) } },
   'coa-cost': COSTAS,
   'aut-cat': CIIU,
   'aut-tram': PADRON,
@@ -627,7 +665,9 @@ const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   'seg-aud': BITACORA,
   // La de `fis-panel` es la **segunda** respuesta —el embudo—, que es lo que `repartir` recibe
   // (#215, #196): la relacion de programas solo sirve para saber de que programa es.
-  'fis-panel': EMBUDO,
+  // Con las cuatro cifras por encima del millar (#389): la de `fiscalizacionDeMuestra.ts` trae 96,
+  // 84 y 61, que es donde `String(n)` y `formatearEntero(n)` coinciden.
+  'fis-panel': { ...EMBUDO, detectadosPorCruce: 5120, programados: 3418, conActa: 2206, conDiferencia: 1041 },
   // Las tres de Fiscalizacion (#179). La de `fis-prog` es la **segunda** respuesta —la muestra—,
   // porque es la que reparte: la relacion de programas solo aporta el `{id}` con que se pide.
   'fis-prog': MUESTRA,
@@ -735,6 +775,156 @@ describe('los conectores', () => {
         'publicado». Se dibujarian con el motivo de la pantalla, que en una conectada dice que SI\n' +
         `esta conectada — un hueco mintiendo sobre su propia causa:\n${olvidados.join('\n')}`,
     ).toEqual([]);
+  });
+});
+
+/**
+ * **Una cifra se escribe igual en las veintiuna hojas** (#389).
+ *
+ * <h2>De que defecto viene</h2>
+ *
+ * Las funciones estaban en `dominio/formato.ts`, pero **quien decidia cual usar era cada conector,
+ * a mano**, y cada uno decidia distinto: `panel` escribia sus observados con `formatearEntero` e
+ * `ini-panel` los mismos —el mismo campo de la misma operacion— con `String`; la fecha de la
+ * ultima corrida era la unica de las veintiuna en ISO; y las columnas «… S/» tenian cuatro
+ * politicas —agrupado sin simbolo, con el simbolo bajo un rotulo que ya lo dice, el texto crudo, y
+ * la celda en blanco—. Las pruebas pasaban porque las muestras ya traian el texto del artboard, o
+ * cifras de tres digitos, que es justo donde `String` y `formatearEntero` coinciden.
+ *
+ * <h2>Por eso esto BARRE, y no enumera</h2>
+ *
+ * Las dos primeras recorren **todas las hojas conectadas** con sus `MUESTRAS`, que desde #389 pasan
+ * del millar donde cuentan o cobran. Una hoja nueva que elija una quinta politica sale roja aqui sin
+ * que nadie se acuerde de anadirla. Las de debajo fijan las cifras una a una, que es lo que dice que
+ * el barrido tiene algo delante.
+ */
+
+/** Una columna que ya dice la moneda en su rotulo: «Monto S/», «Costa S/», «Aporte S/». */
+const COLUMNA_DE_SOLES = /\sS\/$/;
+
+/** Un importe como el artboard lo escribe en esa columna: agrupado, con sus decimales y sin simbolo. */
+const IMPORTE_EN_COLUMNA = /^-?\d{1,3}(?:,\d{3})*\.\d+$/;
+
+/**
+ * Las palabras que una columna de soles puede escribir en vez de una cifra, **con su motivo**: son
+ * las que dicen `importe: null` en `inicio.ts` y `fiscalizacion.ts` (D-02a), no un hueco del barrido.
+ */
+const PALABRAS_EN_COLUMNA_DE_SOLES = new Set(['sin cifrar']);
+
+/** Un conteo escrito sin agrupar: cuatro cifras o mas, sin el cero de la izquierda de un codigo. */
+const CONTEO_SIN_AGRUPAR = /^[1-9]\d{3,}$/;
+
+/** Las filas de la tabla de un bloque, por la via que su definicion declara. */
+function filasDeLaTabla(
+  reparto: Reparto,
+  indice: number,
+  clave: string | undefined,
+): readonly (readonly (string | { readonly texto: string | null })[])[] {
+  if (clave !== undefined) return (reparto.tablas?.get(clave)?.filas ?? []).map((f) => f.celdas);
+  return reparto.filas.get(indice) ?? [];
+}
+
+describe('#389 — una cifra se escribe igual en las veintiuna hojas', () => {
+  it('toda columna «… S/» escribe el importe AGRUPADO y SIN simbolo, y ninguna celda sale en blanco', () => {
+    const mal: string[] = [];
+    const vistas = new Set<string>();
+    for (const [clave, conector] of Object.entries(CONECTORES)) {
+      if (conector === undefined) continue;
+      const reparto = conector.repartir(MUESTRAS[clave as ClaveDeHoja] as never);
+      for (const [bloque, b] of bloquesConSuIndice(PANTALLAS[clave as ClaveDeHoja])) {
+        const tabla = bloque.tabla;
+        if (tabla === undefined) continue;
+        for (const fila of filasDeLaTabla(reparto, b, tabla.clave)) {
+          tabla.columnas.forEach((columna, c) => {
+            if (!COLUMNA_DE_SOLES.test(columna.rotulo)) return;
+            const celda = fila[c];
+            const texto = typeof celda === 'string' ? celda : (celda?.texto ?? null);
+            // `null` es una celda que DICE que no hay dato, con su palabra y su motivo.
+            if (texto === null || PALABRAS_EN_COLUMNA_DE_SOLES.has(texto)) return;
+            const donde = `${clave} · «${columna.rotulo}»`;
+            if (IMPORTE_EN_COLUMNA.test(texto)) vistas.add(donde);
+            else mal.push(`  ${donde}: «${texto}»`);
+          });
+        }
+      }
+    }
+    expect(
+      mal,
+      'Hay celdas bajo un rotulo que ya dice «S/» que no escriben el importe como el artboard —\n' +
+        '«9,418,204.60»—: con el simbolo repetido, sin sus millares, o en blanco. La politica vive\n' +
+        `en \`formatearImporteEnColumna\` de \`dominio/formato.ts\`:\n${mal.join('\n')}`,
+    ).toEqual([]);
+    // EL CENTINELA: las ocho celdas que el issue midio divergentes se ejercen de verdad, con una
+    // cifra delante. Sin esto, un barrido que no viera ninguna columna pasaria en verde.
+    expect([...vistas].sort()).toEqual(
+      expect.arrayContaining([
+        'coa-cost · «Costa S/»',
+        'coa-exp · «Costa S/»',
+        'con-doc · «Total S/»',
+        'ini-flujo · «Emitido S/»',
+        'panel · «Monto S/»',
+        'territorio · «Aporte S/»',
+        'territorio · «Importe S/»',
+        'territorio · «Límite superior S/»',
+        'territorio · «Porción gravada S/»',
+      ]),
+    );
+  });
+
+  it('ningun campo de solo lectura escribe un conteo de cuatro cifras sin agrupar', () => {
+    const sinAgrupar: string[] = [];
+    for (const [clave, conector] of Object.entries(CONECTORES)) {
+      if (conector === undefined) continue;
+      const reparto = conector.repartir(MUESTRAS[clave as ClaveDeHoja] as never);
+      for (const coord of soloLecturaDe(clave as ClaveDeHoja)) {
+        const valor = reparto.valores.get(coord as never);
+        if (valor !== undefined && CONTEO_SIN_AGRUPAR.test(valor)) {
+          sinAgrupar.push(`  ${clave} · ${coord}: «${valor}»`);
+        }
+      }
+    }
+    expect(
+      sinAgrupar,
+      'Hay conteos escritos con `String(n)`: el artboard los agrupa —«62,418», «1,184»— y la\n' +
+        `misma cifra saldria de dos maneras en dos hojas. Van por \`formatearEntero\`:\n${sinAgrupar.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('`panel` e `ini-panel` escriben los MISMOS observados de la misma corrida: «1,204» (#389)', () => {
+    // El mismo campo —`observados`— de la misma operacion. Hasta #389, «1,204» en una hoja y «1204»
+    // en la otra.
+    const enPanel = CONECTORES.panel?.repartir(CORRIDA as never);
+    const enInicio = CONECTORES['ini-panel']?.repartir([RECAUDACION_MEDIDA, CORRIDA] as never);
+
+    expect(enPanel?.valores.get(coordenada(0, 3))).toBe('1,204');
+    expect(enInicio?.valores.get(coordenada(0, 5))).toBe('1,204');
+  });
+
+  it('los conteos de los paneles, uno a uno, con sus millares', () => {
+    const escrito = (clave: ClaveDeHoja, bloque: number, campo: number) =>
+      CONECTORES[clave]?.repartir(MUESTRAS[clave] as never).valores.get(coordenada(bloque, campo));
+
+    // `coa-panel`: el artboard escribe «1,184».
+    expect([1, 2, 3, 4].map((c) => escrito('coa-panel', 0, c))).toEqual([
+      '4,871',
+      '1,093',
+      '1,027',
+      '1,412',
+    ]);
+    // `fis-panel`: el artboard escribe «3,418».
+    expect([2, 3, 4, 5].map((c) => escrito('fis-panel', 0, c))).toEqual([
+      '5,120',
+      '3,418',
+      '2,206',
+      '1,041',
+    ]);
+    // `tra-panel`: el artboard escribe «8,412».
+    expect([1, 2, 5].map((c) => escrito('tra-panel', 0, c))).toEqual(['8,412', '5,884', '1,388']);
+    // `val-tip`: «Declaraciones» es el total que el servidor conto, y se agrupa igual.
+    expect(escrito('val-tip', 0, 3)).toBe('1,184');
+    // Y el unico conteo que va en una TABLA sin ser de `panel`: «Cuántos» de `ini-parado`.
+    const parado = CONECTORES['ini-parado']?.repartir(PARADO_MEDIDO as never);
+    expect(parado?.filas.get(0)?.[0]?.[2]).toBe('1,842');
   });
 });
 
@@ -963,17 +1153,19 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     expect(definicion?.clave).toBe('tramos-del-articulo-13');
     expect(definicion?.sinDato?.texto).toBe('Sin tope');
     expect(tabla?.filas).toHaveLength(3);
+    // Los tres importes **sin el simbolo**, como la columna de al lado de cualquier otra hoja: sus
+    // rotulos ya dicen «Límite superior S/», «Porción gravada S/» y «Aporte S/» (#389).
     expect(tabla?.filas[0]?.celdas).toEqual([
       '1',
-      'S/ 82,500.00',
+      '82,500.00',
       '0.200000 %',
-      'S/ 82,500.00',
+      '82,500.00',
       // Sin redondear, y por eso no pasa por `formatearImporte`: reventaria con veinte decimales.
-      'S/ 165.00000000000000000000',
+      '165.00000000000000000000',
     ]);
     // El tercero: sin tope, y con el aporte que **ningun** formateador de dos decimales admite.
     expect(tabla?.filas[2]?.celdas[1]).toEqual({ texto: null });
-    expect(tabla?.filas[2]?.celdas[4]).toBe('S/ 700.00750000000000000000');
+    expect(tabla?.filas[2]?.celdas[4]).toBe('700.00750000000000000000');
     // Cinco celdas por fila, que son las cinco columnas que la definicion declara.
     expect(definicion?.columnas).toHaveLength(5);
     // Sin total publicado: la operacion no pagina tramos, los publica enteros.
@@ -1000,16 +1192,17 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     expect(reparto.filas.has(3)).toBe(false);
     expect(tabla?.filas).toHaveLength(4);
     expect(tabla?.filas.map((fila) => fila.celdas.slice(0, 3))).toEqual([
-      ['1', '27/02/2026', 'S/ 587.50'],
-      ['2', '29/05/2026', 'S/ 587.50'],
-      ['3', '31/08/2026', 'S/ 587.50'],
+      ['1', '27/02/2026', '587.50'],
+      ['2', '29/05/2026', '587.50'],
+      ['3', '31/08/2026', '587.50'],
       // La ultima lleva el centimo del resto, y no la primera: el artboard dibuja lo contrario.
-      ['4', '30/11/2026', 'S/ 587.51'],
+      ['4', '30/11/2026', '587.51'],
     ]);
     // Y la del CONTADO es **una**, con la misma linea de codigo: el articulo 15 a) no es cuatro.
     const alContado = conector.repartir(DETERMINACION_GUARDADA as never).tablas?.get('cronograma');
     expect(alContado?.filas).toHaveLength(1);
-    expect(alContado?.filas[0]?.celdas.slice(0, 3)).toEqual(['1', '27/02/2026', 'S/ 2,350.01']);
+    // Agrupado y sin simbolo, bajo «Importe S/» (#389).
+    expect(alContado?.filas[0]?.celdas.slice(0, 3)).toEqual(['1', '27/02/2026', '2,350.01']);
     // Nada que decir de una ventana: la operacion no pagina cuotas, las publica enteras.
     expect(tabla?.totalElementos).toBeUndefined();
   });
@@ -1036,7 +1229,7 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     // Y la clave de React es la misma que la celda: dos filas con la clave «1» se pisarian.
     expect(filas.map((fila) => fila.clave)).toEqual(['4', '3', '2', '1']);
     // Cada fila conserva ademas SU fecha y SU importe: no se reordena nada aqui.
-    expect(filas[0]?.celdas.slice(1, 3)).toEqual(['30/11/2026', 'S/ 587.51']);
+    expect(filas[0]?.celdas.slice(1, 3)).toEqual(['30/11/2026', '587.51']);
   });
 
   it('«SITUACION» no se llena: la celda dice que no hay dato y anuncia por que (#252)', () => {
@@ -1087,9 +1280,9 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     const dichas = (tabla?.filas ?? []).flatMap((fila) =>
       fila.celdas.filter((celda): celda is string => typeof celda === 'string'),
     );
-    expect(dichas).not.toContain('S/ 2,354.51');
-    expect(dichas).not.toContain('S/ 2,350.01');
-    expect(dichas).not.toContain('S/ 588.63');
+    expect(dichas).not.toContain('2,354.51');
+    expect(dichas).not.toContain('2,350.01');
+    expect(dichas).not.toContain('588.63');
     expect(tabla?.totalElementos).toBeUndefined();
   });
 
@@ -1133,19 +1326,37 @@ describe('`panel` — la ultima corrida', () => {
   const reparto = conector.repartir(CORRIDA as never);
 
   it('la fecha, los observados y los dos agregados salen de la respuesta', () => {
-    expect(reparto.valores.get(coordenada(0, 1))).toBe('28/01/2026 02:14');
+    // La fecha por `formatearFecha`, como las otras veinte hojas: era la unica que salia en ISO
+    // (#389). Sin hora, porque el backend publica un `LocalDate` y la hora no se inventa.
+    expect(reparto.valores.get(coordenada(0, 1))).toBe('28/01/2026');
     expect(reparto.valores.get(coordenada(0, 2))).toBe('58,412');
-    expect(reparto.valores.get(coordenada(0, 3))).toBe('534');
+    expect(reparto.valores.get(coordenada(0, 3))).toBe('1,204');
     expect(reparto.valores.get(coordenada(0, 4))).toBe('S/ 8,772,431.05');
   });
 
-  it('la tabla sale de `etapas`, con sus cinco columnas en orden', () => {
-    const filas = reparto.filas.get(0);
+  it('la tabla sale de `etapas`, con sus cinco columnas en orden y como el artboard las escribe (#389)', () => {
+    // Por `tablas` y con `clave` desde #389: la etapa que no mueve dinero llega con `monto: ""`, y
+    // por la via `filas` —solo cadenas— esa celda salia EN BLANCO. Ahora dice que no hay dato.
+    expect(PANTALLAS.panel.bloques[0]?.tabla?.clave).toBe('etapas-de-la-corrida');
+    expect(reparto.filas.has(0)).toBe(false);
+    const filas = reparto.tablas?.get('etapas-de-la-corrida')?.filas;
     expect(filas).toHaveLength(2);
-    expect(filas?.[1]).toEqual(['Generacion de cuponeras', '61350', '—', '534', 'Observado']);
+    // Los conteos agrupados y el monto sin simbolo —el rotulo ya dice «Monto S/»—, que es como
+    // el artboard escribe esta misma tabla: `'62,418'` y `'9,418,204.60'`.
+    expect(filas?.[1]?.celdas).toEqual([
+      'Determinados',
+      '61,350',
+      '9,418,204.60',
+      '1,204',
+      'CON OBSERVACIONES',
+    ]);
+    // Y la etapa sin monto lo DICE: ni `''` —un blanco— ni un cero, que seria «no se emitio nada».
+    const [etapa, registros, monto, observados, estado] = filas?.[0]?.celdas ?? [];
+    expect([etapa, registros, observados, estado]).toEqual(['Padrón leído', '62,418', '0', 'OK']);
+    expect(monto).toEqual({ texto: null, nota: expect.stringMatching(/no mueve dinero/) });
     // Cinco celdas por fila, que son las cinco columnas que la definicion declara.
     expect(PANTALLAS.panel.bloques[0]?.tabla?.columnas).toHaveLength(5);
-    expect(filas?.[0]).toHaveLength(5);
+    expect(filas?.[0]?.celdas).toHaveLength(5);
   });
 
   it('«cuentas emitidas» sale del CAMPO publicado, no de la ultima etapa (#271)', () => {

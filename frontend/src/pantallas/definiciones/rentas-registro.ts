@@ -29,6 +29,15 @@ export const RENTAS_REGISTRO = {
           { etiqueta: 'Derecho de emisión', tipo: 'r' },
         ],
         tabla: {
+          // Con `clave` desde #389: sus filas llegan por `DatosDeLaPantalla.tablas`, que es el unico
+          // camino cuyas celdas pueden decir que no hay dato. La etapa que no mueve dinero llega con
+          // `monto: ""`, y por la via de siempre esa celda salia EN BLANCO. Con `sinDato` dice la
+          // raya del artboard y anuncia el motivo.
+          clave: 'etapas-de-la-corrida',
+          sinDato: {
+            texto: '—',
+            nota: 'Esta etapa no mueve dinero: no emite nada, y eso no es un monto cero.',
+          },
           titulo: 'Etapas de la corrida',
           columnas: [
             { rotulo: 'Etapa', alineadoDerecha: false },

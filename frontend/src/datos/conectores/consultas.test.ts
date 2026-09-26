@@ -116,16 +116,18 @@ describe('`con-doc` — la constancia de no adeudo', () => {
     const filas = negada.filas.get(0);
 
     expect(filas).toHaveLength(2);
-    expect(filas?.[0]).toEqual(['2024', 'Impuesto predial', '1 a 4', 'S/ 2,067.04', 'Vencida']);
+    // «Total S/» sin el simbolo, que ya lo dice el rotulo: como el artboard escribe `'2,067.04'`
+    // y como cualquier otra columna de soles del arbol (#389).
+    expect(filas?.[0]).toEqual(['2024', 'Impuesto predial', '1 a 4', '2,067.04', 'Vencida']);
     // Una sola cuota se escribe «1» y no «1 a 1», como el artboard.
-    expect(filas?.[1]).toEqual(['2024', 'Patrimonio vehicular', '1', 'S/ 892.44', 'En coactiva']);
+    expect(filas?.[1]).toEqual(['2024', 'Patrimonio vehicular', '1', '892.44', 'En coactiva']);
     expect(PANTALLAS['con-doc'].bloques[0]?.tabla?.columnas).toHaveLength(5);
   });
 
   it('el total de cada fila es el que trae la obligacion, y no la suma de sus partidas', () => {
     // `deuda.total` viene del propio `ObligacionPublica#total()`: la suma se hace en un solo sitio
     // y no es este. Que 1800.00 + 67.04 + 200.00 + 0.00 de 2067.04 es cierto y no viene al caso.
-    expect(negada.filas.get(0)?.[0]?.[3]).toBe('S/ 2,067.04');
+    expect(negada.filas.get(0)?.[0]?.[3]).toBe('2,067.04');
   });
 
   it('EL DATO ES EL QUE LLEGO: una constancia que procede cambia la pantalla entera', () => {

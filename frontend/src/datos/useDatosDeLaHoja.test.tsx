@@ -72,14 +72,14 @@ const CORRIDA: CorridaDelPredial = {
   simulacion: false,
   conjunto: 'V3',
   conjuntoId: null,
-  fechaCalculo: '28/01/2026 02:14',
+  // La FORMA del backend y no el texto del artboard (#389): ISO sin hora, `"OK"` y el monto vacio
+  // de la etapa que no mueve dinero, como los compone `CorridaGuardadaResource`.
+  fechaCalculo: '2026-01-28',
   determinados: 58412,
   montoEmitido: '8772431.05',
   derechoDeEmision: null,
   observados: 534,
-  etapas: [
-    { etapa: 'Lectura del padron', registros: 62418, monto: '—', observados: 0, estado: 'Conforme' },
-  ],
+  etapas: [{ etapa: 'Padrón leído', registros: 62418, monto: '', observados: 0, estado: 'OK' }],
 };
 
 /**
@@ -192,8 +192,10 @@ describe('una pantalla CON conector recorre sus estados', () => {
     await waitFor(() => {
       expect(result.current.valores?.size).toBeGreaterThan(0);
     });
-    expect(result.current.valores?.get(coordenada(0, 1))).toBe('28/01/2026 02:14');
-    expect(result.current.filas?.get(0)).toHaveLength(1);
+    expect(result.current.valores?.get(coordenada(0, 1))).toBe('28/01/2026');
+    // Por `tablas` desde #389: la tabla de etapas lleva `clave`, y sus celdas pueden decir que no
+    // hay dato —el monto de «Padrón leído»— en vez de quedarse en blanco.
+    expect(result.current.tablas?.get('etapas-de-la-corrida')?.filas).toHaveLength(1);
     // Y el que la operacion no publica va marcado campo a campo, no con el motivo de la pantalla:
     // la pantalla SI esta conectada, y decir lo contrario ahi seria falso.
     //

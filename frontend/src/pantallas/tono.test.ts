@@ -34,6 +34,26 @@ describe('el tono de una insignia sale de lo que DICE la celda', () => {
     }
   });
 
+  it('los DOS estados que `panel` recibe de verdad se juzgan: «OK» es verde y «CON OBSERVACIONES» rojo (#389)', () => {
+    // `CorridaGuardadaResource` publica exactamente estas dos cadenas —`ESTADO_OK` y
+    // `ESTADO_CON_OBSERVACIONES`—, y hasta #389 ninguna regla las reconocia: `observado` no casa
+    // dentro de «observaciones» y CONFORME no tenia `ok`. Las dos salian con el tono de «no se», y
+    // la etapa que dejo contribuyentes fuera de la emision se pintaba igual que la que no.
+    expect(tonoDe('OK')).toBe('ok');
+    expect(tonoDe('CON OBSERVACIONES')).toBe('mal');
+    expect(reconocido('OK')).toBe(true);
+    expect(reconocido('CON OBSERVACIONES')).toBe(true);
+  });
+
+  it('y las dos van ancladas por palabra: ni «Tokio» es «ok» ni «sin observaciones» es malo', () => {
+    // Sin `\b`, `ok` casaria dentro de cualquier palabra que lo lleve y la pintaria de VERDE, que
+    // es el lado que no se ve (ver el javadoc de CONFORME).
+    expect(tonoDe('Yokohama')).toBe(TONO_SIN_RECONOCER);
+    expect(tonoDe('Tokio')).toBe(TONO_SIN_RECONOCER);
+    // Y la regla de MAL es la frase entera, no «observaciones» suelta.
+    expect(tonoDe('sin observaciones')).toBe(TONO_SIN_RECONOCER);
+  });
+
   it('LO QUE NO RECONOCE NINGUNA REGLA sale con el tono de «no se», nunca con el de «conforme»', () => {
     // Las cuatro son las frases que `GET /indicadores/trabajo-parado` publica en la columna de
     // insignia de `ini-parado` —`porQueCuestaDinero`, que es una frase y no un estado—, copiadas

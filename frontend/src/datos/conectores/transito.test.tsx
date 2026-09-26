@@ -361,8 +361,9 @@ describe('`tra-panel` — los cinco recuentos del ejercicio (#184, #222, #243)',
     // «Levantadas» es el total del RESUMEN —calculado en el servidor—, y los otros dos son de la
     // linea del ejercicio. **Eran cuatro hasta #243**: «Canceladas» dibujaba `pagadas`, que cuenta
     // `p.estado = 'PAGADA'` y que nadie escribe.
-    expect(reparto.valores.get(coordenada(0, 1))).toBe('8412');
-    expect(reparto.valores.get(coordenada(0, 2))).toBe('5884');
+    // Con sus millares, como el artboard escribe «8,412» y como cualquier conteo del arbol (#389).
+    expect(reparto.valores.get(coordenada(0, 1))).toBe('8,412');
+    expect(reparto.valores.get(coordenada(0, 2))).toBe('5,884');
     expect(reparto.valores.get(coordenada(0, 5))).toBe('388');
   });
 
@@ -408,7 +409,7 @@ describe('`tra-panel` — los cinco recuentos del ejercicio (#184, #222, #243)',
     const raro = TRA_PANEL.repartir(
       resumen({ papeletas: 9999, lineas: [lineaDelResumen({ cantidad: 1 })] }) as never,
     );
-    expect(raro.valores.get(coordenada(0, 1))).toBe('9999');
+    expect(raro.valores.get(coordenada(0, 1))).toBe('9,999');
   });
 
   it('los DOS que nadie publica lo dicen, y no con un cero', () => {
@@ -462,7 +463,7 @@ describe('`tra-panel` — los cinco recuentos del ejercicio (#184, #222, #243)',
     ).not.toContain('11');
     expect(dosAnos.noPublicados.get(coordenada(0, 2))).toBe(NO_PUBLICADO);
     expect(dosAnos.noPublicados.get(coordenada(0, 5))).toBe(NO_PUBLICADO);
-    expect(dosAnos.valores.get(coordenada(0, 1))).toBe('8500');
+    expect(dosAnos.valores.get(coordenada(0, 1))).toBe('8,500');
   });
 
   it('y sin ninguna linea tampoco se deduce un cero', () => {
@@ -497,7 +498,7 @@ describe('`tra-panel` — los cinco recuentos del ejercicio (#184, #222, #243)',
     expect(container.textContent).not.toContain('Ejercicio2024');
     // Y lo que si llega es todo lo demas: la casilla en blanco no se lleva la pantalla por
     // delante.
-    expect(container.textContent).toContain('Levantadas8412');
+    expect(container.textContent).toContain('Levantadas8,412');
   });
 
   it('esta hoja no tiene tabla: su bloque son seis campos', () => {
@@ -835,8 +836,8 @@ describe('LA ROTURA DEL AC3, en el DOM: con otra respuesta, la pantalla ensena o
     // Los seis campos de esta hoja son de solo lectura o un desplegable: el interprete los
     // escribe en el texto y no en un `<input>`, al contrario que los de `tra-veh`.
     const { container } = await pintar('tra-panel', comoTraPanel(resumen()));
-    expect(container.textContent).toContain('Levantadas8412');
-    expect(container.textContent).toContain('Con multa notificada5884');
+    expect(container.textContent).toContain('Levantadas8,412');
+    expect(container.textContent).toContain('Con multa notificada5,884');
 
     const otro = await pintar(
       'tra-panel',
@@ -860,7 +861,7 @@ describe('LA ROTURA DEL AC3, en el DOM: con otra respuesta, la pantalla ensena o
     expect(otro.container.textContent).toContain('Levantadas311');
     expect(otro.container.textContent).toContain('Con multa notificada77');
     expect(otro.container.textContent).toContain('Con resolución de multa4');
-    expect(otro.container.textContent).not.toContain('8412');
+    expect(otro.container.textContent).not.toContain('8,412');
 
     for (const celda of FILA_DEL_ARTBOARD['tra-panel']) {
       expect(otro.container.textContent, `«${celda}» es del artboard`).not.toContain(celda);

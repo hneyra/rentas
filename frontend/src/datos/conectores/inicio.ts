@@ -1,6 +1,10 @@
 import { coordenada, type Coordenada, type DatoConNombre } from '@kamayuk/ui';
 
-import { formatearImporte } from '../../dominio/formato.ts';
+import {
+  formatearEntero,
+  formatearImporte,
+  formatearImporteEnColumna,
+} from '../../dominio/formato.ts';
 import { nombreDelAvance, nombreDelTributo } from '../../piezas/serieDeAvance.ts';
 import { ejercicioDeLaRespuesta, type Conector, type Reparto } from '../conectores.ts';
 import { NO_PUBLICADO, SIN_EMISION_DEL_EJERCICIO, type PalabraDeHueco } from '../palabrasDeHueco.ts';
@@ -70,18 +74,16 @@ const SIN_CIFRAR = 'sin cifrar';
 const SIN_MEDIR = 'sin medir';
 
 /**
- * El prefijo de moneda que `formatearImporte` pone siempre.
+ * Un importe para una columna que ya dice «S/» en su rotulo —«Emitido S/», «Importe S/»—; `sin
+ * cifrar` cuando llega nulo.
  *
- * Se quita **solo** en las celdas de una tabla cuyo ROTULO ya lo dice —«Emitido S/», «Importe
- * S/»—, que es como lo escribe el artboard: `9,418,204.60` bajo la cabecera y `S/ 23,725,394.80`
- * en un campo suelto. El importe se formatea igual en los dos sitios: lo unico que cambia es que
- * la columna no repita la moneda cinco veces.
+ * Lo unico que decide este archivo es **el nulo**. Como se escribe la cifra —`9,418,204.60` bajo la
+ * cabecera, sin el simbolo— lo decide `formatearImporteEnColumna`, y hasta #389 no era asi: aqui
+ * vivia una copia de `LA_MONEDA` que recortaba el prefijo con una expresion regular, igual que otra
+ * en `fiscalizacion.ts`, mientras las demas columnas de soles del arbol elegian otra politica.
  */
-const LA_MONEDA = /^S\/\s/;
-
-/** Un importe para una columna que ya dice «S/» en su rotulo; `sin cifrar` cuando llega nulo. */
 function enColumnaDeSoles(importe: ImporteConFecha | null): string {
-  return importe === null ? SIN_CIFRAR : formatearImporte(importe.importe).replace(LA_MONEDA, '');
+  return importe === null ? SIN_CIFRAR : formatearImporteEnColumna(importe.importe);
 }
 
 /**
@@ -219,7 +221,9 @@ const INI_PANEL: Conector = {
     const noEsLaEmision = corrida === null ? null : porQueNoEsLaEmisionDelEjercicio(corrida);
     if (corrida === null) noPublicados.set(coordenada(0, 5), SIN_EMISION_DEL_EJERCICIO);
     else if (noEsLaEmision !== null) noPublicados.set(coordenada(0, 5), noEsLaEmision);
-    else poner(coordenada(0, 5), String(corrida.observados));
+    // Con `formatearEntero`, como `panel` escribe el MISMO campo de la MISMA operacion: hasta #389
+    // una hoja decia «1,204» y la otra «1204».
+    else poner(coordenada(0, 5), formatearEntero(corrida.observados));
 
     return { valores, filas: new Map(), noPublicados };
   },
@@ -269,9 +273,9 @@ const INI_FLUJO: Conector = {
  * **Cinco de cinco columnas, columna a columna**, y es la hoja mas limpia del repositorio: modulo,
  * que esta parado, cuantos, cuanto suma y por que cuesta dinero tenerlo asi.
  *
- * `cuantos` se escribe con `String()` y sin separador de miles, como hace `panel` con los
- * registros de sus etapas: un segundo formateador de recuentos seria una segunda verdad sobre como
- * se escribe un numero en una tabla, y el que hay —`formatearImporte`— es de importes.
+ * `cuantos` se escribe con `formatearEntero`, agrupado como cualquier otro conteo del arbol (#389).
+ * Hasta #389 iba con `String()` y sin separador de miles «como hace `panel` con los registros de sus
+ * etapas» —y `panel` tampoco tenia razon: el artboard agrupa todos los conteos—.
  *
  * <b>Lo que hay que mirar al revisar esto</b>: la quinta columna es la de la insignia
  * (`columnaDeInsignia: 4` en la definicion, que viene del artboard) y lo que se le da es
@@ -319,7 +323,7 @@ const INI_PARADO: Conector = {
         parado.frentes.map((frente) => [
           frente.modulo,
           frente.queEstaParado,
-          String(frente.cuantos),
+          formatearEntero(frente.cuantos),
           enColumnaDeSoles(frente.importe),
           frente.porQueCuestaDinero,
         ]),

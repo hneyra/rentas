@@ -127,7 +127,9 @@ const CORRIDA: CorridaDelPredial = {
   sector: null,
   simulacion: false,
   conjunto: 'V3',
-  fechaCalculo: '28/01/2026 02:14',
+  // ISO y sin hora, que es la forma que el backend publica (#389): `panel` la pasa por
+  // `formatearFecha`, y con el texto del artboard la hoja revienta.
+  fechaCalculo: '2026-01-28',
   observados: 534,
   // Los dos que #271 anadio a la operacion. Sin ellos el conector llama a `formatearEntero` con
   // `undefined`, revienta, y el armazon **no llega a montarse**: el rojo sale como un tiempo
@@ -140,9 +142,11 @@ const CORRIDA: CorridaDelPredial = {
   // en la ola anterior.
   conjuntoId: 77,
   derechoDeEmision: '4.50',
+  // Los estados y el monto vacio que compone `CorridaGuardadaResource` (#389): «OK» y «CON
+  // OBSERVACIONES», no el «Conforme» y el «Observado» que el artboard dibuja.
   etapas: [
-    { etapa: 'Lectura del padron', registros: 62418, monto: '—', observados: 0, estado: 'Conforme' },
-    { etapa: 'Generacion de cuponeras', registros: 61350, monto: '—', observados: 534, estado: 'Observado' },
+    { etapa: 'Padrón leído', registros: 62418, monto: '', observados: 0, estado: 'OK' },
+    { etapa: 'Determinados', registros: 61350, monto: '9418204.60', observados: 534, estado: 'CON OBSERVACIONES' },
   ],
 };
 
@@ -307,19 +311,22 @@ test('y el tono de «no se» SI llega al navegador, en la tabla de `fis-prog` (#
   ).toBe(TONOS.sinReconocer);
 });
 
-test('y el verde SI llega donde se ha ganado: «Conforme» en `panel` es verde, «Observado» rojo', async ({
+test('y el verde SI llega donde se ha ganado: «OK» en `panel` es verde, «CON OBSERVACIONES» rojo', async ({
   page,
 }) => {
+  // Con los DOS estados que el backend publica (#389). Hasta #389 esta prueba buscaba «Conforme» y
+  // «Observado» —las palabras del artboard, que el fixture traia y la instalacion no contesta—, y
+  // con las de verdad las dos insignias salian con el tono de «no se».
   await abrir(page, 'panel');
 
-  const conforme = page.getByText('Conforme', { exact: true }).first();
+  const conforme = page.getByText('OK', { exact: true }).first();
   await expect(conforme, 'la tabla de la corrida no se dibujo').toBeVisible();
   expect(
     await conforme.evaluate((e) => getComputedStyle(e).backgroundColor),
-    'el verde de «conforme» no llego al navegador: entonces la comprobacion de arriba no dice nada',
+    'el verde de «OK» no llego al navegador: entonces la comprobacion de arriba no dice nada',
   ).toBe(TONOS.ok);
 
-  const observado = page.getByText('Observado', { exact: true }).first();
+  const observado = page.getByText('CON OBSERVACIONES', { exact: true }).first();
   await expect(observado).toBeVisible();
   expect(await observado.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe(TONOS.mal);
 });

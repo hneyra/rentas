@@ -97,7 +97,13 @@ export interface EtapaDeLaCorrida {
   /**
    * Lo emitido en esa etapa. **Cadena vacia donde la etapa no mueve dinero**, y no un cero:
    * «no se emitio nada» y «esta etapa no emite» no son lo mismo, y el artboard escribe ahi un
-   * guion. La pantalla lo dibuja como guion; sumarlo como cero seria decir otra cosa.
+   * guion. Sumarlo como cero seria decir otra cosa.
+   *
+   * **Hasta #389 este comentario decia que «la pantalla lo dibuja como guion», y era falso**: la
+   * tabla iba por `Reparto.filas`, que solo admite cadenas, y el interprete solo dice «sin dato»
+   * con `null` —asi que la celda salia EN BLANCO—. Desde #389 la tabla lleva `clave`, el conector
+   * convierte `""` en una celda sin dato con su motivo (`etapasDeLaCorrida` de `conectores.ts`) y
+   * el guion que se ve es el `sinDato` de la definicion.
    */
   readonly monto: string;
   readonly observados: number;

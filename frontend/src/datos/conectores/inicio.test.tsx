@@ -157,7 +157,8 @@ function corrida(observados: number): CorridaDelPredial {
     simulacion: false,
     conjunto: 'V3',
     conjuntoId: 77,
-    fechaCalculo: '28/01/2026 02:14',
+    // ISO y sin hora, como la publica el backend (#389): el texto del artboard no llega nunca.
+    fechaCalculo: '2026-01-28',
     determinados: 61350,
     montoEmitido: '9418204.60',
     derechoDeEmision: '4.50',
@@ -202,7 +203,9 @@ describe('`ini-panel` — el avance del ejercicio', () => {
         pendiente: '998086.20',
         pct: 89,
       }),
-      [CORRIDA]: corrida(534),
+      // Por encima del millar (#389): con 534 —lo de antes— `String` y `formatearEntero` escribian
+      // lo mismo, y esta hoja podia decir «1204» donde `panel` dice «1,204».
+      [CORRIDA]: corrida(1204),
     });
     const { container } = arnes()('ini-panel');
 
@@ -213,7 +216,7 @@ describe('`ini-panel` — el avance del ejercicio', () => {
     expect(screen.getByText('77 %')).toBeInTheDocument();
     // «Observados sin emision» no sale del panel de recaudacion: sale de la ultima corrida, que
     // es la segunda operacion que esta hoja pide.
-    expect(screen.getByText('534')).toBeInTheDocument();
+    expect(screen.getByText('1,204')).toBeInTheDocument();
     // Y el desplegable de ejercicio dice el de la respuesta, no el primero de su lista.
     expect(container.textContent).toContain('2026');
   });
@@ -241,7 +244,7 @@ describe('`ini-panel` — el avance del ejercicio', () => {
     // respuesta no puede seguir ahi. Una pantalla que dibujara cifras suyas pasaria la mitad de
     // arriba en cuanto el doble contestara lo que ella ya ensenaba.
     expect(screen.queryByText('S/ 23,725,394.80')).toBeNull();
-    expect(screen.queryByText('534')).toBeNull();
+    expect(screen.queryByText('1,204')).toBeNull();
   });
 
   it('«Contribuyentes activos» dice «no publicado», y NO se deduce de la corrida', async () => {
@@ -444,7 +447,9 @@ describe('`ini-parado` — los frentes abiertos', () => {
       expect(screen.getByText('Transito')).toBeInTheDocument();
     });
     expect(screen.getByText('papeletas sin resolucion de multa emitida')).toBeInTheDocument();
-    expect(screen.getByText('1842')).toBeInTheDocument();
+    // Agrupado, como cualquier otro conteo del arbol (#389). Hasta #389 esta prueba FIJABA «1842»,
+    // y el javadoc del conector lo justificaba con que `panel` tampoco agrupaba sus etapas.
+    expect(screen.getByText('1,842')).toBeInTheDocument();
     expect(screen.getByText('788,976.00')).toBeInTheDocument();
     expect(
       screen.getByText('sin emitir no se pueden notificar ni cobrar, y prescriben'),
@@ -459,7 +464,7 @@ describe('`ini-parado` — los frentes abiertos', () => {
       expect(screen.getByText('7')).toBeInTheDocument();
     });
     expect(screen.getByText('12.34')).toBeInTheDocument();
-    expect(screen.queryByText('1842')).toBeNull();
+    expect(screen.queryByText('1,842')).toBeNull();
     expect(screen.queryByText('788,976.00')).toBeNull();
   });
 
