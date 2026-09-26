@@ -116,7 +116,9 @@ export const AUTORIZACIONES_Y_LICENCIAS = {
         titulo: 'Catálogo de giros y certificados',
         nota: 'El riesgo del giro decide la modalidad de la licencia.',
         campos: [
-          { etiqueta: 'Buscar giro o actividad', tipo: '1' },
+          // Lo tecleado viaja a la ruta de la hoja al salir del campo o con Intro (#172,
+          // `kamayuk-lib`#94), y de ahi a `?descripcion=` de `GET /licencias/ciiu`.
+          { etiqueta: 'Buscar giro o actividad', tipo: '1', eleccion: { enLaRuta: 'descripcion' } },
           {
             etiqueta: 'Materia',
             tipo: 's',

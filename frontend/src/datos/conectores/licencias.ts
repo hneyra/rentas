@@ -149,18 +149,14 @@ const FUNCIONAMIENTO = 'GET /licencias/funcionamiento';
  * `hayMas` y `totalPaginas` **los dice el servidor** y viajan por `nombrados`: contar las filas
  * recibidas diria que no hay pagina siguiente justo cuando el tope se alcanza exacto.
  *
- * <h2>El buscador: el parametro YA entra, y lo que falta es el mando</h2>
+ * <h2>El buscador: la caja escribe la ruta, y la ruta llega a la operacion</h2>
  *
  * `?descripcion=` esta declarado aqui, o sea que el marco lo conserva en la ruta, entra en la
  * llave de la cache y viaja a la operacion: `#/aut-cat?descripcion=bodega` acota el catalogo de
- * verdad. **Lo que no hay es quien lo escriba desde la pantalla**, y esto esta medido y no
- * supuesto: `@kamayuk/ui` guarda lo tecleado en el estado de `<Pantalla>` (`Tecleado`,
- * `Pantalla.tsx:113`) y **no lo publica por ningun lado** — ni en `nombrados`, que es lo unico
- * que las acciones de #66 resuelven, ni por una `prop` de salida. O sea que un campo del bloque no
- * puede llegar a la ruta, y la caja «Buscar giro o actividad» sigue sin mover nada.
- *
- * Eso es de la libreria y tiene su issue; aqui queda **el canal entero de este lado**, que es lo
- * que #172 pedia.
+ * verdad. Y desde `kamayuk-lib`#94 la caja «Buscar giro o actividad» es quien lo escribe: su campo
+ * declara `eleccion: { enLaRuta: 'descripcion' }`, y el interprete deja lo tecleado en la ruta **al
+ * salir del campo o al pulsar Intro** —no en cada tecla— y vuelve a la primera pagina en el mismo
+ * movimiento (#172). Lo mide en el navegador `e2e/el-buscador-de-giros-escribe-la-ruta.spec.ts`.
  */
 const AUT_CAT: Conector = {
   clave: ['aut-cat', 'ciiu'],
