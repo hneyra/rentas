@@ -38,6 +38,32 @@ class NotificacionAdministrativaTest {
     }
 
     @Test
+    @DisplayName("el ultimo dia del plazo todavia no esta vencida; al dia siguiente, si (#411)")
+    void elUltimoDiaDelPlazoTodaviaNoEstaVencida() {
+        NotificacionAdministrativa notificacion = emitida((short) 10);
+        LocalDate vencimiento = FECHA.plusDays(10);
+
+        assertThat(notificacion.vencidaA(vencimiento.minusDays(1))).isFalse();
+        assertThat(notificacion.vencidaA(vencimiento))
+                .as("el dia del vencimiento se puede subsanar: es el criterio de Exigibilidad")
+                .isFalse();
+        assertThat(notificacion.vencidaA(vencimiento.plusDays(1))).isTrue();
+    }
+
+    @Test
+    @DisplayName("sin plazoDias no vence nunca (#47 AC3, #411)")
+    void sinPlazoDiasNoVenceNunca() {
+        assertThat(emitida(null).vencidaA(FECHA.plusYears(50))).isFalse();
+    }
+
+    @Test
+    @DisplayName("la copia SQL compara date + integer, estricta, y sin interval (#411)")
+    void laCopiaSqlEsEstrictaYSinInterval() {
+        assertThat(NotificacionAdministrativa.vencidaEnSql("n", "corte"))
+                .isEqualTo("(n.plazo_dias IS NOT NULL AND n.fecha + n.plazo_dias < :corte)");
+    }
+
+    @Test
     @DisplayName("un plazo negativo o cero no se construye")
     void unPlazoNegativoOCeroNoSeConstruye() {
         assertThatThrownBy(() -> emitida((short) 0)).isInstanceOf(IllegalArgumentException.class);

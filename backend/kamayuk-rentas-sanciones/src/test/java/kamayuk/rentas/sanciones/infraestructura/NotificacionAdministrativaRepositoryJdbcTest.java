@@ -8,6 +8,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.List;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.compartido.Pagina;
@@ -46,6 +47,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 class NotificacionAdministrativaRepositoryJdbcTest {
 
     private static final LocalDate FECHA = LocalDate.of(2026, 1, 1);
+
+    /** El motivo que distingue la siembra de #411 del resto de la municipalidad. */
+    private static final String FRONTERA = "Frontera del plazo 411";
 
     private static BaseDeDatosDePrueba base;
     private static long municipalidadA;
@@ -158,6 +162,61 @@ class NotificacionAdministrativaRepositoryJdbcTest {
                     .extracting(NotificacionAdministrativa::numero)
                     .contains("NA-0010")
                     .doesNotContain("NA-0011");
+        }
+
+        /**
+         * #411: el reporte de vencidas y {@link NotificacionAdministrativa#vencidaA} son la misma
+         * regla, y esta prueba las ata.
+         *
+         * <p>La siembra es la que distingue: tres plazos, uno a cada lado de la frontera y el del
+         * medio <b>venciendo exactamente el dia del corte</b>. La prueba de encima corta en {@code
+         * FECHA+10} con plazos de 5 y 30 —ninguno pisa el borde—, y por eso el SQL pudo contar el
+         * ultimo dia como vencido durante toda su vida con la prueba en verde.
+         */
+        @Test
+        @DisplayName(
+                "el reporte de vencidas dice lo mismo que el dominio, tambien el ultimo dia del"
+                        + " plazo (#411)")
+        void elReporteDeVencidasDiceLoMismoQueElDominio() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            LocalDate corte = FECHA.plusDays(10);
+
+            List<NotificacionAdministrativa> sembradas =
+                    List.of(
+                            enLaFrontera("NA-0411-A", (short) 9), // vence la vispera del corte
+                            enLaFrontera("NA-0411-B", (short) 10), // vence EL DIA del corte
+                            enLaFrontera("NA-0411-C", (short) 11), // vence al dia siguiente
+                            enLaFrontera("NA-0411-D", null)); // sin plazo: nada la vence
+
+            List<String> delReporte =
+                    transaccion
+                            .execute(
+                                    estado ->
+                                            repositorio.buscarVencidas(
+                                                    new CriterioDeNotificacion(
+                                                            null, null, corte, null, FRONTERA,
+                                                            null),
+                                                    Paginacion.de(0, 20, "fecha")))
+                            .contenido()
+                            .stream()
+                            .map(NotificacionAdministrativa::numero)
+                            .sorted()
+                            .toList();
+            List<String> delDominio =
+                    sembradas.stream()
+                            .filter(notificacion -> notificacion.vencidaA(corte))
+                            .map(NotificacionAdministrativa::numero)
+                            .sorted()
+                            .toList();
+
+            assertThat(delReporte)
+                    .as("el SQL del reporte y vencidaA son la misma regla, fila a fila")
+                    .isEqualTo(delDominio);
+            assertThat(delReporte)
+                    .as(
+                            "solo la de la vispera: el ultimo dia todavia se puede subsanar, y el"
+                                    + " reporte ofreceria multar a quien sigue en plazo")
+                    .containsExactly("NA-0411-A");
         }
 
         @Test
@@ -299,6 +358,20 @@ class NotificacionAdministrativaRepositoryJdbcTest {
     private static NotificacionAdministrativa notificacionDe(String numero, Short plazoDias) {
         return NotificacionAdministrativa.emitida(
                 numero, FECHA, null, null, "Av. Grau 123", "Falta administrativa", plazoDias);
+    }
+
+    private static NotificacionAdministrativa enLaFrontera(String numero, Short plazoDias) {
+        return transaccion.execute(
+                estado ->
+                        repositorio.insertar(
+                                NotificacionAdministrativa.emitida(
+                                        numero,
+                                        FECHA,
+                                        null,
+                                        null,
+                                        "Av. Grau 123",
+                                        FRONTERA,
+                                        plazoDias)));
     }
 
     private static long crearMunicipalidad(String ubigeo, String nombre) throws SQLException {

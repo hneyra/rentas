@@ -48,13 +48,12 @@ public class SubsanarNotificacion {
             throw new EstadoInvalido(notificacion);
         }
 
-        notificacion
-                .vencimiento()
-                .filter(fechaSubsanacion::isAfter)
-                .ifPresent(
-                        vencimiento -> {
-                            throw new FueraDePlazo(notificacion, vencimiento, fechaSubsanacion);
-                        });
+        // La frontera es la del dominio y no se repite aqui (#411): el ultimo dia todavia
+        // se subsana, y el reporte de vencidas y la fase del procedimiento leen la misma.
+        if (notificacion.vencidaA(fechaSubsanacion)) {
+            throw new FueraDePlazo(
+                    notificacion, notificacion.vencimiento().orElseThrow(), fechaSubsanacion);
+        }
 
         NotificacionAdministrativa subsanada =
                 notificaciones.subsanar(

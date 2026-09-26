@@ -163,8 +163,9 @@ public class ConsultaDeConvenios {
                     continue;
                 }
                 // Sin cobrar es «numero >= pagadas», el mismo predicado que usa el saldo:
-                // con la inicial cobrada (pagadas = 1), la cuota 1 sigue pendiente.
-                if (!cuota.vencimiento().isAfter(aLaFecha) && cuota.numero() >= pagadas) {
+                // con la inicial cobrada (pagadas = 1), la cuota 1 sigue pendiente. Y
+                // vencida es la del dominio: el dia en que vence todavia no (#411).
+                if (cuota.vencidaA(aLaFecha) && cuota.numero() >= pagadas) {
                     vencidas++;
                 }
             }

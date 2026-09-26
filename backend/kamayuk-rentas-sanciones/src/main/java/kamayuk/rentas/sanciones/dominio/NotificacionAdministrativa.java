@@ -104,6 +104,57 @@ public record NotificacionAdministrativa(
         return plazoDias == null ? Optional.empty() : Optional.of(fecha.plusDays(plazoDias));
     }
 
+    /**
+     * Si el plazo para subsanar ya venció a {@code corte} (#411).
+     *
+     * <p><b>El último día queda dentro del plazo</b>: vence el día <i>siguiente</i> a {@link
+     * #vencimiento}, nunca el mismo. Es el criterio que el proyecto escribió para cualquier plazo
+     * en {@code Exigibilidad} —«el día en que vence, tampoco: ese día todavía se puede»— y el que
+     * {@code SubsanarNotificacion} aplica al admitir una subsanación. Sin plazo, nada la vence (#47
+     * AC3).
+     *
+     * <p>Es <b>la</b> definición de «vencida», y tiene una sola copia en SQL: {@link
+     * #vencidaEnSql}. Hasta #411 había tres —esta, la del reporte de vencidas y la de la fase del
+     * procedimiento— y las dos de SQL daban el último día por vencido.
+     */
+    public boolean vencidaA(LocalDate corte) {
+        Objects.requireNonNull(corte, "Vencida a que fecha: toda cifra dice la suya (regla 9)");
+        return vencimiento().map(corte::isAfter).orElse(false);
+    }
+
+    /**
+     * {@link #vencidaA} escrita en SQL, para una fila de {@code notificacion_administrativa} con
+     * alias {@code alias} contra el parámetro con nombre {@code parametro} (#411).
+     *
+     * <p>Es una Specification con dos lecturas de la misma regla, y está <b>aquí, junto a la
+     * Java</b>, para que nadie pueda cambiar una sin ver la otra. La leen el reporte de vencidas
+     * ({@code adm_notificaciones_vencidas}, RF-074) y, negada, la fase {@link
+     * FaseDelProcedimiento#PREVENTIVA}: así la grilla y el reporte no sólo coinciden entre sí —que
+     * era lo único que garantizaban las dos copias que había—, sino con el dominio.
+     *
+     * <p>{@code date + integer} es un {@code date} en PostgreSQL, y la comparación es estricta
+     * igual que {@link LocalDate#isAfter}. La suma con {@code interval} que había antes daba un
+     * {@code timestamp} a medianoche, y el {@code <=} contaba como vencido el mismo último día.
+     *
+     * <p>Los dos nombres son constantes del código que llama, nunca texto del cliente: se
+     * concatenan a la consulta. Sin plazo, la primera condición ya es falsa, de modo que la
+     * negación tampoco se topa con un {@code NULL}.
+     *
+     * @param alias el alias de {@code notificacion_administrativa} en la consulta
+     * @param parametro el nombre, sin los dos puntos, del parámetro con la fecha de corte
+     */
+    public static String vencidaEnSql(String alias, String parametro) {
+        return "("
+                + alias
+                + ".plazo_dias IS NOT NULL AND "
+                + alias
+                + ".fecha + "
+                + alias
+                + ".plazo_dias < :"
+                + parametro
+                + ")";
+    }
+
     /** La misma notificación, cerrada por subsanación (#47 AC2). */
     public NotificacionAdministrativa subsanada() {
         Objects.requireNonNull(id, "Solo se subsana una notificacion ya guardada");
