@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.valores.dominio.MovimientoDeValor;
 import kamayuk.rentas.valores.dominio.MovimientoDeValorRepository;
+import kamayuk.rentas.valores.dominio.PaseRegistrado;
 import kamayuk.rentas.valores.dominio.TipoDeMovimiento;
 
 /**
@@ -21,10 +22,11 @@ public final class MovimientosEnMemoria implements MovimientoDeValorRepository {
     private long siguienteId = 1;
 
     @Override
-    public MovimientoDeValor registrarPase(MovimientoDeValor movimiento) {
+    public PaseRegistrado registrarPase(MovimientoDeValor movimiento) {
         Optional<MovimientoDeValor> existente = paseDe(movimiento.valorId());
         if (existente.isPresent()) {
-            return existente.get();
+            // Como la base (#444): el que ya estaba, y dicho que no es nuevo.
+            return new PaseRegistrado(existente.get(), false);
         }
         MovimientoDeValor conId =
                 new MovimientoDeValor(
@@ -37,7 +39,7 @@ public final class MovimientosEnMemoria implements MovimientoDeValorRepository {
                         "prueba",
                         movimiento.observacion());
         guardados.add(conId);
-        return conId;
+        return new PaseRegistrado(conId, true);
     }
 
     /**

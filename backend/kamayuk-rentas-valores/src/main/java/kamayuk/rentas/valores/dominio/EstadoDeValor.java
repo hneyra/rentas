@@ -15,5 +15,17 @@ public enum EstadoDeValor {
     COACTIVA,
     PAGADO,
     ANULADO,
-    PRESCRITO
+    PRESCRITO;
+
+    /**
+     * Si el valor todavia describe una cobranza (#444): ni pagado, ni anulado, ni prescrito.
+     *
+     * <p>Es la unica definicion de «cobrable». Hasta #444 la lista estaba escrita dos veces —en el
+     * SQL de la grilla y en un javadoc— y el pase a coactiva y la notificacion no miraban ninguna:
+     * un valor PRESCRITO recibia su PCO, permanente, despues de la prescripcion. El SQL de {@code
+     * ValorRepositoryJdbc} se deriva de aqui.
+     */
+    public boolean esCobrable() {
+        return this != PAGADO && this != ANULADO && this != PRESCRITO;
+    }
 }
