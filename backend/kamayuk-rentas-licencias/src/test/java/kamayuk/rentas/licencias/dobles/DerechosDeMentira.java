@@ -1,11 +1,14 @@
 package kamayuk.rentas.licencias.dobles;
 
+import java.math.RoundingMode;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.PuntoDeRedondeo;
 import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.licencias.dominio.TipoDeCertificado;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -33,6 +36,9 @@ public final class DerechosDeMentira implements LectorDeParametros {
 
     private final java.util.Map<TipoDeCertificado, Integer> vigenciasDeCertificado =
             new java.util.EnumMap<>(TipoDeCertificado.class);
+
+    private final java.util.Map<PuntoDeRedondeo, java.util.Map.Entry<Integer, RoundingMode>>
+            redondeos = new java.util.EnumMap<>(PuntoDeRedondeo.class);
 
     public DerechosDeMentira(
             @Nullable String conceptoDeLaLicencia, @Nullable String conceptoDelDuplicado) {
@@ -74,6 +80,19 @@ public final class DerechosDeMentira implements LectorDeParametros {
         if (meses != null) {
             vigenciasDeCertificado.put(tipo, meses);
         }
+        return this;
+    }
+
+    /**
+     * La fila {@code REDONDEO:‹punto›} del conjunto: la escala en {@code valor_numerico} y el modo
+     * en {@code valor_texto}, las dos mitades juntas (#378).
+     *
+     * <p>Entra como dato del constructor por lo mismo que los meses del certificado: la escala y el
+     * modo que ADR-0018 decidio los publica {@code normativa}, y una prueba tiene que poder sellar
+     * otros —o ninguno— para ver que la cifra los sigue.
+     */
+    public DerechosDeMentira conRedondeo(PuntoDeRedondeo punto, int escala, RoundingMode modo) {
+        redondeos.put(punto, java.util.Map.entry(escala, modo));
         return this;
     }
 
@@ -121,6 +140,17 @@ public final class DerechosDeMentira implements LectorDeParametros {
                     "VIGENCIA_CERTIFICADO",
                     vigencia.getKey().claveDeLaVigencia(),
                     new ValorNormativo(java.math.BigDecimal.valueOf(vigencia.getValue())));
+        }
+        for (java.util.Map.Entry<PuntoDeRedondeo, java.util.Map.Entry<Integer, RoundingMode>>
+                redondeo : redondeos.entrySet()) {
+            constructor.numero(
+                    PoliticasDeRedondeoSelladas.TIPO,
+                    redondeo.getKey().name(),
+                    new ValorNormativo(java.math.BigDecimal.valueOf(redondeo.getValue().getKey())));
+            constructor.texto(
+                    PoliticasDeRedondeoSelladas.TIPO,
+                    redondeo.getKey().name(),
+                    redondeo.getValue().getValue().name());
         }
         return constructor.construir();
     }

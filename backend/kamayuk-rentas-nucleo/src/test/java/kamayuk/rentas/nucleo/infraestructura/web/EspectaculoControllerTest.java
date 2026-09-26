@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,6 +23,7 @@ import kamayuk.rentas.autorizacion.GuardiaDeAcceso;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.PuntoDeRedondeo;
 import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.nucleo.aplicacion.RegistrarEspectaculo;
 import kamayuk.rentas.nucleo.dobles.PadronDeMentira;
@@ -81,7 +83,14 @@ class EspectaculoControllerTest {
     private final DeterminacionesEnMemoria determinaciones = new DeterminacionesEnMemoria();
     private final EventosEnMemoria eventos = new EventosEnMemoria();
 
-    private MockMvc mvc = montar(DerivadoPublicado.conjuntoDelEjercicio(EJERCICIO));
+    /**
+     * El conjunto que {@code normativa} sella, mas la fila {@code REDONDEO:IMPUESTO_ESPECTACULO}
+     * con el valor de ADR-0018, que el derivado todavia no publica (#378).
+     */
+    private MockMvc mvc =
+            montar(
+                    DerivadoPublicado.conjuntoDelEjercicioConRedondeo(
+                            EJERCICIO, RoundingMode.HALF_UP, PuntoDeRedondeo.IMPUESTO_ESPECTACULO));
 
     @BeforeEach
     void fijarOrigen() {

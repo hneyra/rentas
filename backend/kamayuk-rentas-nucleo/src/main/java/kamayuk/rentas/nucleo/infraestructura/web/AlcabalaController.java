@@ -11,6 +11,7 @@ import kamayuk.rentas.nucleo.aplicacion.RegistrarAlcabala;
 import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ProblemaDeNegocio;
@@ -95,11 +96,21 @@ public class AlcabalaController {
         } catch (RegistrarAlcabala.NoGravaAlcabala noGrava) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(noGrava));
         } catch (ParametrosSellados.ParametroAusente
-                | LectorDeParametros.EjercicioSinSellar falta) {
+                | LectorDeParametros.EjercicioSinSellar
+                | PoliticasDeRedondeoSelladas.SinPuntosObservados
+                | PoliticasDeRedondeoSelladas.PuntoSinObservar
+                | PoliticasDeRedondeoSelladas.MediaPolitica
+                | PoliticasDeRedondeoSelladas.EscalaNoEntera
+                | PoliticasDeRedondeoSelladas.ModoDesconocido falta) {
             // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
             // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
             // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
             // enumerando las dos, que es peor que no decir nada.
+            //
+            // La politica de redondeo del impuesto tambien es una cifra que se publica (#378):
+            // sin la fila REDONDEO:<punto> no se determina con el producto crudo, se dice cual
+            // falta. Se pide con el ejercicio a la vista (PuntoSinObservar, #633), asi que la
+            // del dominio puro, PuntoSinPolitica, no llega hasta aqui.
             throw FaltaPublicar.problema(falta);
         } catch (IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));

@@ -2,6 +2,7 @@ package kamayuk.rentas.licencias.infraestructura.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -20,6 +21,7 @@ import kamayuk.rentas.documentos.RenderizadorPdf;
 import kamayuk.rentas.documentos.RenderizadorRtf;
 import kamayuk.rentas.documentos.RenderizadorXls;
 import kamayuk.rentas.dominio.Dinero;
+import kamayuk.rentas.dominio.PuntoDeRedondeo;
 import kamayuk.rentas.licencias.aplicacion.CompletarSeccionDelFue;
 import kamayuk.rentas.licencias.aplicacion.ConsultaDeFue;
 import kamayuk.rentas.licencias.aplicacion.DerechosDeTramiteParametrizados;
@@ -134,7 +136,11 @@ class EdificacionControllerTest {
         return montar(
                 cuadro,
                 new DerechosDeMentira(null, null)
-                        .conEdificacion(DERECHO_EDIFICACION, DERECHO_REVALIDACION));
+                        .conEdificacion(DERECHO_EDIFICACION, DERECHO_REVALIDACION)
+                        // La politica de ADR-0018 para el valor de obra del FUE (#378): sin
+                        // ella el papel imprime «—» aunque haya cuadro, y con razon.
+                        .conRedondeo(
+                                PuntoDeRedondeo.VALOR_DE_OBRA_DEL_FUE, 2, RoundingMode.HALF_UP));
     }
 
     private MockMvc montar(LectorDeValoresUnitarios cuadro, DerechosDeMentira derechosDelTupa) {
@@ -145,7 +151,7 @@ class EdificacionControllerTest {
             LectorDeValoresUnitarios cuadro, DerechosDeMentira derechosDelTupa, Clock reloj) {
         DerechosDeTramiteParametrizados derechos =
                 new DerechosDeTramiteParametrizados(derechosDelTupa);
-        ValorizacionDelFue valorizaciones = new ValorizacionDelFue(cuadro);
+        ValorizacionDelFue valorizaciones = new ValorizacionDelFue(cuadro, derechosDelTupa);
         return MockMvcBuilders.standaloneSetup(
                         new EdificacionController(
                                 new ConsultaDeFue(
@@ -467,12 +473,12 @@ class EdificacionControllerTest {
             assertThat(ficha).contains("\"estado\":\"VIGENTE\"");
             assertThat(ficha)
                     .as("AC 2: la cifra viaja con su fecha o no viaja (RNF-075)")
-                    // Y SIN REDONDEAR: 40 x 120,000000 + 40 x 80,000000 sale con la escala del
-                    // producto, no con dos decimales. D-03 sigue abierta en sus tres partes, asi
-                    // que quien presente la cifra aplica la politica que reciba —recortarla aqui
-                    // seria tomar la decision por descuido, en el borde HTTP—.
+                    // Y con la escala de la politica sellada, no con la del producto (#378): hasta
+                    // #378 salia «8000.00000000», porque esta prueba daba D-03 por abierta y
+                    // ADR-0018 de normativa ya la habia cerrado. Se redondea en la regla, con la
+                    // fila REDONDEO:VALOR_DE_OBRA_DEL_FUE del conjunto; no aqui, en el borde HTTP.
                     .contains(
-                            "\"valorDeObra\":{\"importe\":\"8000.00000000\",\"actualizadoA\":\"2026-03-16\"}");
+                            "\"valorDeObra\":{\"importe\":\"8000.00\",\"actualizadoA\":\"2026-03-16\"}");
         }
 
         @Test
@@ -564,6 +570,49 @@ class EdificacionControllerTest {
                     .contains("\"nroLicencia\":\"LE-2026-000001\"");
             assertThat(cuerpo).contains("\"valorDeObraNoDisponible\":");
             assertThat(cuerpo).contains("#197");
+        }
+
+        /**
+         * #378 — Con cuadro y sin la politica de redondeo del valor de obra, la licencia sale igual
+         * y la cifra no: el papel no imprime el producto sin redondear, dice que fila falta.
+         *
+         * <p>Es el mismo trato que la celda del cuadro que falta. Imprimir el producto crudo es
+         * exactamente lo que ADR-0018 descarta —«un punto que el calculo pida sin politica
+         * publicada sigue fallando en vez de no redondear»—, y un 500 dejaria sin licencia una obra
+         * que ya pago su derecho.
+         */
+        @Test
+        @DisplayName(
+                "#378 — sin REDONDEO:VALOR_DE_OBRA_DEL_FUE la licencia sale, sin cifra y con la fila")
+        void sinLaPoliticaDeRedondeo() throws Exception {
+            MockMvc sinRedondeo =
+                    montar(
+                            new CuadroDeMentira()
+                                    .con("MUROS", 'A', "120.000000")
+                                    .con("TECHOS", 'B', "80.000000"),
+                            new DerechosDeMentira(null, null)
+                                    .conEdificacion(DERECHO_EDIFICACION, DERECHO_REVALIDACION)
+                                    // Observa OTRO punto: el conjunto tiene politicas, no esta.
+                                    .conRedondeo(
+                                            PuntoDeRedondeo.IMPUESTO_ALCABALA,
+                                            2,
+                                            RoundingMode.HALF_UP));
+            expedienteCompleto();
+            String cuerpo = emitir(sinRedondeo, 201);
+
+            assertThat(cuerpo).contains("\"nroLicencia\":\"LE-2026-000001\"");
+            assertThat(cuerpo)
+                    .as("dice por que no hay cifra, nombrando la fila que hay que publicar")
+                    .contains("\"valorDeObraNoDisponible\":")
+                    .contains("REDONDEO:VALOR_DE_OBRA_DEL_FUE");
+
+            String ficha =
+                    obtener(
+                            sinRedondeo,
+                            "/rentas/api/v1/licencias/edificacion?nroLicencia=LE-2026-000001");
+            assertThat(ficha)
+                    .contains("\"valorDeObra\":null")
+                    .contains("\"llaveQueFalta\":\"REDONDEO:VALOR_DE_OBRA_DEL_FUE\"");
         }
     }
 

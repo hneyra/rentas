@@ -318,9 +318,40 @@ class RegistrarAlcabalaTest {
                             base, llave[0], llave[1].isEmpty() ? null : llave[1], fila.getValue()),
                     Observacion.de("Fila del derivado publicable"));
         }
+        administrarParametros.agregarParametro(
+                conjunto.id(),
+                parametroDeRedondeo(base, "IMPUESTO_ALCABALA"),
+                Observacion.de("Politica de redondeo de ADR-0018 (#378)"));
         ConjuntoDeParametros sellado =
                 administrarParametros.sellar(conjunto.id(), Observacion.de("Sellado de prueba"));
         return sellado.id();
+    }
+
+    /**
+     * La fila {@code REDONDEO:‹punto›} con la politica de ADR-0018 —escala 2, {@code HALF_UP}—, que
+     * el derivado de {@code normativa} todavia no publica (#378). La escala en {@code
+     * valor_numerico} y el modo en {@code valor_texto}, en la misma fila.
+     */
+    private static long parametroDeRedondeo(BaseDeDatosDePrueba base, String punto)
+            throws SQLException {
+        try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
+                PreparedStatement sentencia =
+                        carga.prepareStatement(
+                                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
+                                        + " valor_numerico, valor_texto, vigencia_desde,"
+                                        + " documento_fuente, usuario_carga, usuario_aprueba)"
+                                        + " VALUES (NULL, 'REDONDEO', ?, 2, 'HALF_UP',"
+                                        + " DATE '2026-01-01', 'ADR-0018 de normativa, sembrado"
+                                        + " para la prueba (#378)', 'carga', 'aprueba')"
+                                        + " RETURNING id")) {
+            sentencia.setString(1, punto);
+            try (ResultSet fila = sentencia.executeQuery()) {
+                fila.next();
+                long id = fila.getLong(1);
+                carga.commit();
+                return id;
+            }
+        }
     }
 
     private static kamayuk.rentas.dominio.Ejercicio ejercicio2026() {

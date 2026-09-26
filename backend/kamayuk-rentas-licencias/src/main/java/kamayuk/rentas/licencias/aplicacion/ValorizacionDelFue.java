@@ -10,10 +10,12 @@ import java.util.Optional;
 import kamayuk.rentas.catastro.LectorDeValoresUnitarios;
 import kamayuk.rentas.catastro.ValorUnitarioPublicado;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.licencias.dominio.EstructuraDelProyecto;
 import kamayuk.rentas.licencias.dominio.TablaDeValoresUnitarios;
 import kamayuk.rentas.licencias.dominio.ValorizacionDeObra;
 import kamayuk.rentas.parametros.LectorDeParametros;
+import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
@@ -41,14 +43,26 @@ import org.springframework.stereotype.Service;
  * licencia ya se otorgo, y la de la declaracion mientras no. Sin eso, revisar dentro de dos anios
  * con que cuadro se valorizo una obra devolveria el vigente y podria dar otra cifra, sin avisar
  * (ARQ-09 §3, regla 9).
+ *
+ * <h2>Y la cifra sale redondeada, o no sale (#378)</h2>
+ *
+ * <p>Hasta #378 la valorizacion devolvia el producto crudo y el papel de la licencia lo imprimia:
+ * «Valor de obra (S/) 103320.31500000». ADR-0018 de {@code normativa} redondea al cierre de cada
+ * regla, a centimo, {@code HALF_UP}, y lo publica como dato: la fila {@code
+ * REDONDEO:VALOR_DE_OBRA_DEL_FUE} del conjunto sellado del mismo ejercicio. Se lee aqui, con {@link
+ * PoliticasDeRedondeoSelladas#en}, y si el conjunto no la publica pasa lo mismo que cuando falta el
+ * cuadro: el papel imprime «—» con su motivo y la ficha nombra la fila que falta. Imprimir el
+ * producto sin redondear seria justo lo que el ADR descarta.
  */
 @Service
 public class ValorizacionDelFue {
 
     private final LectorDeValoresUnitarios cuadro;
+    private final LectorDeParametros parametros;
 
-    public ValorizacionDelFue(LectorDeValoresUnitarios cuadro) {
+    public ValorizacionDelFue(LectorDeValoresUnitarios cuadro, LectorDeParametros parametros) {
         this.cuadro = cuadro;
+        this.parametros = parametros;
     }
 
     /**
@@ -114,8 +128,15 @@ public class ValorizacionDelFue {
                     null);
         }
 
+        Redondeo redondeo = redondeoEn(ejercicio);
+        PoliticaDeRedondeo politica = redondeo.politica();
+        if (politica == null) {
+            return redondeo.sinCifra(ejercicio);
+        }
+
         try {
-            return Resultado.calculada(ejercicio, ValorizacionDeObra.valorizar(estructuras, tabla));
+            return Resultado.calculada(
+                    ejercicio, ValorizacionDeObra.valorizar(estructuras, tabla, politica));
         } catch (TablaDeValoresUnitarios.ValorUnitarioSinParametrizar falta) {
             return Resultado.noDisponible(ejercicio, mensajeDe(falta), falta.celda());
         }
@@ -169,6 +190,9 @@ public class ValorizacionDelFue {
         }
         TablaDeValoresUnitarios tabla =
                 TablaDeValoresUnitarios.de(traducidas, ejercicio, ejercicio.valor());
+        // Una sola lectura de la politica para toda la pagina, por lo mismo que el cuadro.
+        Redondeo redondeo = redondeoEn(ejercicio);
+        PoliticaDeRedondeo politica = redondeo.politica();
 
         Map<Long, Resultado> resultados = new LinkedHashMap<>();
         for (Map.Entry<Long, List<EstructuraDelProyecto>> entrada : porExpediente.entrySet()) {
@@ -188,11 +212,16 @@ public class ValorizacionDelFue {
                                 null));
                 continue;
             }
+            if (politica == null) {
+                resultados.put(entrada.getKey(), redondeo.sinCifra(ejercicio));
+                continue;
+            }
             try {
                 resultados.put(
                         entrada.getKey(),
                         Resultado.calculada(
-                                ejercicio, ValorizacionDeObra.valorizar(estructuras, tabla)));
+                                ejercicio,
+                                ValorizacionDeObra.valorizar(estructuras, tabla, politica)));
             } catch (TablaDeValoresUnitarios.ValorUnitarioSinParametrizar falta) {
                 resultados.put(
                         entrada.getKey(),
@@ -207,6 +236,62 @@ public class ValorizacionDelFue {
         return mensaje == null ? "El cuadro de valores unitarios sellado esta incompleto" : mensaje;
     }
 
+    /**
+     * La politica con que se redondea el valor de obra en el ejercicio del acto, o por que no la
+     * hay (#378).
+     *
+     * <p>No lanza: lo que falta publicar vuelve dentro del {@link Resultado}, como la celda del
+     * cuadro que falta. Las cinco excepciones de {@link PoliticasDeRedondeoSelladas} nombran su
+     * fila —{@code REDONDEO:VALOR_DE_OBRA_DEL_FUE}, o el bloque {@code REDONDEO} entero si no hay
+     * ninguna—, y esa llave es la que la ficha publica en {@code llaveQueFalta}.
+     */
+    private Redondeo redondeoEn(Ejercicio ejercicio) {
+        try {
+            return new Redondeo(
+                    PoliticasDeRedondeoSelladas.en(
+                            parametros.vigenteEn(ejercicio), ValorizacionDeObra.PUNTO_DE_REDONDEO),
+                    null,
+                    null);
+        } catch (LectorDeParametros.EjercicioSinSellar sinSellar) {
+            return new Redondeo(
+                    null,
+                    "No hay ningun conjunto de parametros sellado para el ejercicio "
+                            + ejercicio
+                            + ", asi que no hay politica con que redondear el valor de obra"
+                            + " (ADR-0018)",
+                    null);
+        } catch (PoliticasDeRedondeoSelladas.SinPuntosObservados
+                | PoliticasDeRedondeoSelladas.PuntoSinObservar
+                | PoliticasDeRedondeoSelladas.MediaPolitica
+                | PoliticasDeRedondeoSelladas.EscalaNoEntera
+                | PoliticasDeRedondeoSelladas.ModoDesconocido falta) {
+            return new Redondeo(
+                    null,
+                    "El valor de obra no se imprime sin redondear, y el conjunto sellado no dice"
+                            + " como redondearlo (ADR-0018). "
+                            + mensajeDe(falta),
+                    falta.llave().orElse(null));
+        }
+    }
+
+    /**
+     * La politica del punto, o el motivo y la llave de por que no la hay: exactamente uno de los
+     * dos lados.
+     */
+    private record Redondeo(
+            @Nullable PoliticaDeRedondeo politica,
+            @Nullable String motivo,
+            @Nullable String llaveQueFalta) {
+
+        Resultado sinCifra(Ejercicio ejercicio) {
+            String porQue = motivo;
+            return Resultado.noDisponible(
+                    ejercicio,
+                    porQue == null ? "Falta la politica de redondeo del valor de obra" : porQue,
+                    llaveQueFalta);
+        }
+    }
+
     // ------------------------------------------------------------------
 
     /**
@@ -215,7 +300,8 @@ public class ValorizacionDelFue {
      * @param ejercicio el ejercicio con que se resolvio el conjunto sellado
      * @param valorizacion la obra valorizada; nula cuando no se pudo
      * @param motivo por que no se pudo; nulo cuando si se pudo
-     * @param llaveQueFalta la celda que falta, {@code partida:categoria}, cuando es eso lo que pasa
+     * @param llaveQueFalta la celda que falta, {@code partida:categoria}, cuando es eso lo que
+     *     pasa; o la fila de redondeo que falta, {@code REDONDEO:VALOR_DE_OBRA_DEL_FUE} (#378)
      */
     public record Resultado(
             Ejercicio ejercicio,

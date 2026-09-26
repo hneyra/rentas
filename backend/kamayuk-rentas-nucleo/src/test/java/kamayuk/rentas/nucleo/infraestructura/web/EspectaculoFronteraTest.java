@@ -7,6 +7,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import java.io.IOException;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -23,6 +24,7 @@ import kamayuk.rentas.contribuyentes.infraestructura.ContribuyenteRepositoryJdbc
 import kamayuk.rentas.contribuyentes.infraestructura.FichaRepositoryJdbc;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.MunicipalidadId;
+import kamayuk.rentas.dominio.PuntoDeRedondeo;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.nucleo.aplicacion.RegistrarEspectaculo;
 import kamayuk.rentas.nucleo.infraestructura.DeterminacionRepositoryJdbc;
@@ -95,7 +97,13 @@ class EspectaculoFronteraTest {
                         new RegistrarEspectaculo(
                                 new EspectaculoPublicoRepositoryJdbc(jdbc),
                                 new DeterminacionRepositoryJdbc(jdbc),
-                                DerivadoPublicado.conjuntoDelEjercicio(EJERCICIO),
+                                // Con la fila de redondeo del impuesto (#378): sin ella la
+                                // operacion contesta 422 «falta publicar» antes de llegar al
+                                // padron, que es lo que esta prueba mide.
+                                DerivadoPublicado.conjuntoDelEjercicioConRedondeo(
+                                        EJERCICIO,
+                                        RoundingMode.HALF_UP,
+                                        PuntoDeRedondeo.IMPUESTO_ESPECTACULO),
                                 envolver(
                                         new DirectorioJdbc(
                                                 new ContribuyenteRepositoryJdbc(jdbc),

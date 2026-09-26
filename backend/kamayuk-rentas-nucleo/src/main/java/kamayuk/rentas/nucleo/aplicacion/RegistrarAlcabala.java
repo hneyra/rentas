@@ -9,6 +9,7 @@ import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.nucleo.dominio.ObjetoDeTransferencia;
 import kamayuk.rentas.nucleo.dominio.Transferencia;
 import kamayuk.rentas.nucleo.dominio.TransferenciaRepository;
@@ -20,6 +21,7 @@ import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
 import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,12 @@ import org.springframework.transaction.annotation.Transactional;
  * como {@code ALICUOTA_ALCABALA}, que nadie publica, y la operación contestaba siempre 422 «falta
  * publicar» con el conjunto real; y el «10» estaba escrito aquí como estructura de la ley, cuando
  * {@code normativa} lo publica como cifra.
+ *
+ * <p><b>Y el impuesto se redondea en su punto</b>, {@code REDONDEO:IMPUESTO_ALCABALA}, con la
+ * politica del mismo conjunto (#378; ADR-0018 de {@code normativa}). Se pide por {@link
+ * PoliticasDeRedondeoSelladas#en} para que, si falta, el 422 diga de que ejercicio es la fila que
+ * hay que publicar (#633). Hasta #378 la respuesta y la auditoria decian el producto crudo y la
+ * columna {@code dinero} guardaba otra cifra.
  */
 @Service
 public class RegistrarAlcabala {
@@ -110,9 +118,11 @@ public class RegistrarAlcabala {
                         sellados.exigirNumero(LlavesDelConjunto.ALCABALA_ALICUOTA, null)
                                 .valor()
                                 .toPlainString());
+        PoliticaDeRedondeo redondeo =
+                PoliticasDeRedondeoSelladas.en(sellados, ImpuestoDeAlcabala.PUNTO_DE_REDONDEO);
 
         Dinero montoDeterminado =
-                ImpuestoDeAlcabala.calcular(eleccion.base(), tramoInafecto, alicuota);
+                ImpuestoDeAlcabala.calcular(eleccion.base(), tramoInafecto, alicuota, redondeo);
 
         Determinacion nueva =
                 Determinacion.nuevaAlcabala(

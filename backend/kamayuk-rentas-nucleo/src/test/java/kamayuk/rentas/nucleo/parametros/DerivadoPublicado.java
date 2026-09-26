@@ -1,15 +1,21 @@
 package kamayuk.rentas.nucleo.parametros;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Path;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.PoliticaDeRedondeo;
+import kamayuk.rentas.dominio.PuntoDeRedondeo;
 import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.parametros.CorpusDeNormativa;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 
 /**
  * El derivado publicable del corpus, leido como lo lee el proceso que publica (#188, #192, #395).
@@ -30,6 +36,13 @@ public final class DerivadoPublicado {
     /** El derivado que este repositorio versiona, tal como se despliega. */
     public static final Path ARCHIVO = CorpusDeNormativa.derivadoPublicable();
 
+    /**
+     * La escala que ADR-0018 fija para todo importe que se asienta: la de {@code dinero
+     * numeric(15,2)}. Es un dato de la prueba —el que {@code normativa} publicara—, no del codigo
+     * que se prueba.
+     */
+    private static final int ESCALA_DE_LA_ADR_0018 = 2;
+
     private DerivadoPublicado() {}
 
     /**
@@ -48,7 +61,28 @@ public final class DerivadoPublicado {
 
     /** Un lector de un conjunto compuesto con <b>todo</b> lo que el derivado publica. */
     public static LectorDeParametros conjuntoDelEjercicio(Ejercicio ejercicio) {
-        return new DelDerivado(ejercicio, numerosVigentesEn(ejercicio.valor()));
+        return new DelDerivado(ejercicio, numerosVigentesEn(ejercicio.valor()), Map.of());
+    }
+
+    /**
+     * Todo lo que el derivado publica <b>mas</b> las filas {@code REDONDEO:‹punto›} de esos puntos,
+     * con la escala 2 de ADR-0018 y el modo que se pida (#378).
+     *
+     * <p>Existe porque el derivado <b>no trae ninguna</b> fila de redondeo: ADR-0018 de {@code
+     * normativa} ya decidio el valor —escala 2, {@code HALF_UP}, al cierre de cada regla— y
+     * publicarlo es trabajo de {@code normativa}, no de este repositorio. Mientras tanto, una
+     * determinacion que cierra su regla en uno de esos puntos falla con el conjunto real, que es lo
+     * que el ADR manda; las pruebas que necesitan <b>llegar</b> a la cifra anaden aqui la fila que
+     * falta, y el modo entra como argumento para que una prueba pueda sellar otro y ver que la
+     * cifra cambia (#378).
+     */
+    public static LectorDeParametros conjuntoDelEjercicioConRedondeo(
+            Ejercicio ejercicio, RoundingMode modo, PuntoDeRedondeo... puntos) {
+        Map<PuntoDeRedondeo, PoliticaDeRedondeo> redondeos = new EnumMap<>(PuntoDeRedondeo.class);
+        for (PuntoDeRedondeo punto : puntos) {
+            redondeos.put(punto, new PoliticaDeRedondeo(ESCALA_DE_LA_ADR_0018, modo));
+        }
+        return new DelDerivado(ejercicio, numerosVigentesEn(ejercicio.valor()), redondeos);
     }
 
     /**
@@ -82,7 +116,7 @@ public final class DerivadoPublicado {
             }
             elegidos.put(normalizada, valor);
         }
-        return new DelDerivado(ejercicio, elegidos);
+        return new DelDerivado(ejercicio, elegidos, Map.of());
     }
 
     /**
@@ -92,16 +126,31 @@ public final class DerivadoPublicado {
      * <p>Solo lo usa {@link ElVehicularQuePlaneaNormativa} (#499): es la forma de probar hoy el
      * conjunto que {@code normativa} sellara el dia que publique el vehicular, sin escribir en
      * {@code normativa} y sin sembrar a mano el resto del conjunto.
+     *
+     * <p>Los puntos de {@code conRedondeo} entran con la politica que ADR-0018 ya decidio —escala
+     * 2, {@code HALF_UP}— y que {@code normativa} tampoco publica todavia (#378).
      */
     static LectorDeParametros conjuntoDelEjercicioMas(
-            Ejercicio ejercicio, Map<String, String> filas) {
+            Ejercicio ejercicio, Map<String, String> filas, PuntoDeRedondeo... conRedondeo) {
         Map<String, String> compuesto = new LinkedHashMap<>(numerosVigentesEn(ejercicio.valor()));
         filas.forEach(compuesto::putIfAbsent);
-        return new DelDerivado(ejercicio, compuesto);
+        Map<PuntoDeRedondeo, PoliticaDeRedondeo> redondeos = new EnumMap<>(PuntoDeRedondeo.class);
+        for (PuntoDeRedondeo punto : conRedondeo) {
+            redondeos.put(
+                    punto, new PoliticaDeRedondeo(ESCALA_DE_LA_ADR_0018, RoundingMode.HALF_UP));
+        }
+        return new DelDerivado(ejercicio, compuesto, redondeos);
     }
 
-    /** Un conjunto sellado compuesto con lo que el derivado publica, y nada mas. */
-    private record DelDerivado(Ejercicio ejercicio, Map<String, String> publicados)
+    /**
+     * Un conjunto sellado compuesto con lo que el derivado publica, y las filas de redondeo que la
+     * prueba anada (#378): {@code valor_numerico} la escala y {@code valor_texto} el modo, en la
+     * misma fila, como las lee {@link PoliticasDeRedondeoSelladas}.
+     */
+    private record DelDerivado(
+            Ejercicio ejercicio,
+            Map<String, String> publicados,
+            Map<PuntoDeRedondeo, PoliticaDeRedondeo> redondeos)
             implements LectorDeParametros {
 
         @Override
@@ -113,6 +162,16 @@ public final class DerivadoPublicado {
                         partes[0],
                         partes[1].isEmpty() ? null : partes[1],
                         ValorNormativo.de(fila.getValue()));
+            }
+            for (Map.Entry<PuntoDeRedondeo, PoliticaDeRedondeo> punto : redondeos.entrySet()) {
+                constructor.numero(
+                        PoliticasDeRedondeoSelladas.TIPO,
+                        punto.getKey().name(),
+                        new ValorNormativo(BigDecimal.valueOf(punto.getValue().escala())));
+                constructor.texto(
+                        PoliticasDeRedondeoSelladas.TIPO,
+                        punto.getKey().name(),
+                        punto.getValue().modo().name());
             }
             return constructor.construir();
         }

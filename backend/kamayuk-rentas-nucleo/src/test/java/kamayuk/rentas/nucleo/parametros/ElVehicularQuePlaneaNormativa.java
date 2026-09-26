@@ -3,6 +3,7 @@ package kamayuk.rentas.nucleo.parametros;
 import java.nio.file.Path;
 import java.util.Map;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.PuntoDeRedondeo;
 import kamayuk.rentas.parametros.LectorDeParametros;
 
 /**
@@ -64,7 +65,10 @@ public final class ElVehicularQuePlaneaNormativa {
                 Map.of(
                         ALICUOTA + "|", FILAS.get(ALICUOTA).cifra(),
                         MINIMO + "|", FILAS.get(MINIMO).cifra());
-        return DerivadoPublicado.conjuntoDelEjercicioMas(ejercicio, planeadas);
+        // Y la fila REDONDEO:IMPUESTO_VEHICULAR con el valor de ADR-0018 (#378): sin ella el
+        // impuesto no cierra su regla, y el conjunto que normativa selle la tendra que traer.
+        return DerivadoPublicado.conjuntoDelEjercicioMas(
+                ejercicio, planeadas, PuntoDeRedondeo.IMPUESTO_VEHICULAR);
     }
 
     /**

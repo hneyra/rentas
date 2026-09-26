@@ -39,10 +39,13 @@ import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
  * (regla 9): esa regla mira el tipo {@code Dinero}, y aquí no aparece. La fecha a la que están
  * calculadas es una sola para toda la petición y vive en {@link CalculoVehicularResource}.
  *
- * <p><b>Los importes viajan sin redondear.</b> El vehicular no tiene todavía ningún punto de
- * redondeo parametrizado y {@link kamayuk.rentas.dominio.Dinero} no elige escala por su cuenta
- * (D-03a/D-03c, ADR-0018): {@code 112800.00 × 1 %} sale «1128.0000». Redondearlo aquí sería tomar
- * esa decisión de paso y repartirla por la capa web.
+ * <p><b>Los importes viajan como quedaron en la fila</b> (#378). Este párrafo decía que viajaban
+ * sin redondear —«1128.0000»— citando ADR-0018, y el ADR dice lo contrario: escala 2, {@code
+ * HALF_UP}, al cierre de cada regla. Ahora el impuesto se redondea en {@code IMPUESTO_VEHICULAR}
+ * con la política del conjunto sellado, y lo asentado sale de lo que el repositorio leyó de la fila
+ * ({@code RETURNING}), así que la respuesta, la auditoría y {@code determinacion.monto_determinado}
+ * dicen la misma cifra: {@code 112845.50 × 1 %} es «1128.46», no «1128.4550». Redondear aquí
+ * seguiría siendo tomar esa decisión de paso en la capa web: se toma en la regla.
  *
  * @param id el identificador de la determinación guardada; {@code 0} si esto fue una simulación
  * @param ejercicio el ejercicio determinado

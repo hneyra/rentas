@@ -15,6 +15,7 @@ import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.nucleo.dominio.CriterioDeVehiculo;
 import kamayuk.rentas.nucleo.dominio.EstadoVehiculo;
 import kamayuk.rentas.nucleo.dominio.Transferencia;
@@ -33,6 +34,7 @@ import kamayuk.rentas.nucleo.dominio.vehicular.PropietarioAlPrimeroDeEnero;
 import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,6 +69,13 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code transferencia} —con la convención del mismo 1 de enero escrita allí—, y con la misma regla
  * {@link #vehiculosDe} resuelve sobre qué vehículos calcula una persona: los que tenía ese día, no
  * los que tiene hoy.
+ *
+ * <p><b>El impuesto se redondea en su punto</b>, {@code REDONDEO:IMPUESTO_VEHICULAR}, con la
+ * politica del mismo conjunto sellado (#378; ADR-0018 de {@code normativa}): hasta #378 salia el
+ * producto crudo —«1128.4550»— en la respuesta y en la auditoria, y la columna {@code dinero}
+ * guardaba 1128.46. Se pide por {@link PoliticasDeRedondeoSelladas#en} para que, si el conjunto no
+ * la publica, el 422 nombre la fila y el ejercicio (#633). Vale tambien para la simulacion: una
+ * cifra simulada que no fuera la que se asentaria no simula nada.
  *
  * <p><b>Ningún asiento de cuenta corriente se genera aquí</b>, igual que en {@link
  * RegistrarDeterminacionPredial}: trasladar el monto a una deuda exigible es un acto posterior
@@ -144,6 +153,8 @@ public class RegistrarDeterminacionVehicular {
                                 .valor()
                                 .toPlainString());
         Dinero minimoImponible = minimoImponibleDe(sellados);
+        PoliticaDeRedondeo redondeo =
+                PoliticasDeRedondeoSelladas.en(sellados, ImpuestoVehicular.PUNTO_DE_REDONDEO);
 
         // El contribuyente del ejercicio (art. 31, #329) y el precio al que ESE entro al
         // patrimonio (art. 32, #330) salen de la misma historia, leida una vez: asi la base no
@@ -160,7 +171,8 @@ public class RegistrarDeterminacionVehicular {
                                         ejercicio)
                                 .orElse(null),
                         valorReferencial.valor());
-        Dinero montoDeterminado = ImpuestoVehicular.calcular(base, alicuota, minimoImponible);
+        Dinero montoDeterminado =
+                ImpuestoVehicular.calcular(base, alicuota, minimoImponible, redondeo);
 
         Determinacion nueva =
                 Determinacion.nuevaVehicular(
