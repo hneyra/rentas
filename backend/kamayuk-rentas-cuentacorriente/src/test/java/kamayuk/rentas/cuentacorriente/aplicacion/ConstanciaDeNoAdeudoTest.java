@@ -213,6 +213,70 @@ class ConstanciaDeNoAdeudoTest {
         assertThat(constancia.seNiega()).isTrue();
     }
 
+    /**
+     * #363 — Una obligacion que sale de una fase avanzada y vuelve, dice la fase a la que volvio.
+     *
+     * <p>La siembra que distingue: ORDINARIA → CONVENIO → ORDINARIA, con identificadores
+     * crecientes. La muestra uniforme —obligaciones que solo avanzan de fase— da lo mismo con el
+     * maximo y con el ultimo, y no distingue nada. El convenio quebrado deja sus asientos en
+     * CONVENIO en el libro, pero ya no dicen donde esta la deuda.
+     */
+    @Test
+    @DisplayName("#363 — tras volver de CONVENIO la constancia dice ORDINARIA, no la maxima")
+    void trasVolverDelConvenioDiceOrdinaria() {
+        String codigo = crearContribuyenteConCodigo("K-0363", "80500363");
+        long titular = idDe(codigo);
+        Dinero total = Dinero.de(500);
+        cargar(titular, "PREDIAL", 2026, 0, total, Fase.ORDINARIA);
+        moverDeFase(titular, Fase.ORDINARIA, Fase.CONVENIO, total, LocalDate.of(2026, 4, 1));
+        moverDeFase(titular, Fase.CONVENIO, Fase.ORDINARIA, total, LocalDate.of(2026, 5, 1));
+
+        ConstanciaDeNoAdeudo constancia =
+                consulta.constanciaDeNoAdeudo(codigo, LocalDate.of(2026, 6, 1));
+
+        assertThat(constancia.obligaciones())
+                .singleElement()
+                .satisfies(
+                        fila -> {
+                            assertThat(fila.fase())
+                                    .as("la del ultimo asiento, no la mas avanzada que toco")
+                                    .isEqualTo(Fase.ORDINARIA);
+                            assertThat(fila.deuda().total()).isEqualTo(total);
+                        });
+    }
+
+    /**
+     * #363 — La fase de una constancia a una fecha pasada es la que la obligacion tenia ese dia.
+     *
+     * <p>La OP del 2026-06-01 asienta el par AJUSTE a VALOR con esa fecha valor. Una constancia al
+     * 2026-05-15 describe la obligacion en ORDINARIA —el pase a valor todavia no habia ocurrido—;
+     * la misma al 2026-06-01, en VALOR. Las dos mitades hacen falta: la primera sola la pasaria una
+     * constancia que dijera siempre ORDINARIA.
+     */
+    @Test
+    @DisplayName(
+            "#363 — con corte anterior al pase a valor la constancia dice ORDINARIA; al dia, VALOR")
+    void conCorteAnteriorAlPaseAValorDiceOrdinaria() {
+        String codigo = crearContribuyenteConCodigo("K-1363", "80501363");
+        long titular = idDe(codigo);
+        Dinero total = Dinero.de("420.00");
+        cargar(titular, "PREDIAL", 2026, 0, total, Fase.ORDINARIA);
+        moverDeFase(titular, Fase.ORDINARIA, Fase.VALOR, total, LocalDate.of(2026, 6, 1));
+
+        assertThat(consulta.constanciaDeNoAdeudo(codigo, LocalDate.of(2026, 5, 15)).obligaciones())
+                .singleElement()
+                .satisfies(
+                        fila -> {
+                            assertThat(fila.fase())
+                                    .as("al 15 de mayo la OP del 1 de junio todavia no existia")
+                                    .isEqualTo(Fase.ORDINARIA);
+                            assertThat(fila.deuda().total()).isEqualTo(total);
+                        });
+        assertThat(consulta.constanciaDeNoAdeudo(codigo, LocalDate.of(2026, 6, 1)).obligaciones())
+                .singleElement()
+                .satisfies(fila -> assertThat(fila.fase()).isEqualTo(Fase.VALOR));
+    }
+
     @Test
     @DisplayName("una obligacion cancelada (cargo y abono netean a cero) no niega la constancia")
     void obligacionCanceladaNoNiega() {
@@ -316,6 +380,41 @@ class ConstanciaDeNoAdeudoTest {
     private void abonar(
             long titular, String tributo, int ejercicio, int periodo, Dinero insoluto, Fase fase) {
         asentar(titular, tributo, ejercicio, periodo, insoluto, fase, TipoAsiento.ABONO);
+    }
+
+    /**
+     * El par de un movimiento de fase del PREDIAL anual, como lo asientan el pase a valor ({@code
+     * AJUSTE}) y el acogimiento ({@code FRACCIONAMIENTO}): ABONO en la de salida y CARGO en la de
+     * entrada, en ese orden, asi que el ultimo identificador es el de la fase de entrada. Ninguno
+     * de los dos conceptos mueve el total.
+     */
+    private void moverDeFase(
+            long titular, Fase salida, Fase entrada, Dinero monto, LocalDate fechaValor) {
+        Concepto concepto =
+                entrada == Fase.VALOR || salida == Fase.VALOR
+                        ? Concepto.AJUSTE
+                        : Concepto.FRACCIONAMIENTO;
+        for (Fase fase : List.of(salida, entrada)) {
+            registrarAsiento.asentar(
+                    // nuevoConMotivo: AJUSTE exige motivo; RegistrarAsiento lo sustituye por la
+                    // observacion, como en el pase a valor de verdad.
+                    Asiento.nuevoConMotivo(
+                            new Ejercicio(2026),
+                            titular,
+                            "PREDIAL",
+                            concepto,
+                            fase == salida ? TipoAsiento.ABONO : TipoAsiento.CARGO,
+                            fase,
+                            0,
+                            null,
+                            null,
+                            null,
+                            monto,
+                            fechaValor,
+                            "RES-PRUEBA-0363",
+                            "movimiento de fase de la prueba"),
+                    OBSERVACION);
+        }
     }
 
     private void asentar(
