@@ -1,4 +1,4 @@
-import { coordenada, type CeldaDeLaTabla, type Coordenada } from '@kamayuk/ui';
+import { coordenada, type Ausencia, type CeldaDeLaTabla, type Coordenada } from '@kamayuk/ui';
 
 import {
   formatearEntero,
@@ -504,6 +504,18 @@ function totalDeLaResolucion(
 }
 
 /**
+ * Lo que se dice cuando el numero de resolucion de la direccion no existe (#457): se arregla
+ * escribiendo otro numero —o abriendo la hoja sin el, que toma la primera—, no revisando la cuenta.
+ */
+export const RESOLUCION_QUE_NO_EXISTE: Ausencia = {
+  enElCampo: 'resolucion inexistente',
+  explicacion:
+    'El numero de resolucion que trae la direccion no existe en esta municipalidad. No es una ' +
+    'averia y reintentar no lo cambia: se abre con otro numero, o sin el para ver la primera.',
+  tono: 'atencion',
+};
+
+/**
  * `fis-res` — la resolucion de determinacion.
  *
  * <h2>Dejo de EXIGIR sujeto y pasa a ADMITIRLO, que no es lo mismo (#192, #215)</h2>
@@ -522,10 +534,10 @@ function totalDeLaResolucion(
  *       que es el `ORDEN_POR_OMISION` de `ResolucionController`— y con ella se pide su detalle.</li>
  * </ul>
  *
- * **Retirar `exigeSujeto` a secas habria costado la mitad buena**: `catalogo.ts` deriva de el el
+ * **Retirar `sujeto: 'exige'` a secas habria costado la mitad buena**: `catalogo.ts` deriva de el el
  * sitio del sujeto, y sin esa linea el marco **tira** el numero de la direccion con un aviso, de
  * modo que un enlace a una resolucion concreta abriria siempre la primera del padron. Por eso la
- * tercera forma, `admiteSujeto`; ver su javadoc en `datos/conectores.ts`.
+ * tercera forma, `sujeto: 'admite'`; ver su javadoc en `datos/conectores.ts`.
  *
  * Con la relacion vacia devuelve `null`: «se pregunto y no hay», que la pantalla dice como «sin
  * datos». Un numero que no existe sigue siendo **404** del backend, y eso es correcto —lo pidio
@@ -579,7 +591,8 @@ function totalDeLaResolucion(
  */
 const FIS_RES: Conector = {
   clave: ['fis-res', 'resolucion-de-determinacion'],
-  admiteSujeto: true,
+  sujeto: 'admite',
+  noEncontrado: RESOLUCION_QUE_NO_EXISTE,
   pedir: async ({ senal, sujeto }) => {
     // Con numero en la direccion se pide ESE, y la relacion no se toca: pedirla seria una ida de
     // mas para elegir lo que ya esta elegido.

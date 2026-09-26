@@ -274,6 +274,44 @@ describe('`ini-panel` — el avance del ejercicio', () => {
  * que el hueco de la corrida es de UN campo y no de la pantalla. Una hoja que dijera «sin datos»
  * de arriba abajo pasaria la mitad de «no revienta» y esconderia cinco cifras que si llegaron.
  */
+describe('`ini-panel` dice de cuando es cada cifra (#457, regla 9)', () => {
+  it('el panel a su fecha y los observados a la de SU emision: dos fechas, no una', async () => {
+    // Las dos fechas son distintas a proposito: con una sola —o con la de hoy— el pie generico
+    // «a la fecha de hoy» acertaria por casualidad y esta prueba pasaria con el defecto.
+    contesta({
+      [RECAUDACION]: {
+        ...recaudacion(2026, '1.00', '2.00', '3 %', { nombre: 'x', cargado: '1.00', cobrado: '1.00', pendiente: '1.00', pct: 1 }),
+        fechaCalculo: '2026-09-23',
+      },
+      [CORRIDA]: corrida(534),
+    });
+    const { container } = arnes()('ini-panel');
+
+    await waitFor(() => {
+      expect(screen.getByText('534')).toBeInTheDocument();
+    });
+    expect(container.textContent).toContain('Las cifras son al 23/09/2026.');
+    expect(container.textContent).toContain('«Observados sin emisión» es al 28/01/2026.');
+  });
+
+  it('`ini-flujo` e `ini-parado` tambien dicen la suya', async () => {
+    contesta({
+      [RECAUDACION]: recaudacion(2026, '1.00', '2.00', '3 %', { nombre: 'x', cargado: '1.00', cobrado: '1.00', pendiente: '1.00', pct: 1 }),
+    });
+    const flujo = arnes()('ini-flujo');
+    await waitFor(() => {
+      expect(flujo.container.textContent).toContain('Las cifras son al 16/09/2026.');
+    });
+    flujo.unmount();
+
+    contesta({ [PARADO]: trabajoParado(3, '120.00') });
+    const parado = arnes()('ini-parado');
+    await waitFor(() => {
+      expect(parado.container.textContent).toContain('Las cifras son al 16/09/2026.');
+    });
+  });
+});
+
 describe('`ini-panel` sin corrida del ejercicio (#354)', () => {
   it('la corrida en 204: las cinco de la recaudacion salen, y «Observados» dice «sin corrida»', async () => {
     contesta({

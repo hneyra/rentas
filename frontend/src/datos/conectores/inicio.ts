@@ -67,6 +67,12 @@ import { RUTAS, pedirUno, pedirUnoOVacio } from '../lecturas.ts';
  * `aritmetica-con-importes`).
  */
 
+/**
+ * La etiqueta del campo de `ini-panel` que sale de la ultima emision y no del panel (#457). Es la de
+ * la definicion, letra por letra: viaja como clave de traduccion.
+ */
+const OBSERVADOS_SIN_EMISION = 'Observados sin emisión';
+
 /** Lo que se escribe donde la operacion publica `importe: null`. Nunca `0.00`. */
 const SIN_CIFRAR = 'sin cifrar';
 
@@ -225,7 +231,17 @@ const INI_PANEL: Conector = {
     // una hoja decia «1,204» y la otra «1204».
     else poner(coordenada(0, 5), formatearEntero(corrida.observados));
 
-    return { valores, filas: new Map(), noPublicados };
+    return {
+      valores,
+      filas: new Map(),
+      noPublicados,
+      // Regla 9 (#457): las cifras del panel son de su calculo, y el recuento de observados es de
+      // la emision de la que sale, que casi nunca es de hoy.
+      aLaFecha: recaudacion.fechaCalculo,
+      ...(corrida !== null && noEsLaEmision === null
+        ? { fechasPropias: [{ de: OBSERVADOS_SIN_EMISION, fecha: corrida.fechaCalculo }] }
+        : {}),
+    };
   },
 };
 
@@ -263,6 +279,8 @@ const INI_FLUJO: Conector = {
       // Y sin el bloque tampoco hay serie: el grafico dice que no la hay, por lo mismo.
       nombrados: serieDelGrafico(porTributo?.rows ?? []),
       noPublicados: new Map(),
+      // Emitido, recaudado y saldo son a la fecha del calculo, y la pantalla lo dice (regla 9).
+      aLaFecha: recaudacion.fechaCalculo,
     };
   },
 };
@@ -330,6 +348,8 @@ const INI_PARADO: Conector = {
       ],
     ]),
     noPublicados: new Map(),
+    // Los importes de la cuarta columna son a la fecha del calculo (regla 9, #457).
+    aLaFecha: parado.fechaCalculo,
   }),
 };
 

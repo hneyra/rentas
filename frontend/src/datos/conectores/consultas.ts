@@ -1,4 +1,4 @@
-import { coordenada } from '@kamayuk/ui';
+import { coordenada, type Ausencia } from '@kamayuk/ui';
 
 import {
   formatearFecha,
@@ -54,6 +54,22 @@ import { NO_PUBLICADO } from '../conectores.ts';
 const importe = (valor: { readonly importe: string }): string => formatearImporte(valor.importe);
 
 /**
+ * Lo que se dice cuando el codigo de la direccion no esta en el padron (#457).
+ *
+ * Sin esto, el 404 de negocio caia en el peldano de identidad de la escalera —«Revise con que
+ * cuenta esta entrando»—, que manda a revisar la cuenta cuando lo que esta mal es un codigo
+ * tecleado. Los dos 404 llevan el mismo `codigo`, asi que la escalera no los puede separar: lo dice
+ * el conector, que es quien sabe que la direccion trae un sujeto.
+ */
+export const CODIGO_QUE_NO_EXISTE: Ausencia = {
+  enElCampo: 'no esta en el padron',
+  explicacion:
+    'El codigo de contribuyente que trae la direccion no existe en esta municipalidad. No es una ' +
+    'averia y reintentar no lo cambia: se abre con otro codigo.',
+  tono: 'atencion',
+};
+
+/**
  * `con-panel` — la cuenta corriente del contribuyente, de DOS operaciones.
  *
  * <h2>De donde sale cada uno de los ocho campos</h2>
@@ -91,7 +107,8 @@ const importe = (valor: { readonly importe: string }): string => formatearImport
  */
 export const CON_PANEL: Conector = {
   clave: ['con-panel', 'unificada'],
-  exigeSujeto: true,
+  sujeto: 'exige',
+  noEncontrado: CODIGO_QUE_NO_EXISTE,
   pedir: async ({ senal, sujeto }) => {
     // `Promise.all` y no dos lecturas con estado propio: `Reparto` reparte UNA respuesta, asi que
     // si una de las dos falla la pantalla dice que fallo entera en vez de pintar la mitad. Pintar
@@ -178,7 +195,8 @@ function cuotasDe(obligacion: DeudaPorConcepto): string {
  */
 export const CON_DOC: Conector = {
   clave: ['con-doc', 'constancia-de-no-adeudo'],
-  exigeSujeto: true,
+  sujeto: 'exige',
+  noEncontrado: CODIGO_QUE_NO_EXISTE,
   pedir: ({ senal, sujeto }) =>
     pedirUno<ConstanciaDeNoAdeudo>(RUTAS.constanciaDeNoAdeudoDe(sujeto ?? ''), senal),
   repartir: (constancia: ConstanciaDeNoAdeudo): Reparto => {

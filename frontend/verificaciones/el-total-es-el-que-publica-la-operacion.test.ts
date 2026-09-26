@@ -2,9 +2,10 @@
 //
 // Lee las fuentes de los conectores del disco, y ademas los ejercita. No hay DOM que necesitar.
 
-import { readFileSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { CONECTORES } from "../src/datos/conectores.ts";
@@ -14,6 +15,7 @@ import { CLAVES_DE_HOJA, type ClaveDeHoja } from "../src/pantallas/arbol.ts";
 import { tablasDe } from "../src/pantallas/bloques.ts";
 import { pantallaDe } from "../src/pantallas/definiciones/index.ts";
 import { hayMasDe, paginasDe } from "../src/pantallas/tablas.ts";
+import { fuentesDeLosConectores as lasFuentesDelArbol } from "./los-conectores-del-arbol.ts";
 
 /**
  * **El total que una tabla ensena es el que la OPERACION publica, jamas uno contado aqui** (#172
@@ -42,28 +44,48 @@ import { hayMasDe, paginasDe } from "../src/pantallas/tablas.ts";
  * `conectores.ts` usa para la regla hermana.
  */
 
-const AQUI = dirname(fileURLToPath(import.meta.url));
-const CONECTORES_DIR = join(AQUI, "../src/datos/conectores");
+const FRONTEND = dirname(dirname(fileURLToPath(import.meta.url)));
 
 /**
- * Los conectores de produccion, con su texto.
+ * Los conectores de produccion, con su texto: **la misma derivacion que las otras dos guardas**
+ * (#277, #457), el reparto —`conectores.ts`— mas un archivo por modulo del arbol.
  *
- * **Fuera los `*DeMuestra.ts`**, y no es una excepcion comoda: son <b>respuestas de `curl` a la
- * instalacion</b>, copiadas tal cual. Su `totalElementos: 84` es lo que la instalacion contesto, o
- * sea justo lo que hay que conservar; corregirlo ahi seria falsificar la medida. Lo que esta
- * guarda vigila es el conector, que es quien decide que numero llega a la pantalla.
+ * Hasta #457 esta guarda tenia su propia copia —un `readdirSync` de `conectores/`— que dejaba
+ * fuera `conectores.ts`, justo donde `TERRITORIO` arma sus tablas y discute por que no llevan
+ * `totalElementos`. Dos copias de una derivacion son dos copias que se separan. Los `*DeMuestra.ts`
+ * siguen fuera: son respuestas de `curl` a la instalacion, y su `totalElementos: 84` es lo medido.
  */
 function fuentesDeLosConectores(): readonly { readonly archivo: string; readonly texto: string }[] {
-  return readdirSync(CONECTORES_DIR)
-    .filter((entrada) => entrada.endsWith(".ts") && !entrada.includes(".test.") && !entrada.endsWith("DeMuestra.ts"))
-    .map((entrada) => ({
-      archivo: `src/datos/conectores/${entrada}`,
-      texto: readFileSync(join(CONECTORES_DIR, entrada), "utf8"),
-    }));
+  return lasFuentesDelArbol().map((ruta) => ({
+    archivo: relative(FRONTEND, ruta),
+    texto: readFileSync(ruta, "utf8"),
+  }));
 }
 
-/** Lo que se le asigna a `totalElementos:` en un conector, una aparicion por linea. */
-const ASIGNACION = /^\s*totalElementos:\s*(.+?),?\s*$/gm;
+/**
+ * Lo que se le asigna a cada propiedad `nombres` en un literal de objeto, leido con el compilador
+ * (#457): una asignacion en una sola linea —`{ filas, totalElementos: filas.length }`— es igual de
+ * asignacion que una en su linea, y un patron anclado al principio de linea no la veia. El
+ * abreviado `{ totalElementos }` sale con su nombre: tampoco dice de donde viene el numero.
+ */
+function asignaciones(
+  archivo: string,
+  texto: string,
+  nombres: readonly string[],
+): readonly { readonly nombre: string; readonly derecha: string }[] {
+  const fuente = ts.createSourceFile(archivo, texto, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const halladas: { nombre: string; derecha: string }[] = [];
+  const visitar = (nodo: ts.Node): void => {
+    if (ts.isPropertyAssignment(nodo) && nombres.includes(nodo.name.getText(fuente))) {
+      halladas.push({ nombre: nodo.name.getText(fuente), derecha: nodo.initializer.getText(fuente) });
+    } else if (ts.isShorthandPropertyAssignment(nodo) && nombres.includes(nodo.name.getText(fuente))) {
+      halladas.push({ nombre: nodo.name.getText(fuente), derecha: nodo.name.getText(fuente) });
+    }
+    nodo.forEachChild(visitar);
+  };
+  visitar(fuente);
+  return halladas;
+}
 
 describe("el total de una tabla sale del envoltorio, y no de una cuenta (#172, AC3)", () => {
   it("EL CENTINELA: hay conectores, y alguno entrega un total", () => {
@@ -76,8 +98,7 @@ describe("el total de una tabla sale del envoltorio, y no de una cuenta (#172, A
   it("ninguna asignacion de `totalElementos` cuenta filas: solo lee el campo de la respuesta", () => {
     const contados: string[] = [];
     for (const { archivo, texto } of fuentesDeLosConectores()) {
-      for (const casado of texto.matchAll(ASIGNACION)) {
-        const derecha = (casado[1] ?? "").trim();
+      for (const { derecha } of asignaciones(archivo, texto, ["totalElementos"])) {
         // Lo unico admitido es leer el campo del envoltorio: `<loQueLlego>.totalElementos`.
         if (!/^[A-Za-z_$][\w$]*(\?)?\.totalElementos$/.test(derecha)) {
           contados.push(`  ${archivo}: totalElementos: ${derecha}`);
@@ -100,8 +121,8 @@ describe("el total de una tabla sale del envoltorio, y no de una cuenta (#172, A
   it("y `hayMas` y `paginas` tampoco se cuentan: los dice el servidor", () => {
     const contados: string[] = [];
     for (const { archivo, texto } of fuentesDeLosConectores()) {
-      for (const casado of texto.matchAll(/^\s*(hayMas|totalPaginas):\s*(.+?),?\s*$/gm)) {
-        contados.push(`  ${archivo}: ${casado[1] ?? ""}: ${casado[2] ?? ""}`);
+      for (const { nombre, derecha } of asignaciones(archivo, texto, ["hayMas", "totalPaginas"])) {
+        contados.push(`  ${archivo}: ${nombre}: ${derecha}`);
       }
     }
     expect(
@@ -306,7 +327,7 @@ describe("un recuento que no cuenta sus propias filas no se llama `totalElemento
     "GET /coactiva/liquidaciones-costas": "liquidacionesDelCriterio",
   };
 
-  const FORMAS = join(AQUI, "../../docs/50-api/formas-de-la-api.json");
+  const FORMAS = join(FRONTEND, "../docs/50-api/formas-de-la-api.json");
   const formas = JSON.parse(readFileSync(FORMAS, "utf8")) as Readonly<Record<string, Record<string, unknown>>>;
 
   it("EL CENTINELA: el contrato se lee y declara las dos operaciones", () => {

@@ -454,7 +454,7 @@ type LoDeTraVeh = readonly [
  * <h2>La placa va en la RUTA, y sin ella no se pide nada</h2>
  *
  * `GET /rentas/vehiculos/{placa}` es la primera operacion encendida que lleva su sujeto **en la
- * ruta** y no en la cadena de consulta. El mecanismo es el que #169 dejo instalado: `exigeSujeto`
+ * ruta** y no en la cadena de consulta. El mecanismo es el que #169 dejo instalado: `sujeto: 'exige'`
  * aqui, `enLaRuta` derivado de aqui en `catalogo.ts` —derivado, y no una lista paralela que se
  * desincroniza en silencio— y la placa viajando en la direccion, `#/tra-veh/T2G-418`. Sin ella la
  * hoja lo dice con `SIN_PLACA` en vez de pedir el padron vehicular entero.
@@ -550,6 +550,18 @@ type LoDeTraVeh = readonly [
  * lee una vez, en «Dias de custodia».
  */
 /**
+ * Lo que se dice cuando la placa de la direccion no esta registrada (#457): se arregla escribiendo
+ * otra placa, no revisando la cuenta con que se entra.
+ */
+export const PLACA_QUE_NO_EXISTE: Ausencia = {
+  enElCampo: 'placa no registrada',
+  explicacion:
+    'La placa que trae la direccion no esta registrada en esta municipalidad. No es una averia y ' +
+    'reintentar no lo cambia: se abre con otra placa.',
+  tono: 'atencion',
+};
+
+/**
  * **Si ese internamiento ya termino** (#387): el vehiculo salio del deposito.
  *
  * Se miran las dos cosas que la operacion publica de la salida, y basta una: `estado` es la
@@ -564,13 +576,14 @@ function yaSalioDelDeposito(internamiento: InternamientoEnDeposito): boolean {
 
 const TRA_VEH: Conector = {
   clave: ['tra-veh', 'deposito'],
-  exigeSujeto: true,
+  sujeto: 'exige',
+  noEncontrado: PLACA_QUE_NO_EXISTE,
   sinSujeto: SIN_PLACA,
   // La ventana de la tabla del deposito. La tercera lectura —la de ESTA placa— no pagina: es una
   // fila, la ULTIMA que entro, y se pide con `?sentido=DESCENDENTE&tamano=1` (#387).
   parametros: laVentanaDe('GET /transito/internamientos'),
   pedir: ({ senal, sujeto, enLaRuta }) => {
-    // `useDatosDeLaHoja` no llama a `pedir` sin sujeto cuando `exigeSujeto` esta puesto; el `??`
+    // `useDatosDeLaHoja` no llama a `pedir` sin sujeto cuando `sujeto: 'exige'` esta puesto; el `??`
     // es para el compilador, no una rama que se ejecute.
     const placa = sujeto ?? '';
     return Promise.all([
