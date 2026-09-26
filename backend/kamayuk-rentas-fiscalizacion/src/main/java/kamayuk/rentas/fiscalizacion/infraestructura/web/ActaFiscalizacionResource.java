@@ -66,7 +66,9 @@ import org.jspecify.annotations.Nullable;
  * @param contribuyente el nombre del obligado; {@code null} si ya no está en el padrón
  * @param codContribuyente el código con el que se le identifica en ventanilla; {@code null} por lo
  *     mismo
- * @param areaDeclarada la superficie que consigna la versión de ficha que el acta referencia
+ * @param areaDeclarada la superficie que consigna la declaración jurada del ejercicio del programa
+ *     —la versión de ficha que esa declaración referencia, no la inscrita el día de la visita
+ *     (#344)—; {@code null} si no declaró o no hay de dónde saberlo
  * @param usoDeclarado el uso que consigna esa misma versión
  * @param diferenciaDeArea hallada menos declarada, nunca negativa; nula si falta un lado
  */

@@ -158,11 +158,9 @@ public class AnularActaFiscalizacion {
      * modo de fallo que #194 midio—.
      */
     private ActaConLoDeclarado conLoDeclarado(ActaFiscalizacion acta) {
-        Long fichaId = acta.fichaId();
-        return fichaId == null
-                ? ActaConLoDeclarado.sinLadoDeclarado(acta)
-                : ActaConLoDeclarado.de(
-                        acta, actas.loDeclaradoPorFicha(java.util.Set.of(fichaId)).get(fichaId));
+        long actaId = java.util.Objects.requireNonNull(acta.id(), "Un acta leida lleva su id");
+        return ActaConLoDeclarado.de(
+                acta, actas.loDeclaradoDeLasActas(java.util.Set.of(actaId)).get(actaId));
     }
 
     private static String descripcion(ActaFiscalizacion acta) {

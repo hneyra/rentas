@@ -8,6 +8,7 @@ import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
+import kamayuk.rentas.fiscalizacion.dominio.ComparacionHalladoDeclarado;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,10 +28,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Hasta #191 esta lectura devolvía el acta desnuda, que guarda lo <b>hallado</b> y no lo
  * declarado: la tabla «Declarado contra verificado» de la pantalla salía con dos de sus cinco
- * columnas en raya en todas sus filas. El lado declarado lo dice la versión de ficha que el acta
- * referencia en {@code fichaId}, y se resuelve aquí —{@link ActaConLoDeclarado}— en <b>una</b>
- * lectura por página. No se guarda en la fila del acta: sería una segunda verdad sobre lo mismo,
- * que es lo que #397 y #481 se negaron a introducir.
+ * columnas en raya en todas sus filas. El lado declarado lo dice la declaración jurada del
+ * ejercicio del programa —no la ficha inscrita el día de la visita (#344)—, y se resuelve aquí
+ * —{@link ActaConLoDeclarado}— en <b>una</b> lectura por página. No se guarda en la fila del acta:
+ * sería una segunda verdad sobre lo mismo, que es lo que #397 y #481 se negaron a introducir.
  *
  * <p>{@code @Transactional(readOnly = true)}: sin transacción no hay contexto de tenant fijado, y
  * sin él la política RLS no devuelve una página vacía sino que <b>revienta</b> —{@code invalid
@@ -48,33 +49,26 @@ public class ConsultaDeActas {
     @Transactional(readOnly = true)
     public Pagina<ActaConLoDeclarado> buscar(Paginacion paginacion) {
         Pagina<ActaFiscalizacion> pagina = actas.consultar(paginacion);
-        Map<Long, ActaConLoDeclarado.LoDeclarado> porFicha =
-                actas.loDeclaradoPorFicha(fichasDe(pagina));
+        Map<Long, ComparacionHalladoDeclarado.LoDeclarado> porActa =
+                actas.loDeclaradoDeLasActas(idsDe(pagina));
         return pagina.mapear(
                 acta ->
                         ActaConLoDeclarado.de(
-                                acta,
-                                acta.fichaId() == null ? null : porFicha.get(acta.fichaId())));
+                                acta, acta.id() == null ? null : porActa.get(acta.id())));
     }
 
     /**
-     * Las versiones de ficha que esta pagina referencia, <b>una sola vez cada una</b>.
-     *
-     * <p>Es una lectura por pagina y no una por fila, el mismo reparto con que {@code
-     * DeteccionDeOmisos} resuelve los titulares de la suya. Resolverlo fila a fila seria una
-     * consulta por acta, y por el puerto HTTP de catastro seria una peticion por acta.
-     *
-     * <p>Un acta vehicular no referencia ninguna, y un acta predial de un predio sin ficha
-     * registrada a la fecha de la visita tampoco: esas no aportan ninguna llave y salen con su lado
-     * declarado nulo.
+     * Las actas de esta pagina: el lado declarado se resuelve para todas en <b>una</b> lectura, el
+     * mismo reparto con que {@code DeteccionDeOmisos} resuelve los titulares de la suya. Fila a
+     * fila seria una consulta por acta.
      */
-    private static Set<Long> fichasDe(Pagina<ActaFiscalizacion> pagina) {
-        Set<Long> fichas = new HashSet<>();
+    private static Set<Long> idsDe(Pagina<ActaFiscalizacion> pagina) {
+        Set<Long> ids = new HashSet<>();
         for (ActaFiscalizacion acta : pagina.contenido()) {
-            if (acta.fichaId() != null) {
-                fichas.add(acta.fichaId());
+            if (acta.id() != null) {
+                ids.add(acta.id());
             }
         }
-        return fichas;
+        return ids;
     }
 }

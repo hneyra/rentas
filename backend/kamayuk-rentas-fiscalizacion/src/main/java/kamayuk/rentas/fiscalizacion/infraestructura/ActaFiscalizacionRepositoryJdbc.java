@@ -5,6 +5,7 @@ import java.util.Map;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
+import kamayuk.rentas.fiscalizacion.dominio.ComparacionHalladoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeActa;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
@@ -277,37 +278,46 @@ public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
     }
 
     /**
-     * El lado declarado de cada version de ficha, leido de la <b>proyeccion local</b> (#191).
+     * Lo que consta declarado para cada acta predial, en el ejercicio de su programa (#191, #344).
      *
-     * <p>{@code ficha_ref} es una tabla de ESTE esquema (V4, P5C): la proyeccion que el ingestor de
-     * catastro mantiene, y la misma de la que {@code DeteccionRepositoryJdbc} saca el area
-     * declarada de cada predio. No cruza ninguna frontera de sistema y no cuesta una peticion HTTP
-     * por fila, que es lo que costaria resolverlo por el puerto {@code LectorDeFichas} —cuyo
-     * adaptador deja escrito que «cada metodo es una peticion»—.
+     * <p>El {@code JOIN} de la declaracion es {@link LaDeclaracionDelEjercicio}, el MISMO fragmento
+     * con que {@code DeteccionRepositoryJdbc} saca el area declarada de cada predio: hasta #344
+     * esta lectura iba por {@code acta.ficha_id}, que es la ficha inscrita el dia de la visita, y
+     * contestaba otra pregunta con el mismo nombre. Todo es de este esquema —{@code
+     * declaracion_jurada} y la proyeccion {@code ficha_ref}—: no cruza ninguna frontera de sistema
+     * ni cuesta una peticion HTTP por fila.
      *
-     * <p>No filtra por {@code municipalidad_id}: lo hace la politica RLS de {@code ficha_ref}.
-     *
-     * <p>Una version que la proyeccion todavia no tenga no sale del mapa. Eso publica el lado
-     * declarado en nulo, que es lo que significa: «no consta», y no «cero».
+     * <p>No filtra por {@code municipalidad_id}: lo hace la politica RLS de cada tabla. Un acta
+     * vehicular, o de un programa sin ejercicio, no sale del mapa.
      */
     @Override
-    public Map<Long, kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado.LoDeclarado>
-            loDeclaradoPorFicha(java.util.Set<Long> fichaIds) {
-        if (fichaIds.isEmpty()) {
+    public Map<Long, ComparacionHalladoDeclarado.LoDeclarado> loDeclaradoDeLasActas(
+            java.util.Set<Long> actaIds) {
+        if (actaIds.isEmpty()) {
             return Map.of();
         }
-        Map<Long, kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado.LoDeclarado> porFicha =
-                new HashMap<>();
-        for (LoDeclaradoDeUnaFicha leida :
+        Map<Long, ComparacionHalladoDeclarado.LoDeclarado> porActa = new HashMap<>();
+        for (LoDeclaradoDeUnActa leida :
                 jdbc().sql(
-                                "SELECT ficha_id, area_terreno, uso FROM ficha_ref"
-                                        + " WHERE ficha_id IN (:fichas)")
-                        .param("fichas", fichaIds)
+                                "SELECT a.id AS acta_id, dj.id IS NOT NULL AS presento,"
+                                        + " COALESCE(dj.fuera_de_plazo, false) AS fuera_de_plazo,"
+                                        + " fd.area_terreno, fd.uso"
+                                        + " FROM acta_fiscalizacion a"
+                                        + " JOIN programa_fiscalizacion pr"
+                                        + "   ON pr.municipalidad_id = a.municipalidad_id"
+                                        + "  AND pr.id = a.programa_id"
+                                        + LaDeclaracionDelEjercicio.unidaA(
+                                                "a.municipalidad_id", "a.predio_id", "pr.ejercicio")
+                                        + " WHERE a.id IN (:actas)"
+                                        + "   AND a.predio_id IS NOT NULL"
+                                        + "   AND pr.ejercicio IS NOT NULL")
+                        .param("actas", actaIds)
+                        .param("estados", LaDeclaracionDelEjercicio.ESTADOS_VIGENTES)
                         .query(ActaFiscalizacionRepositoryJdbc::mapearLoDeclarado)
                         .list()) {
-            porFicha.put(leida.fichaId(), leida.declarado());
+            porActa.put(leida.actaId(), leida.declarado());
         }
-        return Map.copyOf(porFicha);
+        return Map.copyOf(porActa);
     }
 
     /**
@@ -360,18 +370,24 @@ public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
     }
 
     /** Una fila de {@code ficha_ref} con su llave, para poder armar el mapa sin nulos. */
-    private record LoDeclaradoDeUnaFicha(
-            long fichaId,
-            kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado.LoDeclarado declarado) {}
+    private record LoDeclaradoDeUnActa(
+            long actaId, ComparacionHalladoDeclarado.LoDeclarado declarado) {}
 
-    private static LoDeclaradoDeUnaFicha mapearLoDeclarado(
-            java.sql.ResultSet fila, int numeroDeFila) throws java.sql.SQLException {
-        java.math.BigDecimal area = fila.getBigDecimal("area_terreno");
-        return new LoDeclaradoDeUnaFicha(
-                fila.getLong("ficha_id"),
-                new kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado.LoDeclarado(
-                        area == null ? null : new kamayuk.rentas.dominio.AreaM2(area),
-                        fila.getString("uso")));
+    private static LoDeclaradoDeUnActa mapearLoDeclarado(java.sql.ResultSet fila, int numeroDeFila)
+            throws java.sql.SQLException {
+        long actaId = fila.getLong("acta_id");
+        if (!fila.getBoolean("presento")) {
+            return new LoDeclaradoDeUnActa(actaId, ComparacionHalladoDeclarado.LoDeclarado.nada());
+        }
+        java.math.BigDecimal leida = fila.getBigDecimal("area_terreno");
+        kamayuk.rentas.dominio.AreaM2 area =
+                leida == null ? null : new kamayuk.rentas.dominio.AreaM2(leida);
+        String uso = fila.getString("uso");
+        return new LoDeclaradoDeUnActa(
+                actaId,
+                fila.getBoolean("fuera_de_plazo")
+                        ? ComparacionHalladoDeclarado.LoDeclarado.fueraDePlazo(area, uso)
+                        : ComparacionHalladoDeclarado.LoDeclarado.enPlazo(area, uso));
     }
 
     /**

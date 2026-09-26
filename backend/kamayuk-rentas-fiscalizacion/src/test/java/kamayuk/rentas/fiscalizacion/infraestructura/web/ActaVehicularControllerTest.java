@@ -70,9 +70,9 @@ class ActaVehicularControllerTest {
                         @Override
                         public java.util.Map<
                                         Long,
-                                        kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado
-                                                .LoDeclarado>
-                                loDeclaradoPorFicha(java.util.Set<Long> fichaIds) {
+                                        kamayuk.rentas.fiscalizacion.dominio
+                                                .ComparacionHalladoDeclarado.LoDeclarado>
+                                loDeclaradoDeLasActas(java.util.Set<Long> actaIds) {
                             return java.util.Map.of();
                         }
 
