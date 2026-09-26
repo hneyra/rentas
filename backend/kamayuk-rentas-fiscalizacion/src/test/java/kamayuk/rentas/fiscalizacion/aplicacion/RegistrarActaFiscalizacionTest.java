@@ -299,8 +299,11 @@ class RegistrarActaFiscalizacionTest {
 
         /** Sin proyeccion de catastro no hay lado declarado que devolver (#191). */
         @Override
-        public Map<Long, ActaConLoDeclarado.LoDeclarado> loDeclaradoPorFicha(
-                java.util.Set<Long> fichaIds) {
+        public Map<
+                        Long,
+                        kamayuk.rentas.fiscalizacion.dominio.ComparacionHalladoDeclarado
+                                .LoDeclarado>
+                loDeclaradoDeLasActas(java.util.Set<Long> actaIds) {
             return Map.of();
         }
 

@@ -77,24 +77,23 @@ public interface ActaFiscalizacionRepository {
             @org.jspecify.annotations.Nullable Long vehiculoId);
 
     /**
-     * Lo que consigna cada una de esas versiones de ficha: el <b>lado declarado</b> del contraste
-     * que la pantalla del acta dibuja (#191).
+     * Lo que consta declarado para cada una de esas actas: el <b>lado declarado</b> del contraste
+     * que su pantalla dibuja (#191, #344).
+     *
+     * <p>Es la declaración jurada vigente del <b>ejercicio del programa</b> del acta y la versión
+     * de ficha que esa declaración referencia —lo que el titular declaró—, y no la ficha vigente el
+     * día de la visita, que es lo que catastro tenía inscrito (#344). Un predio sin declaración en
+     * ese ejercicio sale con {@link ComparacionHalladoDeclarado.LoDeclarado#nada()}: es el omiso, y
+     * no tiene área declarada.
+     *
+     * <p>Un acta que no tiene de dónde saberlo —vehicular, o de un programa sin ejercicio— no sale
+     * del mapa, y se publica con su lado declarado nulo: «no consta», que es distinto de cero.
      *
      * <p>Se pide por lote y no una a una porque quien la llama es un <b>listado</b>: una lectura
-     * por página, igual que {@code DeteccionDeOmisos} resuelve los titulares de la suya. Una
-     * versión que la proyección todavía no tenga simplemente no sale del mapa, y el acta se publica
-     * con su lado declarado nulo — que es lo honesto, y distinto de cero.
-     *
-     * <p>Devuelve lo que consigna la <b>versión</b> y no «lo que el predio tiene hoy»: {@code
-     * acta_fiscalizacion.ficha_id} es la versión que regía a la fecha de la visita, y comparar lo
-     * hallado contra la ficha actual acusaría de subvaluación a quien declaró correctamente sobre
-     * lo que entonces existía (RNF-075). Es el mismo criterio de {@code
-     * LectorDeFichas#areaDeLaVersion}.
-     *
-     * <p>Con el conjunto vacío no hay consulta: un {@code IN ()} no es SQL válido.
+     * por página. Con el conjunto vacío no hay consulta: un {@code IN ()} no es SQL válido.
      */
-    java.util.Map<Long, ActaConLoDeclarado.LoDeclarado> loDeclaradoPorFicha(
-            java.util.Set<Long> fichaIds);
+    java.util.Map<Long, ComparacionHalladoDeclarado.LoDeclarado> loDeclaradoDeLasActas(
+            java.util.Set<Long> actaIds);
 
     /**
      * Cuántas <b>unidades</b> del programa tienen acta viva: la tercera etapa del embudo (#196).
