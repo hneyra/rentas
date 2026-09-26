@@ -312,7 +312,11 @@ export function useDatosDeLaHoja(
     enabled: pideLaSesion,
     retry: false,
   });
-  const ejercicio = sesion.data?.ejercicioDeTrabajo ?? null;
+  // **Solo para quien la pide** (#392): `enabled: false` impide pedir, pero no oculta lo que ya
+  // este en la cache, y la cache es UNA para toda la aplicacion. Sin la condicion, el ejercicio
+  // que `seg-aud` dejo alli se colaba en la llave de las demas hojas —que es lo contrario de lo
+  // que `Conector.exigeEjercicio` promete: a las demas les llega `null`—.
+  const ejercicio = pideLaSesion ? (sesion.data?.ejercicioDeTrabajo ?? null) : null;
   // Sin ejercicio no se pide: no es que se pida peor, es que la operacion lo declara obligatorio y
   // **la peticion no se manda**. Ver `SIN_EJERCICIO` y el javadoc de `Conector.exigeEjercicio`.
   const faltaElEjercicio = pideLaSesion && ejercicio === null;
