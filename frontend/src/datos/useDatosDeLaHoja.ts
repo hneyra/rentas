@@ -12,6 +12,7 @@ import { CONECTORES, loQueLaHojaDeclara } from './conectores.ts';
 import { formatearEntero, formatearFecha } from '../dominio/formato.ts';
 import {
   FRASE_DE_LA_FECHA,
+  FRASE_DE_LA_PAGINA_QUE_LLEGA,
   FRASE_DE_QUIEN_ES,
   FRASE_DE_QUIEN_ES_SIN_PADRON,
   FRASE_DEL_CONTEO,
@@ -321,6 +322,12 @@ export function useDatosDeLaHoja(
   // **la peticion no se manda**. Ver `SIN_EJERCICIO` y el javadoc de `Conector.exigeEjercicio`.
   const faltaElEjercicio = pideLaSesion && ejercicio === null;
 
+  const llave = [
+    ...(conector?.clave ?? ['sin-conector', clave]),
+    sujeto ?? '',
+    ejercicio ?? '',
+    JSON.stringify(enLaRuta),
+  ];
   const consulta = useQuery({
     // La clave lleva la hoja dentro: dos pantallas no comparten cache aunque pidan lo mismo. Y
     // lleva el sujeto al final: dos contribuyentes de la misma hoja tampoco. El ejercicio va
@@ -328,17 +335,23 @@ export function useDatosDeLaHoja(
     // Y lo de la ruta detras, serializado: cambiar de pagina o de orden tiene que traer OTRA
     // respuesta. Sin esto, el mando movería la direccion, `pedir` no se volveria a llamar y la
     // tabla dibujaria la pagina 0 con el rotulo «Pagina 3» — en verde y sin un solo error.
-    queryKey: [
-      ...(conector?.clave ?? ['sin-conector', clave]),
-      sujeto ?? '',
-      ejercicio ?? '',
-      JSON.stringify(enLaRuta),
-    ],
+    queryKey: llave,
     queryFn: ({ signal }) =>
       conector?.pedir({ senal: signal, sujeto, ejercicio, enLaRuta }) ?? Promise.resolve(null),
     // Sin conector no se pide nada. Es lo que hace que 36 de las 40 pantallas no toquen la red.
     enabled: conector !== undefined && !faltaElSujeto && !faltaElEjercicio,
     retry: false,
+    /*
+     * **Pasar de pagina no vacia la tabla** (#393). Mientras llega la pagina pedida se siguen
+     * ensenando las filas de la anterior: sin esto la consulta nueva nacia `pending`, la tabla se
+     * quedaba sin filas y el interprete desmontaba «Anterior» y «Siguiente» —con el foco dentro—.
+     *
+     * **Acotado a cuando solo cambio la ruta**: misma hoja, mismo sujeto, mismo ejercicio. Sin la
+     * condicion, cambiar de contribuyente en `con-panel` ensenaria los datos del anterior bajo el
+     * codigo del nuevo, con formato de verdad.
+     */
+    placeholderData: (previo, anterior) =>
+      laMismaVentana(anterior?.queryKey, llave) ? previo : undefined,
   });
 
   if (conector === undefined) {
@@ -422,8 +435,20 @@ export function useDatosDeLaHoja(
     //
     // Los trozos se arman en una lista y se juntan, en vez de anidar dos ternarios: con dos
     // canales opcionales son cuatro combinaciones, y la que lleva los dos no la escribiria nadie.
-    ausencia: conFrasesDePantalla(reparto, t),
+    ausencia: conFrasesDePantalla(reparto, t, consulta.isPlaceholderData),
   };
+}
+
+/**
+ * Si dos llaves son la misma ventana de la misma hoja: todo igual menos lo ultimo, que es lo que la
+ * ruta trae —la pagina y el orden— (#393). Ver `placeholderData` arriba.
+ */
+function laMismaVentana(
+  anterior: readonly unknown[] | undefined,
+  actual: readonly unknown[],
+): boolean {
+  if (anterior === undefined || anterior.length !== actual.length) return false;
+  return actual.slice(0, -1).every((pieza, indice) => pieza === anterior[indice]);
 }
 
 /**
@@ -436,8 +461,10 @@ export function useDatosDeLaHoja(
 function conFrasesDePantalla(
   reparto: Reparto,
   t: (clave: string, datos?: Readonly<Record<string, unknown>>) => string,
+  deLaPaginaAnterior = false,
 ): Ausencia {
   const trozos = [t(NO_PUBLICADO_EN_PANTALLA.explicacion)];
+  if (deLaPaginaAnterior) trozos.push(t(FRASE_DE_LA_PAGINA_QUE_LLEGA));
   if (reparto.aLaFecha !== undefined) {
     trozos.push(t(FRASE_DE_LA_FECHA, { fecha: formatearFecha(reparto.aLaFecha) }));
   }

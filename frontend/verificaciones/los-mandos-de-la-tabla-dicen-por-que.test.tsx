@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CambioDeLaRuta, HojaDelMarco, RutaDeLaHoja } from '@kamayuk/ui';
@@ -192,5 +193,102 @@ describe('`seg-aud` dibujada: la tabla dice que es una ventana de 84 182', () =>
     expect(movimientos[0]).toEqual({
       parametros: { pagina: '0', sentido: 'DESCENDENTE' },
     });
+  });
+});
+
+/**
+ * **Pasar de pagina no se lleva el foco** (#393).
+ *
+ * La siembra que distingue es la PROMESA RETENIDA: la pagina 1 no contesta hasta que la prueba lo
+ * dice. Con un `fetch` que resuelve en la misma vuelta, la espera dura una microtarea y la prueba
+ * pasaria por suerte. Y el marco es de verdad en lo que importa: mover la ruta vuelve a dibujar la
+ * hoja con la ruta nueva, que es lo que el de arriba no hace.
+ */
+describe('`seg-aud`: pasar de pagina con teclado (#393)', () => {
+  const PAGINA_DOS = {
+    ...BITACORA,
+    contenido: [{ ...BITACORA.contenido[0], id: 41183, usuario: 'mrios' }],
+    pagina: 1,
+  };
+
+  function conLaPaginaUnoRetenida(): { soltar: () => void } {
+    let soltar: () => void = () => undefined;
+    const retenida = new Promise<void>((resolver) => {
+      soltar = resolver;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(async (entrada) => {
+        const url = String(entrada);
+        const responde = (cuerpo: unknown) =>
+          new Response(JSON.stringify(cuerpo), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        if (url.includes('/seguridad/sesion')) return responde(SESION);
+        if (url.includes('pagina=1')) {
+          await retenida;
+          return responde(PAGINA_DOS);
+        }
+        return responde(BITACORA);
+      }),
+    );
+    return { soltar: () => soltar() };
+  }
+
+  function BitacoraConRuta() {
+    const [parametros, moverA] = useState<Readonly<Record<string, string>>>({});
+    const hoja: HojaDelMarco = {
+      ruta: { sujeto: null, parametros },
+      // Un `null` en el cambio quita el parametro, como hace el marco.
+      moverLaRuta: (cambio) =>
+        moverA((antes) => {
+          const despues: Record<string, string> = { ...antes };
+          for (const [nombre, valor] of Object.entries(cambio.parametros ?? {})) {
+            if (valor === null) delete despues[nombre];
+            else despues[nombre] = valor;
+          }
+          return despues;
+        }),
+    };
+    return <Bitacora hoja={hoja} />;
+  }
+
+  it('«Siguiente» conserva el foco y las filas mientras llega la pagina pedida', async () => {
+    const { soltar } = conLaPaginaUnoRetenida();
+    const cliente = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={cliente}>
+        <BitacoraConRuta />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('jcardenas')).toBeInTheDocument();
+    });
+
+    const siguiente = document.querySelector('[data-mando="siguiente"]') as HTMLElement;
+    siguiente.focus();
+    act(() => {
+      siguiente.click();
+    });
+    await waitFor(() => {
+      const pedidas = vi.mocked(globalThis.fetch).mock.calls.map((llamada) => String(llamada[0]));
+      expect(pedidas.some((url) => url.includes('pagina=1'))).toBe(true);
+    });
+
+    // Con la pagina 1 RETENIDA: la tabla no se vacia y el boton sigue siendo el mismo, con el foco.
+    expect(document.activeElement, 'el foco cayo en <body>: se desmonto el mando').toBe(siguiente);
+    expect(screen.getByText('jcardenas')).toBeInTheDocument();
+    // Y la discordancia —«Pagina 2» sobre las filas de la 1— se dice, no se esconde.
+    expect(document.body.textContent).toContain('Actualizando');
+
+    await act(async () => {
+      soltar();
+    });
+    await waitFor(() => {
+      expect(screen.getByText('mrios')).toBeInTheDocument();
+    });
+    expect(document.activeElement).toBe(siguiente);
+    expect(document.body.textContent).not.toContain('Actualizando');
   });
 });

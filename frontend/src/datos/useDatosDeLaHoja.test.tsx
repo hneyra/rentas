@@ -409,6 +409,51 @@ describe('una pantalla que es de un contribuyente', () => {
     expect(result.current.valores?.get(coordenada(0, 5))).toContain('Con deuda al 12/09/2026');
   });
 
+  it('#393 — la MISMA hoja con otro contribuyente no ensena al anterior mientras llega el suyo', async () => {
+    // Es lo que hace la aplicacion: el mismo gancho, montado, con la ruta que cambia de sujeto.
+    // `placeholderData` conserva lo anterior mientras llega lo nuevo, y eso solo vale para la
+    // pagina o el orden (#393); con otro sujeto seria ensenar la deuda de otra persona con
+    // formato de verdad. La respuesta del segundo se RETIENE para que la espera se vea.
+    let soltar: () => void = () => undefined;
+    const retenida = new Promise<void>((resolver) => {
+      soltar = resolver;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(async (entrada) => {
+        const url = String(entrada);
+        const esElSegundo = url.includes('00000003541');
+        if (esElSegundo) await retenida;
+        const cuerpo = url.includes('/consultas/unificada')
+          ? esElSegundo
+            ? OTRA_FICHA
+            : FICHA
+          : SIN_CAMPANIA;
+        return new Response(JSON.stringify(cuerpo), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    );
+    const { wrapper } = arnes();
+    const hoja = renderHook(
+      ({ sujeto }: { sujeto: string }) => useDatosDeLaHoja('con-panel', { sujeto, parametros: {} }),
+      { wrapper, initialProps: { sujeto: '00000025673' } },
+    );
+    await waitFor(() => {
+      expect(hoja.result.current.valores?.get(coordenada(0, 6))).toBe('S/ 3,563.24');
+    });
+
+    hoja.rerender({ sujeto: '00000003541' });
+
+    expect(hoja.result.current.valores?.get(coordenada(0, 6))).not.toBe('S/ 3,563.24');
+    expect(hoja.result.current.ausencia.enElCampo).toBe('pidiendo…');
+    soltar();
+    await waitFor(() => {
+      expect(hoja.result.current.valores?.get(coordenada(0, 6))).toBe('S/ 591.94');
+    });
+  });
+
   it('dos contribuyentes de la misma hoja NO comparten cache', async () => {
     contestaSegunLaRuta({
       '/consultas/unificada': FICHA,
