@@ -617,6 +617,43 @@ class CostasYConveniosControllerTest {
         assertThat(convenios.registrados).isZero();
     }
 
+    /**
+     * #433 — Lo que tesoreria contesta 422 o 409 por su ruta, coactiva lo contesta igual por la
+     * suya. Hasta #433 el puerto solo traducia dos familias y el resto salia 500 con incidencia:
+     * pasarse de cuotas, una inicial del 100 % o la clave de otro obligado.
+     */
+    @Test
+    @DisplayName("#433 — condiciones inadmisibles, 422 como por tesoreria; no un 500")
+    void condicionesInadmisiblesSon422() throws Exception {
+        String expediente = expedienteConRec1();
+        convenios.inadmisible =
+                "Se pidieron 36 cuotas y el maximo vigente es 24: un convenio por encima del"
+                        + " maximo no lo respalda ninguna ordenanza";
+
+        MvcResult resultado = fraccionar(expediente, false, "Se registra el convenio coactivo");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("36 cuotas")
+                .doesNotContain("incidencia");
+    }
+
+    @Test
+    @DisplayName("#433 — la clave de otra peticion, 409 como por tesoreria; no un 500")
+    void claveEnConflictoEs409() throws Exception {
+        String expediente = expedienteConRec1();
+        convenios.claveEnConflicto =
+                "Esa clave de idempotencia ya registro el convenio F-2026-000001, que es de otro"
+                        + " contribuyente";
+
+        MvcResult resultado = fraccionar(expediente, false, "Se registra el convenio coactivo");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(409);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("F-2026-000001")
+                .doesNotContain("incidencia");
+    }
+
     @Test
     @DisplayName("lo que SI es un fallo del servidor sigue siendo 500 con su incidencia")
     void loQueSiEsInternoNoSeDisfraza() throws Exception {
@@ -990,6 +1027,12 @@ class CostasYConveniosControllerTest {
         /** Un defecto de verdad del servidor, para el contraste. */
         private boolean revienta;
 
+        /** Lo que el puerto traduce desde #433: mas cuotas que el maximo, o nada que fraccionar. */
+        private @org.jspecify.annotations.Nullable String inadmisible;
+
+        /** Lo que el puerto traduce desde #433: la clave de otra peticion, o dos que chocaron. */
+        private @org.jspecify.annotations.Nullable String claveEnConflicto;
+
         /**
          * Lo que {@code cuentacorriente} lanza desde #442 si la cuota ya esta en fase CONVENIO. Le
          * llega a coactiva sin traducir: vive en el paquete raiz de {@code cuentacorriente}.
@@ -1030,6 +1073,14 @@ class CostasYConveniosControllerTest {
             if (faltaPublicar != null) {
                 throw new CondicionesSinPublicar(
                         faltaPublicar, new FaltaDeMentira(faltaPublicar, llaveQueFalta));
+            }
+            if (inadmisible != null) {
+                throw new FraccionamientoCoactivo.CondicionesInadmisibles(
+                        inadmisible, new IllegalStateException(inadmisible));
+            }
+            if (claveEnConflicto != null) {
+                throw new FraccionamientoCoactivo.ClaveEnConflicto(
+                        claveEnConflicto, new IllegalStateException(claveEnConflicto));
             }
         }
 

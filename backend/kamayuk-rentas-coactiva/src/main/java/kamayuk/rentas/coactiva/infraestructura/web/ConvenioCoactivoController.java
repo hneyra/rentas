@@ -151,8 +151,13 @@ public class ConvenioCoactivoController {
             // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
             // enumerando las dos, que es peor que no decir nada.
             throw FaltaPublicar.problema(falta);
+        } catch (FraccionamientoCoactivo.ClaveEnConflicto conflicto) {
+            // 409 como por /tesoreria/fraccionamientos: la clave ya registro el convenio de otra
+            // peticion, o dos envios con la misma chocaron (#433). Sin este `catch`, 500.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(conflicto));
         } catch (FraccionarEnCoactiva.DeudaAjenaAlProcedimiento
                 | FraccionamientoCoactivo.SinDeudaCoactivaQueFraccionar
+                | FraccionamientoCoactivo.CondicionesInadmisibles
                 | IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
         }
