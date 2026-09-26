@@ -34,12 +34,13 @@ import org.junit.jupiter.api.Test;
  * #431 — <b>el orden de los candados de un cobro no depende de como llegaron sus lineas</b>, y
  * tampoco cuando dos lineas solo se distinguen por el deudor.
  *
- * <p>Hasta #431 un cobro tenia un solo deudor y {@code ORDEN_ESTABLE} no lo miraba: todas las
- * claves lo compartian. Desde que un recibo junta ordenes de deudores distintos, dos condominos del
- * mismo predio producen dos claves que <b>solo</b> difieren en el deudor. Sin el desempate, el
- * orden entre ellas es el de llegada —el ordenamiento es estable—, y dos cobranzas que se solapan y
- * marcan a los dos condominos en orden contrario piden los mismos dos candados al reves: se abrazan
- * y las dos esperan.
+ * <p>Hasta #431 un cobro tenia un solo deudor y {@code ORDEN_ESTABLE} —desde #364 {@code
+ * ClaveDeObligacion.ORDEN_DE_BLOQUEO}, el unico— no lo miraba: todas las claves lo compartian.
+ * Desde que un recibo junta ordenes de deudores distintos, dos condominos del mismo predio producen
+ * dos claves que <b>solo</b> difieren en el deudor. Sin el desempate, el orden entre ellas es el de
+ * llegada —el ordenamiento es estable—, y dos cobranzas que se solapan y marcan a los dos
+ * condominos en orden contrario piden los mismos dos candados al reves: se abrazan y las dos
+ * esperan.
  *
  * <p>La carrera no se provoca aqui: lo que se afirma es su causa, que es el orden en que se llama a
  * {@link SaldoRepository#bloquear}. Un repositorio que anota cada candado basta, y el libro vacio

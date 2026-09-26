@@ -1,5 +1,6 @@
 package kamayuk.rentas.cuentacorriente.dominio;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,6 +52,37 @@ public interface SaldoRepository {
      * que nunca tuvo un asiento: no hay nada que bloquear, y tampoco nada que cobrar.
      */
     int bloquear(ClaveDeObligacion obligacion);
+
+    /**
+     * Bloquea <b>varias</b> obligaciones, cada una una sola vez y siempre en el mismo orden, y
+     * devuelve cuantas filas bloqueo en total (#364).
+     *
+     * <p>Es la unica politica de bloqueo de este contexto. Dos operaciones que se solapan sobre las
+     * mismas obligaciones tienen que pedir los mismos candados en el mismo orden, o se abrazan y
+     * PostgreSQL aborta una con {@code 40P01}. Hasta #364 cada escritor ordenaba por su cuenta y el
+     * convenio lo hacia distinto que la cobranza; ahora quien bloquea varias le pasa aqui sus
+     * claves, en el orden que quiera y con repetidas, y el orden lo pone {@link
+     * ClaveDeObligacion#ORDEN_DE_BLOQUEO}, que fuera de este paquete no se ve.
+     *
+     * <p>Deduplica por {@code equals} y <b>despues</b> ordena, y no con un {@code TreeSet} del
+     * comparador, que haria las dos cosas de una vez. Medido al escribirlo: con un {@code TreeSet},
+     * quitarle al comparador el desempate por deudor no desordenaba a los dos condominos de #431,
+     * los <b>fundia</b> en uno, y el cobro abonaba una obligacion que nadie habia bloqueado. Un
+     * comparador que deja de ser total tiene que costar, como mucho, un orden peor; nunca un
+     * candado menos.
+     */
+    default int bloquearEnOrden(Collection<ClaveDeObligacion> obligaciones) {
+        List<ClaveDeObligacion> enOrden =
+                obligaciones.stream()
+                        .distinct()
+                        .sorted(ClaveDeObligacion.ORDEN_DE_BLOQUEO)
+                        .toList();
+        int bloqueadas = 0;
+        for (ClaveDeObligacion obligacion : enOrden) {
+            bloqueadas += bloquear(obligacion);
+        }
+        return bloqueadas;
+    }
 
     /**
      * Deja la fila con exactamente este contenido: la inserta si no estaba y la reemplaza si

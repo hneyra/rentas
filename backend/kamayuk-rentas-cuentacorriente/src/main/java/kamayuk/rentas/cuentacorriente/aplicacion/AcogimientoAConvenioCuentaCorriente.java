@@ -174,9 +174,13 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
      *
      * <p>Uno solo, y con una bandera, porque acoger y devolver son <b>la misma operacion con las
      * fases intercambiadas</b>. Escribirlos por separado dejaria dos copias de la cristalizacion
-     * del devengo y del orden de los candados, y la primera que alguien tocara dejaria de ser
-     * simetrica de la otra: el quiebre devolveria una cifra distinta de la que el acogimiento
-     * movio, y nadie sabria cual de las dos esta bien.
+     * del devengo, y la primera que alguien tocara dejaria de ser simetrica de la otra: el quiebre
+     * devolveria una cifra distinta de la que el acogimiento movio, y nadie sabria cual de las dos
+     * esta bien.
+     *
+     * <p>El orden de los candados tampoco se copia, y desde #364 ni siquiera vive aqui: hasta
+     * entonces este motor tenia el suyo —el de las cuotas— y la copia ya existia, entre clases, con
+     * la cobranza. Ahora lo pone {@link SaldoRepository#bloquearEnOrden} para los dos.
      *
      * @param haciaElConvenio {@code true} acoge (de la fase de origen a CONVENIO); {@code false}
      *     devuelve (de CONVENIO a la fase de origen)
@@ -195,18 +199,20 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
                             + " convenio");
         }
 
-        // Bloquear TODO antes de leer nada, y en el mismo orden estable que usa la
-        // cobranza: dos operaciones que se solapan tienen que pedir los mismos
-        // candados en el mismo orden, o se abrazan y las dos esperan.
+        // Bloquear TODO antes de leer nada, con la politica de la cobranza y no con una
+        // copia: `bloquearEnOrden` deduplica y ordena las obligaciones por dentro (#364).
+        // Hasta #364 aqui se bloqueaba en el orden de las CUOTAS, con el periodo delante de
+        // la unidad, y ese orden no es el de la cobranza: el predio 3 en las cuotas 4 a 6 y
+        // el 9 en las 1 a 3 salian al reves, y un pago que llegara a la vez abrazaba a las
+        // dos transacciones.
+        saldos.bloquearEnOrden(
+                acogidas.stream()
+                        .map(cuota -> ClaveDeObligacion.de(claveDe(contribuyenteId, cuota)))
+                        .toList());
+
+        // El orden de las cuotas es el de moverlas y presentarlas; ya no decide los candados.
         List<DeudaAcogida> enOrden = new ArrayList<>(acogidas);
         enOrden.sort(ORDEN_ESTABLE);
-        Set<ClaveDeObligacion> bloqueadas = new LinkedHashSet<>();
-        for (DeudaAcogida cuota : enOrden) {
-            ClaveDeObligacion obligacion = ClaveDeObligacion.de(claveDe(contribuyenteId, cuota));
-            if (bloqueadas.add(obligacion)) {
-                saldos.bloquear(obligacion);
-            }
-        }
 
         List<DeudaAcogida> movidas = new ArrayList<>();
         int escritos = 0;
@@ -374,7 +380,15 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
                 seleccion.vehiculoId());
     }
 
-    /** El orden en que se piden los candados. Total y estable: no depende de nulos ni del mapa. */
+    /**
+     * El orden en que se mueven y se presentan las cuotas. Total y estable: no depende de nulos ni
+     * del mapa.
+     *
+     * <p><b>No es el orden de los candados</b> (#364): lleva el periodo delante de la unidad, que
+     * es como se lee un cronograma, y bloquear con el daba el predio 9 (cuota 1) antes que el 3
+     * (cuota 4), al reves que la cobranza. Los candados los ordena {@link
+     * SaldoRepository#bloquearEnOrden}.
+     */
     private static final Comparator<DeudaAcogida> ORDEN_ESTABLE =
             Comparator.comparing(DeudaAcogida::tributo)
                     .thenComparingInt(cuota -> cuota.ejercicio().valor())
