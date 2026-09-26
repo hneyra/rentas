@@ -34,6 +34,7 @@ import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -111,20 +112,37 @@ class DeudasConBeneficioControllerTest {
                 .hasSameSizeAs(cuerpo.split("\"actualizadoA\"", -1));
     }
 
+    /**
+     * La simulacion sale entera, y cada importe en <b>su</b> campo (#439).
+     *
+     * <p>Hasta #439 la muestra era un 50 % sobre {@code TOTAL}: base 1 150,00, ahorro 575,00 y
+     * deuda con beneficio 575,00. La unica cifra que se afirmaba casaba con los dos campos, y
+     * cruzar el ahorro con la deuda con beneficio en el recurso dejaba la prueba en verde. Con un
+     * 10 % sobre {@code INSOLUTO} las tres cifras son distintas entre si y de la deuda acogida:
+     * base 900,00 (800 + 100 de insoluto), ahorro 90,00 y deuda con beneficio 1 060,00 (1 150 -
+     * 90).
+     */
     @Test
-    @DisplayName("con la campana publicada, la simulacion sale entera")
+    @DisplayName("con la campana publicada, la simulacion sale entera y cada importe en su campo")
     void conCampaniaPublicada() throws Exception {
-        parametros.publicar("AMNISTIA DE PRUEBA", "50", "TOTAL", "2", "HALF_UP");
+        parametros.publicar("AMNISTIA DE PRUEBA", "10", "INSOLUTO", "2", "HALF_UP");
 
         String cuerpo = pedir("?contribuyente=C-000021&benefAplicable=AMNISTIA DE PRUEBA", 200);
 
-        assertThat(cuerpo)
-                .contains("\"campania\":\"AMNISTIA DE PRUEBA\"")
-                .contains("\"alicuotaAplicada\":\"50\"")
-                .contains("\"baseDelBeneficio\":\"TOTAL\"")
-                // 1 000 + 150 acogidos, la mitad
-                .contains("\"importe\":\"575.00\"")
-                .contains("Acogimiento simulado a «AMNISTIA DE PRUEBA»");
+        assertThat(cuerpo).contains("Acogimiento simulado a «AMNISTIA DE PRUEBA»");
+        JsonNode simulacion = JsonMapper.builder().build().readTree(cuerpo).path("simulacion");
+        assertThat(simulacion.path("campania").asString()).isEqualTo("AMNISTIA DE PRUEBA");
+        assertThat(simulacion.path("alicuotaAplicada").asString()).isEqualTo("10");
+        assertThat(simulacion.path("baseDelBeneficio").asString()).isEqualTo("INSOLUTO");
+        assertThat(simulacion.path("baseDelBeneficioImporte").path("importe").asString())
+                .as("la base: el insoluto acogido, 800 + 100")
+                .isEqualTo("900.00");
+        assertThat(simulacion.path("ahorro").path("importe").asString())
+                .as("el ahorro: el 10 %% de la base")
+                .isEqualTo("90.00");
+        assertThat(simulacion.path("deudaConBeneficio").path("importe").asString())
+                .as("lo que queda por pagar: 1 150 acogidos menos el ahorro")
+                .isEqualTo("1060.00");
     }
 
     @Test

@@ -37,6 +37,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -154,14 +155,27 @@ class ResumenDeLaCarteraControllerTest {
         assertThat(cuerpo).contains("\"etiqueta\":\"REC 01 NOTIFICADA\",\"expedientes\":1");
     }
 
+    /**
+     * El ejercicio acota de verdad (#439): hasta #439 la muestra tenia un solo expediente, de 2026,
+     * y el doble ignoraba el ejercicio, asi que pasar {@code null} en vez del ejercicio en el
+     * controlador dejaba la prueba en verde. Con un expediente de cada año, cada ejercicio da el
+     * suyo y sin filtro salen los dos.
+     */
     @Test
     @DisplayName("el ejercicio acota, y uno que no es un numero se rechaza con 422")
     void elEjercicioAcota() throws Exception {
         abrir("EXP-2026-000001");
+        abrir("EXP-2025-000002", new Ejercicio(2025), "EJECUTOR COACTIVO");
 
-        assertThat(pedir("?ejercicio=2026").getResponse().getContentAsString())
-                .contains("\"expedientes\":1")
-                .contains("\"ejercicio\":2026");
+        JsonNode de2025 = json(pedir("?ejercicio=2025"));
+        assertThat(de2025.path("expedientes").asLong()).as("solo el de 2025").isEqualTo(1);
+        assertThat(de2025.path("ejercicio").asInt()).isEqualTo(2025);
+        JsonNode de2026 = json(pedir("?ejercicio=2026"));
+        assertThat(de2026.path("expedientes").asLong()).as("solo el de 2026").isEqualTo(1);
+        assertThat(de2026.path("ejercicio").asInt()).isEqualTo(2026);
+        assertThat(json(pedir("")).path("expedientes").asLong())
+                .as("sin ejercicio, los dos")
+                .isEqualTo(2);
 
         MvcResult malo = pedir("?ejercicio=dos-mil-veintiseis");
         assertThat(malo.getResponse().getStatus()).isEqualTo(422);
@@ -177,16 +191,24 @@ class ResumenDeLaCarteraControllerTest {
                 .andReturn();
     }
 
+    private static JsonNode json(MvcResult respuesta) throws Exception {
+        return JsonMapper.builder().build().readTree(respuesta.getResponse().getContentAsString());
+    }
+
     private long abrir(String numero) {
+        return abrir(numero, EJERCICIO, "EJECUTOR COACTIVO");
+    }
+
+    private long abrir(String numero, Ejercicio ejercicio, String ejecutor) {
         ExpedienteCoactivo expediente =
                 expedientes.abrir(
                         new ExpedienteCoactivo(
                                 null,
                                 numero,
-                                EJERCICIO,
+                                ejercicio,
                                 Long.parseLong(numero.substring(numero.length() - 6)),
                                 7L,
-                                "EJECUTOR COACTIVO",
+                                ejecutor,
                                 null,
                                 HOY,
                                 null,
