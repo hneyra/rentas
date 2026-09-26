@@ -41,7 +41,7 @@ import org.jspecify.annotations.Nullable;
  * @param valuacionHuella la huella con que `catastro` la sello; {@code null} si es declarada
  * @param autovaluoDeclarado <b>el otro</b> autovaluo, cuando manda la valuacion sellada y ademas
  *     habia declaracion. Se guarda —{@link #comoDetalle()} lo pasa a {@code
- *     determinacion_predio_detalle.autovaluo_declarado}, V32— y se publica, para que la
+ *     determinacion_predio_detalle.autovaluo_declarado}, V33— y se publica, para que la
  *     discrepancia se pueda ver en vez de descubrirse en ventanilla; {@code null} cuando no hay dos
  *     cifras que comparar. Hasta #362 este parrafo decia lo mismo y la cifra solo vivia en memoria
  */

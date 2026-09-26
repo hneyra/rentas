@@ -34,7 +34,7 @@ import org.jspecify.annotations.Nullable;
  * @param valuacionHuella la huella con que {@code catastro} sello esa valuacion; {@code null}
  *     cuando el autovaluo es declarado
  * @param autovaluoDeclarado el autovaluo que declaro el contribuyente cuando <b>mando la
- *     sellada</b> (#362, V32). Solo puede tener valor en {@link OrigenDelAutovaluo#SELLADO}: en
+ *     sellada</b> (#362, V33). Solo puede tener valor en {@link OrigenDelAutovaluo#SELLADO}: en
  *     {@link OrigenDelAutovaluo#DECLARADO} la declarada <b>es</b> {@code autovaluo}, y guardarla
  *     dos veces invitaria a que difieran. {@code null} cuando no hay dos cifras que comparar. Para
  *     preguntar «que declaro el contribuyente» no se lee este campo sino {@link
@@ -96,7 +96,7 @@ public record DetalleDeterminacionPredio(
             throw new IllegalArgumentException(
                     "La base imponible del predio no puede ser negativa");
         }
-        // La misma guarda que `determinacion_detalle_declarado_ck` (V32). Una declarada al lado de
+        // La misma guarda que `determinacion_detalle_declarado_ck` (V33). Una declarada al lado de
         // un autovaluo que ya ES el declarado seria la misma cifra dos veces, y el dia que
         // difirieran nadie sabria cual de las dos firmo el contribuyente (#362).
         if (autovaluoDeclarado != null) {
@@ -118,7 +118,7 @@ public record DetalleDeterminacionPredio(
      * Lo que declaro el contribuyente para este predio, <b>segun el origen</b> (#362): el propio
      * {@code autovaluo} si es {@link OrigenDelAutovaluo#DECLARADO}, y el que se guardo al lado si
      * es {@link OrigenDelAutovaluo#SELLADO}. Vacio si mando la sellada y nadie habia declarado —o
-     * si la fila es anterior a V32, que no lo guardaba—.
+     * si la fila es anterior a V33, que no lo guardaba—.
      *
      * <p>Es la unica regla para esa pregunta, y la usan el recalculo individual y la corrida
      * masiva. Hasta #362 las dos leian {@code autovaluo} sin mirar el origen: tras una

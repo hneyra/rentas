@@ -88,7 +88,7 @@ import org.springframework.stereotype.Service;
  * <p><b>Manda la valuacion que {@code catastro} sello</b> cuando existe y trae cifra; si no, manda
  * la declarada. Y las dos quedan escritas: {@code determinacion_predio_detalle} guarda desde V14 de
  * cual de las dos salio cada predio, y —cuando salio de una valuacion— con que {@code conjuntoId} y
- * con que huella se calculo; desde V32, <b>ademas</b> la declarada que no mando (#362). Hasta #362
+ * con que huella se calculo; desde V33, <b>ademas</b> la declarada que no mando (#362). Hasta #362
  * esa ultima frase era falsa: la declarada solo vivia en memoria.
  *
  * <p><b>Las tres opciones se enumeraron con su coste antes de elegir</b>, que es lo que AC-2 pide:
@@ -399,7 +399,7 @@ public class DeterminarPredial {
                 // La declarada NO desaparece cuando manda la sellada: se guarda al lado para que
                 // la discrepancia se pueda ver, en vez de descubrirse en ventanilla con el papel
                 // ya notificado (#38, AC-3). «Se guarda» desde #362: `comoDetalle` la pasa a
-                // `autovaluo_declarado` (V32) y las dos respuestas la publican; hasta entonces
+                // `autovaluo_declarado` (V33) y las dos respuestas la publican; hasta entonces
                 // este comentario lo afirmaba y la cifra se quedaba en este objeto.
                 autovaluoDeclarado = declarado == null ? null : declarado.autovaluo();
             } else {
@@ -538,7 +538,7 @@ public class DeterminarPredial {
          * dato declarado aunque el autovaluo venga sellado ({@code catastro} no sabe que parte esta
          * inafecta, ADR-0024).
          *
-         * <p>Vacio —mando la sellada y nadie habia declarado, o la fila es anterior a V32— deja el
+         * <p>Vacio —mando la sellada y nadie habia declarado, o la fila es anterior a V33— deja el
          * predio sin declarada: si la sellada sigue, manda ella; si no, el predio sale sin
          * autovaluo y se dice ({@link PredioSinAutovaluo}), en vez de tomar como declarada una
          * cifra que sello otro.

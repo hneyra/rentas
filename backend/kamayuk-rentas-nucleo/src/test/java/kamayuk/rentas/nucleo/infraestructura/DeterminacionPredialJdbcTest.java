@@ -399,7 +399,7 @@ class DeterminacionPredialJdbcTest {
 
     @Test
     @DisplayName(
-            "#362 — V32: la declarada solo va al lado de un autovaluo SELLADO, tambien por SQL")
+            "#362 — V33: la declarada solo va al lado de un autovaluo SELLADO, tambien por SQL")
     void laDeclaradaSoloVaAlLadoDeLaSellada() throws SQLException {
         enA();
         long titular = crearContribuyente(municipalidadA, "DET-3011", "80300311");

@@ -956,7 +956,7 @@ const DESCRIPCIONES = {
     **Cuando manda la valuación sellada, la declarada viaja al lado** (#362). Si \`catastro\`
     selló la valuación del predio, el \`autovaluo\` de \`predios[]\` es el sellado (#38, AC-2) y
     \`autovaluoDeclarado\` es lo que declaró el contribuyente; con \`simulacion: false\` se
-    guarda además en \`determinacion_predio_detalle.autovaluo_declarado\` (V32). Es **nulo**
+    guarda además en \`determinacion_predio_detalle.autovaluo_declarado\` (V33). Es **nulo**
     cuando no hay dos cifras que comparar: el autovalúo es el declarado, o nadie declaró. La
     diferencia entre las dos es la subvaluación declarada, que es lo que la fiscalización busca.
 
@@ -3514,10 +3514,10 @@ const OPERACIONES_ADICIONALES = {
         ese ejercicio es **204**: la respuesta es «todavía no». Devolver lo mismo en los dos casos es
         el defecto que #546 midió.
 
-        **\`autovaluoDeclarado\` sale de la fila** (#362, V32): lo que declaró el contribuyente
+        **\`autovaluoDeclarado\` sale de la fila** (#362, V33): lo que declaró el contribuyente
         cuando el \`autovaluo\` es el que \`catastro\` selló (\`origenDelAutovaluo: SELLADO\`).
         Nulo cuando no hay dos cifras que comparar —el autovalúo es el declarado, o nadie
-        declaró— y en las filas anteriores a V32, que no lo guardaban: no hay de dónde rellenarlo.
+        declaró— y en las filas anteriores a V33, que no lo guardaban: no hay de dónde rellenarlo.
 
         Exige LECTURA sobre \`predial_individual\`: leer una determinación no es determinarla.
       `),

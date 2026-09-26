@@ -215,8 +215,8 @@ public record DeterminacionGuardadaResource(
      * @param valuacionHuella la huella con que {@code catastro} selló esa valuación; nulo si el
      *     autovalúo es declarado
      * @param autovaluoDeclarado lo que declaró el contribuyente cuando el autovalúo es el sellado
-     *     (#362, V32); nulo cuando no hay dos cifras que comparar —el autovalúo es el declarado,
-     *     nadie declaró, o la fila es anterior a V32 y no lo guardó—
+     *     (#362, V33); nulo cuando no hay dos cifras que comparar —el autovalúo es el declarado,
+     *     nadie declaró, o la fila es anterior a V33 y no lo guardó—
      */
     public record PredioGuardado(
             long predioId,

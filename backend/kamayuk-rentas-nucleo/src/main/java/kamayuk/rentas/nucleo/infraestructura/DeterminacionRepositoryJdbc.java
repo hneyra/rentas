@@ -144,7 +144,7 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                     .param("origen", fila.origen().name())
                     .param("conjuntoDeLaValuacion", fila.valuacionConjuntoId())
                     .param("huellaDeLaValuacion", fila.valuacionHuella())
-                    // La declarada, cuando mando la sellada (#362, V32): sin esta linea la cifra
+                    // La declarada, cuando mando la sellada (#362, V33): sin esta linea la cifra
                     // que la fiscalizacion contrasta se quedaba en memoria.
                     .param(
                             "autovaluoDeclarado",

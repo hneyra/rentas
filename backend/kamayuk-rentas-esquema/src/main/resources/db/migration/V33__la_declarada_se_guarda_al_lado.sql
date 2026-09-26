@@ -1,5 +1,5 @@
 -- ============================================================================
---  V32 — LA DECLARADA SE GUARDA AL LADO DE LA SELLADA (#362)
+--  V33 — LA DECLARADA SE GUARDA AL LADO DE LA SELLADA (#362)
 --
 --  QUE PASABA
 --  ----------
@@ -42,5 +42,5 @@ ALTER TABLE determinacion_predio_detalle
 COMMENT ON COLUMN determinacion_predio_detalle.autovaluo_declarado IS
     'El autovaluo que declaro el contribuyente cuando el predio se determino con la valuacion '
     'que `catastro` sello (#362). Solo en SELLADO: en DECLARADO la declarada es `autovaluo`. '
-    'Nula si no habia declaracion, o si la fila es anterior a V32. Es lo que la fiscalizacion '
+    'Nula si no habia declaracion, o si la fila es anterior a V33. Es lo que la fiscalizacion '
     'contrasta: la diferencia con `autovaluo` es la subvaluacion declarada';

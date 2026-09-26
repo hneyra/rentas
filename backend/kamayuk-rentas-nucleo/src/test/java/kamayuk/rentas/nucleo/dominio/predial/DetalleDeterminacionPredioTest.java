@@ -53,7 +53,7 @@ class DetalleDeterminacionPredioTest {
     }
 
     @Test
-    @DisplayName("un DECLARADO con otra declarada al lado no se construye (V32)")
+    @DisplayName("un DECLARADO con otra declarada al lado no se construye (V33)")
     void unDeclaradoNoLlevaOtraDeclarada() {
         assertThatThrownBy(
                         () ->

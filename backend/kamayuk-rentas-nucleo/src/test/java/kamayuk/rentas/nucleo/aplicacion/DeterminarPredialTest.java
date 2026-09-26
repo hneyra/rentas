@@ -624,7 +624,7 @@ class DeterminarPredialTest {
                         + " valuacion vigente, el predio se nombra")
         void unaSelladaSinDeclaradaNoSeRellenaConLaSellada() {
             predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
-            // Una fila anterior a V32, o un predio que nadie declaro: SELLADO y sin la otra cifra.
+            // Una fila anterior a V33, o un predio que nadie declaro: SELLADO y sin la otra cifra.
             determinaciones.sembrarDelEjercicio(
                     EJERCICIO,
                     7L,
