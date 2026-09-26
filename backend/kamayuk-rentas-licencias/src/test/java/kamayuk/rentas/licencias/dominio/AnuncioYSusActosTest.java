@@ -304,6 +304,90 @@ class AnuncioYSusActosTest {
 
     // ==================================================================
 
+    /**
+     * #417 — El ejercicio que una renovacion devenga es el que renueva, no el del dia del acto.
+     *
+     * <p>Cada caso renueva en una fecha cuyo ejercicio <b>no</b> es el que se espera: en enero los
+     * dos coinciden, y una prueba que renueva en enero pasa en verde con la regla vieja.
+     */
+    @Nested
+    @DisplayName("#417 — el ejercicio que renueva")
+    class ElEjercicioQueRenueva {
+
+        private static final LocalDate DICIEMBRE = LocalDate.of(2026, 12, 15);
+
+        @Test
+        @DisplayName("vigente en diciembre y prorrogado al año siguiente: el año siguiente")
+        void laRenovacionAnticipada() {
+            assertThat(MovimientoDeAnuncio.ejercicioQueRenueva(fin(2026), fin(2027), DICIEMBRE))
+                    .isEqualTo(new Ejercicio(2027));
+        }
+
+        @Test
+        @DisplayName(
+                "una vigencia que ya entra en el año siguiente se cuenta desde su dia siguiente")
+        void desdeElDiaSiguienteALaVigencia() {
+            assertThat(
+                            MovimientoDeAnuncio.ejercicioQueRenueva(
+                                    LocalDate.of(2027, 6, 30), fin(2027), DICIEMBRE))
+                    .as("la prorroga empieza el 1 de julio de 2027: un solo ejercicio")
+                    .isEqualTo(new Ejercicio(2027));
+        }
+
+        @Test
+        @DisplayName("vencido y renovado en enero: el de la vigencia, que es tambien el del acto")
+        void loVencidoEnEnero() {
+            assertThat(
+                            MovimientoDeAnuncio.ejercicioQueRenueva(
+                                    fin(2026), fin(2027), LocalDate.of(2027, 1, 15)))
+                    .isEqualTo(new Ejercicio(2027));
+        }
+
+        @Test
+        @DisplayName("sin plazo, el ejercicio del acto, como antes de #417")
+        void sinPlazo() {
+            assertThat(MovimientoDeAnuncio.ejercicioQueRenueva(fin(2026), null, DICIEMBRE))
+                    .isEqualTo(new Ejercicio(2026));
+        }
+
+        @Test
+        @DisplayName("una prorroga de 2027 a 2028 abarca dos ejercicios y no se cobra como uno")
+        void dosEjerciciosDesdeLaVigencia() {
+            assertThatThrownBy(
+                            () ->
+                                    MovimientoDeAnuncio.ejercicioQueRenueva(
+                                            fin(2026), fin(2028), DICIEMBRE))
+                    .isInstanceOf(MovimientoDeAnuncio.ProrrogaDeVariosEjercicios.class)
+                    .hasMessageContaining("2027-01-01")
+                    .hasMessageContaining("2028-12-31");
+        }
+
+        @Test
+        @DisplayName("vencido, se cuenta desde el acto: diciembre y el año siguiente son dos")
+        void dosEjerciciosDesdeElActo() {
+            assertThatThrownBy(
+                            () ->
+                                    MovimientoDeAnuncio.ejercicioQueRenueva(
+                                            fin(2025), fin(2027), DICIEMBRE))
+                    .isInstanceOf(MovimientoDeAnuncio.ProrrogaDeVariosEjercicios.class)
+                    .hasMessageContaining(DICIEMBRE.toString());
+        }
+
+        @Test
+        @DisplayName("sin vigencia actual tambien se cuenta desde el acto")
+        void sinVigenciaActual() {
+            assertThatThrownBy(
+                            () ->
+                                    MovimientoDeAnuncio.ejercicioQueRenueva(
+                                            null, fin(2027), DICIEMBRE))
+                    .isInstanceOf(MovimientoDeAnuncio.ProrrogaDeVariosEjercicios.class);
+            assertThat(MovimientoDeAnuncio.ejercicioQueRenueva(null, fin(2026), DICIEMBRE))
+                    .isEqualTo(new Ejercicio(2026));
+        }
+    }
+
+    // ==================================================================
+
     @Nested
     @DisplayName("La referencia del cargo lleva el ejercicio dentro")
     class LaReferencia {

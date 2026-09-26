@@ -18,6 +18,7 @@ import kamayuk.rentas.licencias.aplicacion.TasaDeAnunciosParametrizada;
 import kamayuk.rentas.licencias.dominio.AnuncioRepository;
 import kamayuk.rentas.licencias.dominio.ClaseDeAnuncio;
 import kamayuk.rentas.licencias.dominio.CriterioDeAnuncios;
+import kamayuk.rentas.licencias.dominio.MovimientoDeAnuncio;
 import kamayuk.rentas.licencias.dominio.MovimientoDeAnuncioRepository;
 import kamayuk.rentas.licencias.dominio.TipoDeAnuncio;
 import kamayuk.rentas.parametros.FaltaPublicar;
@@ -265,7 +266,9 @@ public class AnuncioController {
             // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
             // enumerando las dos, que es peor que no decir nada.
             throw FaltaPublicar.problema(sinTarifa);
-        } catch (RenovarAnuncio.VigenciaHaciaAtras mal) {
+        } catch (RenovarAnuncio.VigenciaHaciaAtras
+                | MovimientoDeAnuncio.ProrrogaDeVariosEjercicios mal) {
+            // #417: una prorroga de varios ejercicios tampoco se cobra; se renueva año a año.
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(mal));
         }
 

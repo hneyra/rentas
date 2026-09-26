@@ -12,7 +12,8 @@ import java.util.Locale;
  *
  * <ul>
  *   <li>{@link #AUTORIZACION} y {@link #RENOVACION} devengan: la primera por el ejercicio en que se
- *       autoriza, la segunda por cada ejercicio que se renueva.
+ *       autoriza, la segunda por el ejercicio que renueva —el de su nueva vigencia, no el del dia
+ *       del acto (#417)—, y uno por renovacion.
  *   <li>{@link #CESE} y {@link #RETIRO} no. Y no solo no devengan: el cese <b>impide</b> que se
  *       devengue mas, porque renovar exige que el estado derivado no sea CESADO ni RETIRADO. Es la
  *       mitad «detiene la deuda futura» del AC de #51; la otra mitad —«no borra la pasada»— la

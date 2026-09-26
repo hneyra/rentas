@@ -40,7 +40,8 @@ import org.jspecify.annotations.Nullable;
  * @param tipo que le paso
  * @param fecha el dia del acto; entra como argumento, no del reloj (regla 6). Es tambien la fecha
  *     valor del cargo, cuando el acto devenga
- * @param ejercicio el ejercicio al que se imputa la tasa; nulo cuando el acto no devenga
+ * @param ejercicio el ejercicio al que se imputa la tasa; nulo cuando el acto no devenga. En la
+ *     renovacion es el que renueva, no el de {@code fecha}: {@link #ejercicioQueRenueva} (#417)
  * @param referenciaCargo la referencia con la que el cargo entro en el libro; nula cuando el acto
  *     no devenga
  * @param tasa el importe asentado; nulo cuando el acto no devenga
@@ -140,6 +141,56 @@ public record MovimientoDeAnuncio(
         Objects.requireNonNull(numeroDeAutorizacion, "La referencia lleva el numero del anuncio");
         Objects.requireNonNull(ejercicio, "La referencia lleva el ejercicio que devenga");
         return "ANUNCIO-" + numeroDeAutorizacion.strip() + "-" + ejercicio.valor();
+    }
+
+    /**
+     * El ejercicio que una renovacion devenga: el que <b>renueva</b>, no el del dia del acto
+     * (#417).
+     *
+     * <p>Hasta #417 {@code RenovarAnuncio} tomaba {@code Ejercicio.de(fecha)}, y con eso renovar en
+     * diciembre un anuncio autorizado ese mismo año componia la referencia de la autorizacion y
+     * salia 409 —la unica salida era dejarlo caer en VENCIDO—, y lo que se renovaba en diciembre
+     * para el año siguiente se asentaba en el año del acto y con su tarifa. Nadie lo veia porque
+     * todas las pruebas renovaban en enero, donde los dos ejercicios coinciden.
+     *
+     * <h2>La regla</h2>
+     *
+     * <ul>
+     *   <li>El ejercicio de {@code vigenciaHasta}, que es hasta donde llega la prorroga.
+     *   <li>Solo si la renovacion no trae plazo, el ejercicio del acto, como antes.
+     *   <li>Y una prorroga que abarque <b>mas de un ejercicio</b> no se cobra: {@link
+     *       ProrrogaDeVariosEjercicios}. Se cuenta desde el dia siguiente a la vigencia actual si
+     *       el anuncio sigue vigente el dia del acto, y desde el acto si ya vencio o nunca tuvo
+     *       plazo. Devengar uno por año, o uno por varios, es una decision de negocio que no esta
+     *       tomada.
+     * </ul>
+     *
+     * <p>Es una funcion pura (regla 6): las tres fechas entran como argumento.
+     *
+     * @param vigenciaActual hasta cuando rige el anuncio el dia del acto, antes de renovarlo; nula
+     *     si no tiene plazo
+     * @param vigenciaHasta hasta cuando lo prorroga la renovacion; nula si no trae plazo. Se supone
+     *     no anterior a {@code fecha}: eso lo rechaza antes {@code RenovarAnuncio}
+     * @param fecha el dia de la renovacion
+     * @throws ProrrogaDeVariosEjercicios si la prorroga cubre mas de un ejercicio
+     */
+    public static Ejercicio ejercicioQueRenueva(
+            @Nullable LocalDate vigenciaActual,
+            @Nullable LocalDate vigenciaHasta,
+            LocalDate fecha) {
+        Objects.requireNonNull(fecha, "La renovacion lleva la fecha del acto (regla 6)");
+        if (vigenciaHasta == null) {
+            return Ejercicio.de(fecha);
+        }
+        LocalDate desde =
+                vigenciaActual != null && !vigenciaActual.isBefore(fecha)
+                        ? vigenciaActual.plusDays(1)
+                        : fecha;
+        Ejercicio renovado = Ejercicio.de(vigenciaHasta);
+        if (Ejercicio.de(desde).compareTo(renovado) < 0) {
+            throw new ProrrogaDeVariosEjercicios(desde, vigenciaHasta);
+        }
+        return renovado;
     }
 
     /** El acto que da vida a la autorizacion, con el cargo por la tasa del ejercicio. */
@@ -247,5 +298,32 @@ public record MovimientoDeAnuncio(
             throw new IllegalStateException("El movimiento todavia no se ha guardado");
         }
         return guardado;
+    }
+
+    /**
+     * La prorroga cubre mas de un ejercicio, y una renovacion devenga uno solo (#417).
+     *
+     * <p>No es que la peticion este mal escrita: es que cobrar una tasa por dos años, o dos tasas
+     * en un acto, es una decision de negocio que no esta tomada. Hasta que se tome no se cobra ni
+     * lo uno ni lo otro, y se renueva ejercicio a ejercicio.
+     */
+    public static final class ProrrogaDeVariosEjercicios extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        ProrrogaDeVariosEjercicios(LocalDate desde, LocalDate hasta) {
+            super(
+                    "La prorroga del "
+                            + desde
+                            + " al "
+                            + hasta
+                            + " abarca los ejercicios "
+                            + desde.getYear()
+                            + " a "
+                            + hasta.getYear()
+                            + ", y una renovacion devenga uno solo: cobrar uno por varios años, o"
+                            + " varios en un acto, no esta decidido. Se renueva ejercicio a"
+                            + " ejercicio (#417)");
+        }
     }
 }

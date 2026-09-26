@@ -52,9 +52,11 @@ import kamayuk.rentas.licencias.aplicacion.ConsultaDeAnuncios;
 import kamayuk.rentas.licencias.aplicacion.RegistrarAnuncio;
 import kamayuk.rentas.licencias.aplicacion.RenovarAnuncio;
 import kamayuk.rentas.licencias.aplicacion.TasaDeAnunciosParametrizada;
+import kamayuk.rentas.licencias.dominio.Anuncio;
 import kamayuk.rentas.licencias.dominio.ClaseDeAnuncio;
 import kamayuk.rentas.licencias.dominio.CriterioDeAnuncios;
 import kamayuk.rentas.licencias.dominio.EstadoDelAnuncio;
+import kamayuk.rentas.licencias.dominio.MovimientoDeAnuncio;
 import kamayuk.rentas.licencias.dominio.MovimientoDeAnuncioRepository;
 import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeAnuncio;
 import kamayuk.rentas.licencias.dominio.TipoDeAnuncio;
@@ -141,6 +143,19 @@ class AnunciosYPropagandaJdbcTest {
     private static final String TARIFA_DEL_PANEL = "90.00";
 
     private static final String TARIFA_DEL_LETRERO = "45.00";
+
+    /**
+     * #417 — La clase que la ordenanza de la prueba tarifa <b>distinto cada año</b>.
+     *
+     * <p>Las otras dos valen lo mismo en 2026 y en 2027, y con ellas una renovacion que cobrara la
+     * tarifa de otro ejercicio pasa en verde: es la muestra uniforme de siempre. La de 2025 no se
+     * sella —el libro no tiene ese ejercicio—: es la que el caso (b) copia en su autorizacion.
+     */
+    private static final ClaseDeAnuncio TARIFADA_POR_ANIO = ClaseDeAnuncio.BANDEROLA;
+
+    private static final String TARIFA_DE_2025 = "105.00";
+    private static final String TARIFA_DE_2026 = "120.00";
+    private static final String TARIFA_DE_2027 = "135.00";
 
     /**
      * Y la clase que el conjunto sellado <b>no</b> tarifa: con ella el registro tiene que fallar.
@@ -869,6 +884,210 @@ class AnunciosYPropagandaJdbcTest {
 
     // ==================================================================
 
+    /**
+     * #417 — La renovacion devenga el ejercicio que <b>renueva</b>, y con la tarifa de ese año.
+     *
+     * <p>Hasta #417 el ejercicio y la tarifa salian de la fecha del acto. Las pruebas de encima no
+     * lo distinguen: renuevan el 15 de enero ({@link #EN_2027}), donde el ejercicio del acto y el
+     * renovado coinciden, y con una tarifa que vale lo mismo los dos años. Aqui se renueva el <b>15
+     * de diciembre</b> y {@link #TARIFADA_POR_ANIO} cuesta 120,00 en 2026 y 135,00 en 2027.
+     */
+    @Nested
+    @DisplayName("#417 — la renovacion devenga el ejercicio que renueva")
+    class ElEjercicioQueRenueva {
+
+        private static final LocalDate DICIEMBRE_DE_2026 = LocalDate.of(2026, 12, 15);
+
+        @Test
+        @DisplayName("(a) renovar en diciembre lo autorizado ese año: 2027, con la tarifa de 2027")
+        void laRenovacionAnticipada() {
+            long titular = crearContribuyente();
+            RegistrarAnuncio.Registro alta =
+                    enContexto(
+                            () ->
+                                    registrar.registrar(
+                                            solicitudFechada(titular, HOY, FIN_DE_2026),
+                                            null,
+                                            PORQUE));
+            String numero = alta.anuncio().numero();
+            assertThat(alta.autorizacion().tasa()).isEqualTo(Dinero.de(TARIFA_DE_2026));
+
+            RenovarAnuncio.Renovacion prorroga =
+                    enContexto(
+                            () -> renovar.renovar(numero, DICIEMBRE_DE_2026, FIN_DE_2027, PORQUE));
+
+            assertThat(prorroga.movimiento().referenciaCargo())
+                    .as("VIGENTE el 15 de diciembre, y lo que se renueva es 2027")
+                    .isEqualTo("ANUNCIO-" + numero + "-2027");
+            assertThat(prorroga.movimiento().ejercicio()).isEqualTo(new Ejercicio(2027));
+            assertThat(prorroga.movimiento().tasa())
+                    .as("la ordenanza sellada de 2027, no la de 2026 que rige el dia del acto")
+                    .isEqualTo(Dinero.de(TARIFA_DE_2027));
+            assertThat(asientoDe("ANUNCIO-" + numero + "-2027"))
+                    .containsEntry("ejercicio", "2027")
+                    .containsEntry("monto", TARIFA_DE_2027);
+        }
+
+        @Test
+        @DisplayName("(b) lo autorizado en 2025 hasta 2026 y renovado en diciembre asienta 2027")
+        void elCargoEnElAnioQueRenueva() {
+            String numero = autorizadoEn2025(FIN_DE_2026);
+
+            enContexto(() -> renovar.renovar(numero, DICIEMBRE_DE_2026, FIN_DE_2027, PORQUE));
+
+            assertThat(
+                            filas(
+                                    "SELECT count(*) FROM cuenta_corriente_asiento"
+                                            + " WHERE referencia_externa = ?",
+                                    "ANUNCIO-" + numero + "-2026"))
+                    .as(
+                            "2026 ya lo cubre la autorizacion: la renovacion no tiene nada que cobrar alli")
+                    .isZero();
+            assertThat(asientoDe("ANUNCIO-" + numero + "-2027"))
+                    .as("la vigencia que se prorroga es 2027, y ahi va la deuda")
+                    .containsEntry("ejercicio", "2027")
+                    .containsEntry("monto", TARIFA_DE_2027);
+        }
+
+        @Test
+        @DisplayName("una prorroga que abarca 2027 y 2028 no se cobra como un solo ejercicio")
+        void unaProrrogaDeDosEjercicios() {
+            long titular = crearContribuyente();
+            String numero =
+                    enContexto(
+                                    () ->
+                                            registrar.registrar(
+                                                    solicitudFechada(titular, HOY, FIN_DE_2026),
+                                                    null,
+                                                    PORQUE))
+                            .anuncio()
+                            .numero();
+
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    renovar.renovar(
+                                                            numero,
+                                                            DICIEMBRE_DE_2026,
+                                                            LocalDate.of(2028, 12, 31),
+                                                            PORQUE)))
+                    .isInstanceOf(MovimientoDeAnuncio.ProrrogaDeVariosEjercicios.class)
+                    .hasMessageContaining("2027")
+                    .hasMessageContaining("2028");
+            assertThat(cargosDe(numero)).as("solo la autorizacion").isEqualTo(1);
+        }
+
+        /**
+         * El (b) <b>del issue</b>: vencido desde el 31 de diciembre de 2025 y renovado el 15 de
+         * diciembre de 2026 hasta el 31 de diciembre de 2027.
+         *
+         * <p>Contando desde el acto —ya vencio—, la prorroga cubre del 15 al 31 de diciembre de
+         * 2026 <b>y</b> todo 2027: dos ejercicios. La regla de #417 dice que eso sale 422 hasta que
+         * se decida devengar uno por año, y el issue esperaba a la vez que este caso asentara 2027.
+         * Las dos cosas no caben; se aplica la regla, que no cobra nada sin decision, y la
+         * contradiccion queda dicha en el PR.
+         */
+        @Test
+        @DisplayName(
+                "lo vencido y renovado en diciembre hasta el año siguiente abarca dos ejercicios")
+        void loVencidoRenovadoEnDiciembre() {
+            String numero = autorizadoEn2025(LocalDate.of(2025, 12, 31));
+
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    renovar.renovar(
+                                                            numero,
+                                                            DICIEMBRE_DE_2026,
+                                                            FIN_DE_2027,
+                                                            PORQUE)))
+                    .isInstanceOf(MovimientoDeAnuncio.ProrrogaDeVariosEjercicios.class)
+                    .hasMessageContaining("2026")
+                    .hasMessageContaining("2027");
+            assertThat(cargosDe(numero))
+                    .as("la autorizacion de 2025 no esta en el libro, y la renovacion tampoco")
+                    .isZero();
+        }
+
+        /**
+         * Un anuncio autorizado el 10 de mayo de 2025, sembrado con los repositorios de produccion.
+         *
+         * <p>No se registra con {@link RegistrarAnuncio} porque su cargo no cabe en el libro: el
+         * libro de la prueba esta particionado en 2026 y 2027, y abrir 2025 es una migracion. A la
+         * renovacion no le hace falta ese asiento —lo que mira es el historial de movimientos—, asi
+         * que se siembran la fila del anuncio y su movimiento de autorizacion, con su ejercicio, su
+         * referencia y su tasa, y nada mas.
+         */
+        private String autorizadoEn2025(LocalDate vigenciaHasta) {
+            long titular = crearContribuyente();
+            LocalDate fecha = LocalDate.of(2025, 5, 10);
+            Ejercicio ejercicio = Ejercicio.de(fecha);
+            return enContexto(
+                    () ->
+                            transaccion.execute(
+                                    estado -> {
+                                        String numero =
+                                                PlantillaDeNumeroDeAnuncio.POR_OMISION.componer(
+                                                        ejercicio,
+                                                        anuncios.siguienteCorrelativo(ejercicio));
+                                        RegistrarAnuncio.Solicitud base =
+                                                solicitudFechada(titular, fecha, vigenciaHasta);
+                                        long id =
+                                                anuncios.autorizar(
+                                                                new Anuncio(
+                                                                        null,
+                                                                        numero,
+                                                                        titular,
+                                                                        null,
+                                                                        null,
+                                                                        base.clase(),
+                                                                        base.tipo(),
+                                                                        base.emplazamiento(),
+                                                                        base.forma(),
+                                                                        base.denominacion(),
+                                                                        base.ubicacion(),
+                                                                        base.area(),
+                                                                        base.lados(),
+                                                                        base.cantidad(),
+                                                                        fecha,
+                                                                        vigenciaHasta,
+                                                                        base.expediente(),
+                                                                        fecha,
+                                                                        null,
+                                                                        RELOJ.instant(),
+                                                                        null,
+                                                                        PORQUE))
+                                                        .identificador();
+                                        movimientos.registrar(
+                                                MovimientoDeAnuncio.autorizacion(
+                                                        id,
+                                                        fecha,
+                                                        ejercicio,
+                                                        MovimientoDeAnuncio.referenciaDelCargo(
+                                                                numero, ejercicio),
+                                                        Dinero.de(TARIFA_DE_2025),
+                                                        vigenciaHasta,
+                                                        RELOJ.instant(),
+                                                        PORQUE));
+                                        return numero;
+                                    }));
+        }
+
+        private Map<String, String> asientoDe(String referencia) {
+            Map<String, String> asiento =
+                    unicaFila(
+                            "SELECT ejercicio::text AS ejercicio, monto::text AS monto"
+                                    + " FROM cuenta_corriente_asiento WHERE referencia_externa = ?",
+                            referencia);
+            asiento.put("monto", new BigDecimal(asiento.get("monto")).setScale(2).toPlainString());
+            return asiento;
+        }
+    }
+
+    // ==================================================================
+
     @Nested
     @DisplayName("V45 — La autorizacion no se edita ni se borra")
     class Inmutabilidad {
@@ -1184,6 +1403,29 @@ class AnunciosYPropagandaJdbcTest {
                 HOY);
     }
 
+    /** #417: la de siempre, con la clase que se tarifa distinto cada año y fechas propias. */
+    private static RegistrarAnuncio.Solicitud solicitudFechada(
+            long titular, LocalDate fechaAutorizacion, LocalDate vigenciaHasta) {
+        RegistrarAnuncio.Solicitud base = solicitudDeClase(titular, TARIFADA_POR_ANIO);
+        return new RegistrarAnuncio.Solicitud(
+                base.codigoContribuyente(),
+                null,
+                null,
+                base.clase(),
+                base.tipo(),
+                base.emplazamiento(),
+                base.forma(),
+                base.denominacion(),
+                base.ubicacion(),
+                base.area(),
+                base.lados(),
+                base.cantidad(),
+                fechaAutorizacion,
+                vigenciaHasta,
+                base.expediente(),
+                fechaAutorizacion);
+    }
+
     private static RegistrarAnuncio.Solicitud solicitudConLicencia(long titular, String licencia) {
         RegistrarAnuncio.Solicitud base = solicitud(titular);
         return new RegistrarAnuncio.Solicitud(
@@ -1335,9 +1577,19 @@ class AnunciosYPropagandaJdbcTest {
         long delPanel = tarifaDelCatalogo(ClaseDeAnuncio.PANEL, TARIFA_DEL_PANEL);
         long delLetrero = tarifaDelCatalogo(ClaseDeAnuncio.LETRERO, TARIFA_DEL_LETRERO);
 
-        for (int ejercicio : new int[] {2026, 2027}) {
-            sellarConjunto(municipalidadId, ejercicio, delPanel, delLetrero);
-        }
+        // #417: una fila del catalogo por año, y cada conjunto incluye la suya.
+        sellarConjunto(
+                municipalidadId,
+                2026,
+                delPanel,
+                delLetrero,
+                tarifaDelCatalogo(TARIFADA_POR_ANIO, TARIFA_DE_2026, LocalDate.of(2026, 1, 1)));
+        sellarConjunto(
+                municipalidadId,
+                2027,
+                delPanel,
+                delLetrero,
+                tarifaDelCatalogo(TARIFADA_POR_ANIO, TARIFA_DE_2027, LocalDate.of(2027, 1, 1)));
     }
 
     private static void sellarConjunto(long municipalidadId, int ejercicio, long... parametros)
@@ -1382,17 +1634,23 @@ class AnunciosYPropagandaJdbcTest {
 
     private static long tarifaDelCatalogo(ClaseDeAnuncio clase, String importe)
             throws SQLException {
+        return tarifaDelCatalogo(clase, importe, LocalDate.of(2026, 1, 1));
+    }
+
+    private static long tarifaDelCatalogo(ClaseDeAnuncio clase, String importe, LocalDate desde)
+            throws SQLException {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
                                 "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_numerico, vigencia_desde, documento_fuente,"
                                         + " sellado, usuario_carga) VALUES (NULL, 'TASA_ANUNCIO',"
-                                        + " ?, ?::numeric, DATE '2026-01-01',"
+                                        + " ?, ?::numeric, ?,"
                                         + " 'Ordenanza de la prueba', true, 'siembra')"
                                         + " RETURNING id")) {
             sentencia.setString(1, clase.claveDeLaTasa());
             sentencia.setString(2, importe);
+            sentencia.setObject(3, desde);
             try (ResultSet resultado = sentencia.executeQuery()) {
                 resultado.next();
                 long id = resultado.getLong(1);

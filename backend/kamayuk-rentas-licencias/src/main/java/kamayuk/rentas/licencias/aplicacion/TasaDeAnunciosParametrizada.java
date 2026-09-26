@@ -50,10 +50,11 @@ import org.springframework.stereotype.Service;
  *
  * <h2>«Vigente a la fecha del acto», no vigente hoy</h2>
  *
- * <p>El conjunto se resuelve por el ejercicio de la fecha de la autorizacion o de la renovacion.
- * Sin eso, revisar dentro de dos anios por que una autorizacion costo lo que costo resolveria «el
- * vigente» y podria dar otra cifra, sin avisar (ARQ-09 §3). Lo que se cobro queda ademas copiado en
- * {@code anuncio_movimiento.tasa}.
+ * <p>El conjunto se resuelve por el ejercicio de la fecha de la autorizacion, o por el 1 de enero
+ * del ejercicio que la renovacion renueva (#417): renovar en diciembre para el año siguiente cobra
+ * la ordenanza del año siguiente. Sin eso, revisar dentro de dos anios por que una autorizacion
+ * costo lo que costo resolveria «el vigente» y podria dar otra cifra, sin avisar (ARQ-09 §3). Lo
+ * que se cobro queda ademas copiado en {@code anuncio_movimiento.tasa}.
  */
 @Service
 public class TasaDeAnunciosParametrizada {
