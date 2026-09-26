@@ -262,7 +262,6 @@ class LaDeclaradaSeGuardaAlLadoTest {
                                 null,
                                 null,
                                 ModalidadDelPredial.TRIMESTRAL,
-                                true,
                                 false),
                         Observacion.de("Emision del predial 2026 (#362)"));
 

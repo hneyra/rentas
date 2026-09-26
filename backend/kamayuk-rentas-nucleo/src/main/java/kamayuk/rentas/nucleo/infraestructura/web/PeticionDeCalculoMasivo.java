@@ -15,7 +15,8 @@ import org.jspecify.annotations.Nullable;
  * @param alcance TODOS o SECTOR
  * @param sector obligatorio con alcance SECTOR
  * @param modalidad el cronograma de cuotas; TRIMESTRAL si no se dice
- * @param recalculaYaEmitidos si tambien entran los que ya tienen su determinacion emitida
+ * @param recalculaYaEmitidos se RECHAZA con cualquier valor (#373): ninguna determinacion sale de
+ *     BORRADOR mientras no exista el acto que emite; esta aqui solo para decirlo
  * @param simulacion obligatorio: true corre sin guardar nada, false asienta
  * @param incluyeArbitrios se rechaza si viene en true: los arbitrios son otro tributo
  * @param generaCuponeraPdf se rechaza si viene en true: esta corrida determina, no imprime

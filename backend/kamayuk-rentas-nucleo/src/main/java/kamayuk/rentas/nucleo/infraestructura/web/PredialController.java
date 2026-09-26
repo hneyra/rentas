@@ -394,7 +394,6 @@ public class PredialController {
                                     peticion.codigoDesde(),
                                     peticion.codigoHasta(),
                                     exigirModalidad(peticion.modalidad()),
-                                    Boolean.TRUE.equals(peticion.recalculaYaEmitidos()),
                                     simulacion),
                             observacion));
         } catch (CandadoDeEmision.ValuacionSinCerrar
@@ -446,6 +445,16 @@ public class PredialController {
                     CodigoDeError.VALIDACION,
                     "Esta corrida determina el impuesto predial. Los arbitrios son otro tributo, con"
                             + " su propia determinacion por periodo, y no se emiten aqui");
+        }
+        if (peticion.recalculaYaEmitidos() != null) {
+            // Con cualquier valor (#373): no existe todavia el acto que emite, ninguna
+            // determinacion sale de BORRADOR, y toda corrida real vuelve a determinar a todos los
+            // del alcance. Aceptarlo en silencio haria creer a quien lo manda que tuvo efecto.
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.VALIDACION,
+                    "El campo 'recalculaYaEmitidos' no tiene efecto: todavia no existe el acto que"
+                            + " emite una determinacion, ninguna esta EMITIDA, y toda corrida real"
+                            + " vuelve a determinar a todos los del alcance. No lo mande");
         }
         if (Boolean.TRUE.equals(peticion.generaCuponeraPdf())) {
             throw new ProblemaDeNegocio(

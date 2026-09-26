@@ -16,7 +16,6 @@ import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.nucleo.dominio.CorridaDeEmision;
-import kamayuk.rentas.nucleo.dominio.EstadoDeDeterminacion;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionPredialCalculada;
 import kamayuk.rentas.nucleo.dominio.predial.MinimoImponible;
@@ -250,18 +249,10 @@ public class DeterminarPredialMasivo {
             String codigo = quien == null ? String.valueOf(contribuyenteId) : quien.codigo();
             String nombre = quien == null ? "" : quien.nombre();
 
-            if (!peticion.recalculaYaEmitidos()
-                    && fila.cabecera().estado() == EstadoDeDeterminacion.EMITIDA) {
-                observados.add(
-                        new Observado(
-                                codigo,
-                                nombre,
-                                "Su determinacion del ejercicio ya esta EMITIDA. Recalcularla"
-                                        + " crearia otra (ADR-0007) y dejaria dos valores en"
-                                        + " circulacion por el mismo tributo; marcar «recalcula ya"
-                                        + " emitidos» es decir que eso es lo que se quiere"));
-                continue;
-            }
+            // Sin guarda de «ya EMITIDA» (#373): ninguna escritura de produccion saca una
+            // determinacion de BORRADOR —las cuatro fabricas la crean asi y no hay UPDATE—, asi que
+            // aquella rama no protegia nada. Vuelve, detras del alcance, el dia que exista el acto
+            // que emite.
             if (quien == null) {
                 observados.add(
                         new Observado(
@@ -498,7 +489,6 @@ public class DeterminarPredialMasivo {
      * @param alcance {@link #ALCANCE_TODOS} o {@link #ALCANCE_SECTOR}
      * @param sector obligatorio con {@link #ALCANCE_SECTOR}
      * @param modalidad el cronograma que se aplica a las cuotas; <b>obligatorio</b> desde #234
-     * @param recalculaYaEmitidos si tambien entran los que ya tienen su determinacion emitida
      * @param simulacion si la corrida no guarda ninguna determinacion
      */
     public record Peticion(
@@ -508,7 +498,6 @@ public class DeterminarPredialMasivo {
             @Nullable String codigoDesde,
             @Nullable String codigoHasta,
             ModalidadDelPredial modalidad,
-            boolean recalculaYaEmitidos,
             boolean simulacion) {
 
         public Peticion {
