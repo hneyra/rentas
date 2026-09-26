@@ -42,7 +42,7 @@ import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVenta
  * </ul>
  *
  * Y sin ejercicio **no se manda la peticion**: la pantalla lo dice. Quien decide eso es
- * `useDatosDeLaHoja`, que es donde ya vivia la decision hermana de `exigeSujeto`, y lo vigila su
+ * `useDatosDeLaHoja`, que es donde ya vivia la decision hermana de `sujeto: 'exige'`, y lo vigila su
  * propia guarda. Una auditoria del ejercicio equivocado es peor que una pantalla vacia porque
  * **contesta**: 200, con filas, de otro ano, y nada dice de cual.
  *

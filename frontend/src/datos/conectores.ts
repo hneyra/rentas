@@ -153,6 +153,19 @@ export interface Reparto {
    */
   readonly aLaFecha?: string;
   /**
+   * **Los campos cuya fecha NO es la de `aLaFecha`**, cada uno con la suya (#457, regla 9).
+   *
+   * `ini-panel` pinta en el mismo bloque las cifras del panel de recaudacion —calculado hoy— y
+   * «Observados sin emisión», que sale de **la ultima emision** y es de su dia: bajo una sola
+   * fecha, el recuento de enero se leeria como de hoy. Sacarlo del bloque seria cambiar el
+   * artboard para que quepa una fecha, que es al reves de como se decide aqui.
+   *
+   * `de` es la **etiqueta del campo** tal como la escribe su definicion —una clave de traduccion
+   * que ya existe— y `fecha` va cruda, en ISO: la frase la arma `useDatosDeLaHoja`, por lo mismo
+   * que `aLaFecha`.
+   */
+  readonly fechasPropias?: readonly { readonly de: string; readonly fecha: string }[];
+  /**
    * **De quien es lo que esta pantalla dibuja**, cuando la operacion lo publica (#239).
    *
    * <h2>El hueco que lo trae</h2>
@@ -332,41 +345,26 @@ export interface Conector {
    */
   readonly clave: readonly string[];
   /**
-   * **Esta hoja es de un sujeto concreto** (#169): sin el no se pide nada y la pantalla lo dice.
+   * **Si esta hoja es de un sujeto, y que hace sin el** (#169, #215, #457). Un solo campo con dos
+   * valores, y no dos booleanos: «sin el no pido nada» y «sin el tomo la primera» se contradicen,
+   * y hasta #457 eran dos banderas que podian ponerse juntas —el javadoc decia que lo vigilaba una
+   * guarda que no existia—. Con la union, las dos a la vez **no se pueden escribir**: lo impide el
+   * compilador.
    *
-   * Las tres operaciones de Consultas son de un contribuyente —sin su codigo contestan 422—, y el
-   * codigo viaja en la direccion (`#/<hoja>/<codigo>`). Que este declarado aqui y no en una lista
-   * aparte es lo que hace que el catalogo no pueda desincronizarse: `catalogo.ts` deriva de esto
-   * el `enLaRuta` con que el marco lee el sujeto.
+   * - `'exige'` (#169): la hoja es de un sujeto concreto; sin el no se pide nada y la pantalla lo
+   *   dice. Las tres operaciones de Consultas son de un contribuyente —sin su codigo contestan
+   *   422—, y el codigo viaja en la direccion (`#/<hoja>/<codigo>`).
+   * - `'admite'` (#215): la hoja LEE el sujeto de la ruta si lo trae, y sin el toma la primera de la
+   *   relacion. Es el caso de `fis-res`: `GET /fiscalizacion/resoluciones/{numero}` es de UNA
+   *   resolucion, y desde que #192 publico la relacion hay «primera» que tomar; pero
+   *   `#/fis-res/RDF-2026-000001` tiene que seguir abriendo ESA.
+   *
+   * Los dos declaran el sitio del sujeto: `catalogo.ts` deriva de este campo el `enLaRuta` con que
+   * el marco lee la direccion —sin el, el marco **tiraria** el codigo de la barra—, y solo
+   * `'exige'` detiene a `useDatosDeLaHoja`. Declarado aqui y no en una lista aparte, porque quien
+   * sabe que necesita una hoja es quien la pide.
    */
-  readonly exigeSujeto?: boolean;
-  /**
-   * **Esta hoja LEE el sujeto de la ruta si lo trae, y sin el toma la primera de la relacion**
-   * (#215).
-   *
-   * Es la hermana de `exigeSujeto` y no una variante suya: alli el sujeto es una **condicion
-   * previa** —sin el no se pide nada y la pantalla lo dice— y aqui es una **eleccion**.
-   *
-   * <h2>El caso que la trae, y por que no bastaba ninguno de los dos extremos</h2>
-   *
-   * `fis-res` exigia sujeto desde #179, y con motivo: `GET /fiscalizacion/resoluciones/{numero}` es
-   * de UNA resolucion y **no existia ninguna operacion que publicara la relacion**, asi que no
-   * habia «primera» que tomar. #192 la publico, y entonces la hoja podia tomarla como `coa-exp`.
-   *
-   * Retirar `exigeSujeto` a secas —que es lo que #215 propone— arregla lo que mas se nota —abierta
-   * desde el menu la pantalla **no ensenaba una resolucion nunca**— y **pierde lo otro**:
-   * `catalogo.ts` deriva `enLaRuta.sujeto` de `exigeSujeto`, y sin esa linea el marco **tira** el
-   * numero de la direccion, de modo que `#/fis-res/RDF-2026-000001` dejaria de abrir esa
-   * resolucion. Dos capacidades por una.
-   *
-   * Asi que se declara la tercera forma, que es la union de las dos: el catalogo deriva el sitio
-   * del sujeto de `exigeSujeto` **o** de esta, y `useDatosDeLaHoja` solo se detiene por la primera.
-   * Quien decide que hacer sin sujeto es el conector, que es quien sabe si hay una primera.
-   *
-   * **Las dos juntas no tienen sentido** —«sin el no pido nada» y «sin el tomo la primera» se
-   * contradicen— y lo vigila una guarda.
-   */
-  readonly admiteSujeto?: boolean;
+  readonly sujeto?: 'exige' | 'admite';
   /**
    * **Que decir cuando exige sujeto y la direccion no lo trae**, si no vale la frase de por
    * omision (#180).
@@ -377,7 +375,7 @@ export interface Conector {
    * equivocado se lee como una pantalla rota, no como una pantalla que espera algo.
    *
    * Va aqui —y no en una lista aparte, ni en el gancho con un `if` por hoja— por lo mismo que
-   * `exigeSujeto`: quien sabe que sujeto necesita una hoja es quien la pide.
+   * `sujeto: 'exige'`: quien sabe que sujeto necesita una hoja es quien la pide.
    */
   readonly sinSujeto?: Ausencia;
   /**
@@ -410,7 +408,7 @@ export interface Conector {
   /**
    * **Los parametros que esta hoja lleva en su ruta**, y a que operacion viajan (#172, #186).
    *
-   * Declarados aqui y no en una lista aparte por lo mismo que `exigeSujeto`: quien sabe que
+   * Declarados aqui y no en una lista aparte por lo mismo que `sujeto: 'exige'`: quien sabe que
    * necesita una hoja para pedir es quien la pide. De aqui salen el `enLaRuta.parametros` del
    * catalogo, la llave de la cache y la guarda contra el contrato. Ver `ParametroDeLaHoja`.
    */
@@ -420,7 +418,7 @@ export interface Conector {
    *
    * Es la **tercera** forma de exigir algo, y no se parece a las dos anteriores. Sin parametro
    * obligatorio estaban las once primeras; con el sujeto en la ruta, las dos de Consultas
-   * (`exigeSujeto`, #169). Esta es un obligatorio que **no va en la ruta y no lo elige nadie**:
+   * (`sujeto: 'exige'`, #169). Esta es un obligatorio que **no va en la ruta y no lo elige nadie**:
    * `GET /seguridad/auditoria` declara `ejercicio` entre sus obligatorios
    * —`parametros-de-la-api.json`— y el ejercicio de trabajo es del contexto de sesion, que ya lo
    * publica `GET /seguridad/sesion` y que fija la unica escritura de esta interfaz,
@@ -447,7 +445,7 @@ export interface Conector {
    *   <li><b>Sin el no hay peticion, no hay menos filas.</b> Un filtro que falta acota de menos y
    *       la tabla trae mas; una pagina que falta es la primera. Un obligatorio que falta hace que
    *       la peticion <b>no se mande</b>. Eso no es un dato de entrada: es una <b>condicion
-   *       previa</b>, del mismo tipo que `exigeSujeto` —y por eso se declara al lado y se resuelve
+   *       previa</b>, del mismo tipo que `sujeto: 'exige'` —y por eso se declara al lado y se resuelve
    *       en el mismo sitio, con su propia frase—.</li>
    * </ol>
    */
@@ -860,7 +858,7 @@ function cronogramaDe(determinacion: DeterminacionGuardada): readonly FilaDeLaTa
  *
  * <h2>Exige las dos cosas: el sujeto y el ejercicio</h2>
  *
- * Es el primer conector con `exigeSujeto` y `exigeEjercicio` a la vez, y las dos por el mismo
+ * Es el primer conector con `sujeto: 'exige'` y `exigeEjercicio` a la vez, y las dos por el mismo
  * motivo que en sus estrenos: sin `codContribuyente` la operacion es 422 —«no se contesta la de
  * cualquiera»— y sin `ejercicio` contesta **200 con la determinacion del ano del reloj del
  * backend**, que no es el de trabajo de la sesion. Un acierto de ese tipo no se distingue del
@@ -875,7 +873,7 @@ function cronogramaDe(determinacion: DeterminacionGuardada): readonly FilaDeLaTa
  */
 const TERRITORIO: Conector = {
   clave: ['territorio', 'determinacion-guardada'],
-  exigeSujeto: true,
+  sujeto: 'exige',
   exigeEjercicio: true,
   noEncontrado: NO_ESTA_EN_EL_PADRON,
   sinDato: TODAVIA_SIN_DETERMINAR,

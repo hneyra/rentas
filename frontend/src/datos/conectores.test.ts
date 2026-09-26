@@ -1027,7 +1027,7 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     // Sin `codContribuyente` la operacion es 422 —«no se contesta la de cualquiera»— y sin
     // `ejercicio` contesta 200 con la del ano del reloj del BACKEND, que no es el de trabajo de la
     // sesion. La segunda es la peligrosa: contesta bien, con cifras, de otro ejercicio.
-    expect(conector.exigeSujeto).toBe(true);
+    expect(conector.sujeto).toBe('exige');
     expect(conector.exigeEjercicio).toBe(true);
   });
 

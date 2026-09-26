@@ -12,6 +12,7 @@ import { CONECTORES, loQueLaHojaDeclara } from './conectores.ts';
 import { formatearEntero, formatearFecha } from '../dominio/formato.ts';
 import {
   FRASE_DE_LA_FECHA,
+  FRASE_DE_LA_FECHA_DE,
   FRASE_DE_LA_PAGINA_QUE_LLEGA,
   FRASE_DE_QUIEN_ES,
   FRASE_DE_QUIEN_ES_SIN_PADRON,
@@ -292,7 +293,7 @@ export function useDatosDeLaHoja(
   const enLaRuta = loQueLaHojaDeclara(conector, ruta.parametros);
   // Una hoja de un sujeto sin sujeto no pide: no hay nada que pedir, y lo que llegaria seria un
   // 422 del backend dicho como si fuera una averia.
-  const faltaElSujeto = conector?.exigeSujeto === true && (sujeto === null || sujeto === '');
+  const faltaElSujeto = conector?.sujeto === 'exige' && (sujeto === null || sujeto === '');
 
   /*
    * **El ejercicio de trabajo, y solo para quien lo exige** (#181).
@@ -467,6 +468,11 @@ function conFrasesDePantalla(
   if (deLaPaginaAnterior) trozos.push(t(FRASE_DE_LA_PAGINA_QUE_LLEGA));
   if (reparto.aLaFecha !== undefined) {
     trozos.push(t(FRASE_DE_LA_FECHA, { fecha: formatearFecha(reparto.aLaFecha) }));
+  }
+  for (const propia of reparto.fechasPropias ?? []) {
+    trozos.push(
+      t(FRASE_DE_LA_FECHA_DE, { que: t(propia.de), fecha: formatearFecha(propia.fecha) }),
+    );
   }
   if (reparto.deQuienEs !== undefined) trozos.push(deQuienEs(reparto.deQuienEs, t));
   // Un trozo entero que la operacion no trae, con su motivo (#237). Es una clave, no una frase.

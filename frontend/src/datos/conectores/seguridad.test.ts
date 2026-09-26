@@ -63,7 +63,7 @@ describe('`seg-aud` — la bitacora de auditoria', () => {
     expect(SEG_AUD.exigeEjercicio).toBe(true);
     // Y NO exige sujeto: su obligatorio no va en la ruta, que es justo lo que la hace la tercera
     // forma y no un caso mas de #169.
-    expect(SEG_AUD.exigeSujeto).toBeUndefined();
+    expect(SEG_AUD.sujeto).toBeUndefined();
   });
 
   it('pide la ruta de SU ejercicio, y el ejercicio es el que se le da', async () => {

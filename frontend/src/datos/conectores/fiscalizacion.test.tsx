@@ -502,8 +502,8 @@ describe('`fis-actas` — el contraste de un acta de inspeccion', () => {
     // Es la diferencia que decide como se pide cada una de las tres. Aqui y en `fis-prog` existe
     // una relacion de la que tomar la primera —como `coa-exp`—; de resoluciones **no existe
     // ninguna**, y por eso esa hoja es la unica de las tres que espera un sujeto.
-    expect(FIS_ACTAS.exigeSujeto).toBeUndefined();
-    expect(FIS_PROG.exigeSujeto).toBeUndefined();
+    expect(FIS_ACTAS.sujeto).toBeUndefined();
+    expect(FIS_PROG.sujeto).toBeUndefined();
   });
 
   it('LAS DOS MITADES del contraste salen, y la diferencia COPIADA (#191)', () => {
@@ -646,8 +646,7 @@ describe('`fis-res` — la resolucion de determinacion', () => {
   it('ADMITE sujeto y ya no lo exige: con numero en la ruta se pide ESE (#192, #215)', async () => {
     const { doble } = await pintar('fis-res', RUTA, NUMERO);
 
-    expect(FIS_RES.admiteSujeto).toBe(true);
-    expect(FIS_RES.exigeSujeto).toBeUndefined();
+    expect(FIS_RES.sujeto).toBe('admite');
     // Y la relacion NO se pide: seria una ida de mas para elegir lo que ya esta elegido.
     expect(doble.mock.calls.map((l) => String(l[0]))).toHaveLength(1);
     expect(String(doble.mock.calls[0]?.[0])).toContain(`/fiscalizacion/resoluciones/${NUMERO}`);
@@ -680,7 +679,7 @@ describe('`fis-res` — la resolucion de determinacion', () => {
     expect(container.textContent).toContain('sin datos');
   });
 
-  it('el catalogo DERIVA el sitio del sujeto de `admiteSujeto`, o el marco lo tiraria', async () => {
+  it('el catalogo DERIVA el sitio del sujeto de `sujeto: admite`, o el marco lo tiraria', async () => {
     // Sin esta derivacion el marco ignora con aviso el numero de la direccion «porque la hoja no
     // lo declara», y `#/fis-res/RDF-2026-000001` abriria siempre la PRIMERA del padron. Es la
     // capacidad que retirar `exigeSujeto` a secas habria costado.

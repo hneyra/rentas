@@ -243,6 +243,14 @@ export const FRASE_DEL_CONTEO = '{{cuantos}} de {{total}}';
 export const FRASE_DE_LA_FECHA = 'Las cifras son al {{fecha}}.';
 
 /**
+ * **«Observados sin emisión» es al 28/01/2026: un campo con otra fecha que el resto** (#457).
+ *
+ * La hermana de la de arriba para `Reparto.fechasPropias`: el campo va por su etiqueta —ya
+ * traducida— y la fecha por interpolacion, por lo mismo.
+ */
+export const FRASE_DE_LA_FECHA_DE = '«{{que}}» es al {{fecha}}.';
+
+/**
  * **«Actualizando»: las filas que se ven son de la pagina anterior mientras llega la pedida** (#393).
  *
  * Al pasar de pagina la tabla ya no se vacia —vaciarla desmontaba «Siguiente» con el foco dentro,
