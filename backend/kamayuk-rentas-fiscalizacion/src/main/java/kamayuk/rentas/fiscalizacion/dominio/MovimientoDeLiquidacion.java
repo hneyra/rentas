@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
  * #numeroDeNotificacionDe}; la base lo busca con la misma definición.
  *
  * <p>El constructor canónico admite un NOTIFICADA <b>sin</b> número, y no es un descuido: {@code
- * liquidacion_movimiento_notificacion_ck} (V32) es {@code NOT VALID} porque un padrón migrado puede
+ * liquidacion_movimiento_notificacion_ck} (V34) es {@code NOT VALID} porque un padrón migrado puede
  * traer notificaciones sin él, y leer ese historial no puede reventar. Lo que no se puede es
  * <b>escribir</b> uno: {@link #cambioDeEstado} rechaza NOTIFICADA y {@link #notificada} exige el
  * número. Un número en cualquier otro estado se rechaza siempre: diría que se notificó.
@@ -51,7 +51,7 @@ public record MovimientoDeLiquidacion(
 
     private static final int MOTIVO_MAXIMO = 300;
 
-    /** El ancho de {@code liquidacion_movimiento.numero_notificacion} (V32). */
+    /** El ancho de {@code liquidacion_movimiento.numero_notificacion} (V34). */
     public static final int NUMERO_MAXIMO = 40;
 
     public MovimientoDeLiquidacion {

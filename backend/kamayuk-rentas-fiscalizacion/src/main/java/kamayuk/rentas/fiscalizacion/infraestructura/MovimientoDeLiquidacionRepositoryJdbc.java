@@ -44,7 +44,7 @@ public class MovimientoDeLiquidacionRepositoryJdbc extends RepositorioJdbc
         campos.put("fecha", movimiento.fecha());
         campos.put("motivo", movimiento.motivo());
         // El numero del cargo, solo en NOTIFICADA (#368). Es su unica fuente de verdad:
-        // `liquidacion_movimiento_notificacion_ck` (V32) rechaza un NOTIFICADA sin el.
+        // `liquidacion_movimiento_notificacion_ck` (V34) rechaza un NOTIFICADA sin el.
         campos.put("notificacion", movimiento.numeroNotificacion());
         campos.put("usuario", OrigenContext.actual().usuario());
         campos.put("observacion", movimiento.observacion().texto());
