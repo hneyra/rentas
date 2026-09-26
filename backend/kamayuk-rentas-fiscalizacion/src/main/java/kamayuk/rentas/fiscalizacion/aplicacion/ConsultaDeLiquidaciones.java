@@ -118,7 +118,7 @@ public class ConsultaDeLiquidaciones {
 
         /** Cuántas líneas acusan diferencia. Es el total «Con diferencia» de la pantalla. */
         public long lineasConDiferencia() {
-            return lineas.stream().filter(linea -> linea.condicion().hayDiferencia()).count();
+            return lineas.stream().filter(LineaDeLiquidacion::justificaDeterminar).count();
         }
 
         /** Si alguna línea sigue esperando sus cifras (D-02a, #198). */
