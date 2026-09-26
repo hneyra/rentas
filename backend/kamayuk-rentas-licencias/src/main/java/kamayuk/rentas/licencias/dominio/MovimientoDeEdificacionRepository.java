@@ -46,6 +46,19 @@ public interface MovimientoDeEdificacionRepository {
     /** La emision de un expediente, si ya la tuvo. */
     Optional<MovimientoDeEdificacion> emisionDe(long fueId);
 
+    /** La revalidacion de un expediente de revalidacion, si ya la tuvo (#449). */
+    Optional<MovimientoDeEdificacion> revalidacionDe(long fueId);
+
+    /** El expediente ya tenia su revalidacion: lo dice el indice, para la carrera (#449). */
+    final class YaEstabaRevalidada extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public YaEstabaRevalidada(String mensaje, Throwable causa) {
+            super(mensaje, causa);
+        }
+    }
+
     /** El expediente ya tenia su emision. */
     final class YaEstabaEmitida extends RuntimeException {
 

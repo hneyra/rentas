@@ -674,4 +674,29 @@ class FueYValorizacionTest {
                 null,
                 PORQUE);
     }
+
+    /**
+     * #449 — Un expediente de revalidacion resuelto no se queda EN_TRAMITE para siempre.
+     *
+     * <p>Nunca tiene EMISION —su tramite no otorga licencia propia— ni vigencias —el tramo va a la
+     * original—, asi que la derivacion lo dejaba en tramite aunque ya tuviera su resolucion. Las
+     * dos fechas hacen falta: con una sola, posterior al acto, la prueba no ve que el acto se mira
+     * a la fecha.
+     */
+    @Test
+    @DisplayName("#449 — la revalidacion resuelta es RESUELTO desde el dia del acto, no antes")
+    void laRevalidacionResueltaNoSigueEnTramite() {
+        LocalDate acto = LocalDate.of(2026, 9, 23);
+        List<MovimientoDeEdificacion> historial =
+                List.of(
+                        MovimientoDeEdificacion.revalidacion(
+                                90L, acto, 7L, 11L, "RES-2026-000001", AHORA, PORQUE));
+
+        assertThat(
+                        List.of(
+                                EstadoDelFue.derivarDe(historial, List.of(), acto.minusDays(1)),
+                                EstadoDelFue.derivarDe(historial, List.of(), acto)))
+                .as("la vispera sigue en tramite; desde el acto, resuelto")
+                .containsExactly(EstadoDelFue.EN_TRAMITE, EstadoDelFue.RESUELTO);
+    }
 }
