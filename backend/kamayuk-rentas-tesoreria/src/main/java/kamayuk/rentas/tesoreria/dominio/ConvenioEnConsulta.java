@@ -26,8 +26,9 @@ import org.jspecify.annotations.Nullable;
  * @param cuotas cuantas cuotas tiene el cronograma, sin contar la inicial
  * @param pagadas cuantas se han cobrado; hoy solo puede ser la inicial (ver {@code
  *     ConsultaDeConvenios})
- * @param vencidas cuantas han vencido sin cobrarse a la fecha de la consulta
- * @param saldo lo que queda por cobrar del cronograma
+ * @param vencidas cuantas han vencido sin cobrarse a la fecha de la consulta; {@code null} si el
+ *     convenio no esta vigente (#460, {@link SituacionDelCronograma})
+ * @param saldo lo que queda por cobrar del cronograma; {@code null} si no esta vigente
  * @param saldoA la fecha a la que se respondio {@code saldo}
  * @param estado en que situacion esta, derivado de sus movimientos
  * @param motivoDelCierre por que se cerro, si esta cerrado
@@ -41,8 +42,8 @@ public record ConvenioEnConsulta(
         Dinero deudaAcogida,
         int cuotas,
         int pagadas,
-        int vencidas,
-        Dinero saldo,
+        @Nullable Integer vencidas,
+        @Nullable Dinero saldo,
         LocalDate saldoA,
         EstadoDeConvenio estado,
         @Nullable String motivoDelCierre) {
@@ -54,10 +55,13 @@ public record ConvenioEnConsulta(
         Objects.requireNonNull(
                 fechaCorte, "Toda cifra indica su fecha de calculo (RNF-075, regla 9)");
         Objects.requireNonNull(deudaAcogida, "La fila necesita lo acogido");
-        Objects.requireNonNull(saldo, "La fila necesita su saldo");
         Objects.requireNonNull(saldoA, "El saldo indica a que fecha se respondio (regla 9)");
         Objects.requireNonNull(estado, "La fila necesita su estado");
-        if (cuotas < 0 || pagadas < 0 || vencidas < 0) {
+        if ((vencidas == null) != (saldo == null)) {
+            throw new IllegalArgumentException(
+                    "Vencidas y saldo aplican juntos o no aplican: " + vencidas + "/" + saldo);
+        }
+        if (cuotas < 0 || pagadas < 0 || (vencidas != null && vencidas < 0)) {
             throw new IllegalArgumentException(
                     "Las cuentas de cuotas no son negativas: "
                             + cuotas

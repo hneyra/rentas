@@ -10,15 +10,17 @@ import kamayuk.rentas.tesoreria.dominio.Convenio;
 import kamayuk.rentas.tesoreria.dominio.ConvenioEnConsulta;
 import kamayuk.rentas.tesoreria.dominio.CuotaDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.MovimientoDeConvenio;
+import kamayuk.rentas.tesoreria.dominio.SituacionDelCronograma;
 import org.jspecify.annotations.Nullable;
 
 /**
  * El convenio como lo ve la interfaz (#35, RF-084).
  *
  * <p><b>Cada cifra con su fecha</b> (regla 9, RNF-075). {@code fechaCorte} dice a que fecha esta
- * {@code montoTotal}, y {@code aLaFecha} a que fecha estan el saldo y las cuotas vencidas. Son dos
- * fechas distintas —una es del dia del convenio y la otra del dia de la consulta— y las dos viajan:
- * bajo una sola, un convenio de marzo pareceria calculado hoy.
+ * {@code montoTotal}, y {@code aLaFecha} a que fecha estan el saldo y las cuotas vencidas, que solo
+ * tiene un convenio vigente (#460). Son dos fechas distintas —una es del dia del convenio y la otra
+ * del dia de la consulta— y las dos viajan: bajo una sola, un convenio de marzo pareceria calculado
+ * hoy.
  *
  * <p>Los importes salen como texto en su representacion decimal, como en el resto de la API: un
  * numero JSON pasa por coma flotante en cualquier cliente, y un centimo perdido en el transporte es
@@ -62,9 +64,9 @@ public record ConvenioResource(
                 ficha.estado().name(),
                 ficha.movimientos(),
                 ficha.aLaFecha(),
-                ficha.saldoDelCronograma().valor().toPlainString(),
+                ficha.situacion().map(s -> s.saldo().valor().toPlainString()).orElse(null),
                 ficha.cuotasPagadas(),
-                ficha.cuotasVencidas());
+                ficha.situacion().map(SituacionDelCronograma::vencidas).orElse(null));
     }
 
     private static ConvenioResource construir(
@@ -204,6 +206,9 @@ public record ConvenioResource(
      *
      * <p>Ligera a proposito: una pagina de veinte filas no puede costar veinte lecturas de detalle.
      * Quien abra un convenio lo pide por su numero.
+     *
+     * <p>{@code vencidas} y {@code saldoS} son {@code null} fuera de un convenio vigente (#460):
+     * bajo un preconvenio o uno cerrado no se debe nada del convenio, y un cero lo afirmaria.
      */
     public record FilaResource(
             String nroConvenio,
@@ -213,8 +218,8 @@ public record ConvenioResource(
             String deudaAcogidaS,
             int cuotas,
             int pagadas,
-            int vencidas,
-            String saldoS,
+            @Nullable Integer vencidas,
+            @Nullable String saldoS,
             LocalDate saldoALaFecha,
             String estado,
             @Nullable String motivo,
@@ -263,7 +268,7 @@ public record ConvenioResource(
                     fila.cuotas(),
                     fila.pagadas(),
                     fila.vencidas(),
-                    fila.saldo().valor().toPlainString(),
+                    fila.saldo() == null ? null : fila.saldo().valor().toPlainString(),
                     fila.saldoA(),
                     fila.estado().name(),
                     fila.motivoDelCierre(),

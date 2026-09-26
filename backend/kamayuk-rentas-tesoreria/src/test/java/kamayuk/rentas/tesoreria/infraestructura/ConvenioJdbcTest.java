@@ -73,6 +73,7 @@ import kamayuk.rentas.tesoreria.dominio.CuotaDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.EstadoDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.MovimientoDeConvenioRepository;
 import kamayuk.rentas.tesoreria.dominio.NumeroDeConvenio;
+import kamayuk.rentas.tesoreria.dominio.SituacionDelCronograma;
 import kamayuk.rentas.tesoreria.dominio.TipoDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.TipoDeGarantia;
 import kamayuk.rentas.tesoreria.dominio.TipoDeMovimientoDeConvenio;
@@ -1283,7 +1284,7 @@ class ConvenioJdbcTest {
                 assertThat(unaFila(convenio, fecha).vencidas())
                         .as("el listado (SQL) a %s", fecha)
                         .isEqualTo(esperadas);
-                assertThat(fichaA.cuotasVencidas())
+                assertThat(fichaA.situacion().orElseThrow().vencidas())
                         .as("la ficha (Java) a %s", fecha)
                         .isEqualTo(esperadas);
             }
@@ -1299,13 +1300,81 @@ class ConvenioJdbcTest {
             long titular = contribuyenteConDeuda("CONS-3");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
 
-            Dinero total = convenio.totalDelCronograma();
-            assertThat(unaFila(convenio).saldo())
-                    .as("sin la inicial cobrada, se debe el cronograma entero")
-                    .isEqualTo(total);
+            // Esta asercion decia «sin la inicial cobrada, se debe el cronograma entero».
+            // Un preconvenio no acoge deuda (RegistrarPreconvenio): no se debe nada del
+            // convenio, y la deuda sigue en su fase ordinaria (#460).
+            assertThat(String.valueOf(unaFila(convenio).saldo()))
+                    .as("bajo un preconvenio no se debe nada del cronograma: no aplica")
+                    .isEqualTo("null");
 
             formalizarLaInicial(convenio);
-            assertThat(unaFila(convenio).saldo()).isEqualTo(total.menos(convenio.cuotaInicial()));
+            assertThat(unaFila(convenio).saldo())
+                    .isEqualTo(convenio.totalDelCronograma().menos(convenio.cuotaInicial()));
+        }
+
+        /**
+         * #460: vencidas y saldo solo tienen sentido bajo un convenio VIGENTE.
+         *
+         * <p>La siembra que distingue es la matriz: los tres estados que un convenio puede tener
+         * con cronograma —preconvenio, vigente y quebrado—, consultados el dia exacto en que vence
+         * la primera cuota y el siguiente. Sembrar solo formalizados no distingue el {@code CASE};
+         * consultar fuera de un dia de vencimiento no distingue {@code <} de {@code <=}. Y en las
+         * seis celdas el listado (SQL) contesta lo mismo que la regla del dominio.
+         */
+        @Test
+        @DisplayName(
+                "vencidas y saldo: nulos fuera de VIGENTE, y el vigente cuenta la cuota al dia"
+                        + " siguiente (#460)")
+        void soloElVigenteTieneVencidasYSaldo() {
+            Convenio preconvenio = registrarPreconvenio(contribuyenteConDeuda("M460-P"), 6, "20");
+            Convenio vigente = registrarPreconvenio(contribuyenteConDeuda("M460-V"), 6, "20");
+            formalizarLaInicial(vigente);
+            Convenio quebrado = registrarPreconvenio(contribuyenteConDeuda("M460-Q"), 6, "20");
+            formalizarLaInicial(quebrado);
+            quebrar(quebrado, "INCUMPLIMIENTO");
+
+            LocalDate vence =
+                    vigente.cronograma().stream()
+                            .filter(cuota -> cuota.numero() == 1)
+                            .findFirst()
+                            .orElseThrow()
+                            .vencimiento();
+            Dinero saldoDelVigente = vigente.totalDelCronograma().menos(vigente.cuotaInicial());
+            List<String> esperadas = new ArrayList<>();
+            List<String> medidas = new ArrayList<>();
+            List<String> delDominio = new ArrayList<>();
+            for (LocalDate fecha : List.of(vence, vence.plusDays(1))) {
+                for (Convenio convenio : List.of(preconvenio, vigente, quebrado)) {
+                    ConvenioEnConsulta fila = unaFila(convenio, fecha);
+                    medidas.add(celda(fila.estado(), fecha, fila.vencidas(), fila.saldo()));
+                    Optional<SituacionDelCronograma> regla =
+                            SituacionDelCronograma.a(
+                                    fila.estado(), convenio.cronograma(), fila.pagadas(), fecha);
+                    delDominio.add(
+                            celda(
+                                    fila.estado(),
+                                    fecha,
+                                    regla.map(SituacionDelCronograma::vencidas).orElse(null),
+                                    regla.map(SituacionDelCronograma::saldo).orElse(null)));
+                }
+                esperadas.add(celda(EstadoDeConvenio.PRECONVENIO, fecha, null, null));
+                esperadas.add(
+                        celda(
+                                EstadoDeConvenio.VIGENTE,
+                                fecha,
+                                fecha.equals(vence) ? 0 : 1,
+                                saldoDelVigente));
+                esperadas.add(celda(EstadoDeConvenio.QUEBRADO, fecha, null, null));
+            }
+
+            assertThat(medidas)
+                    .as(
+                            "un convenio que no acoge deuda no tiene cuotas que vencer ni saldo"
+                                    + " que cobrar, y el dia en que vence la cuota aun se paga")
+                    .containsExactlyElementsOf(esperadas);
+            assertThat(delDominio)
+                    .as("el listado (SQL) y la regla del dominio contestan lo mismo en cada celda")
+                    .containsExactlyElementsOf(medidas);
         }
 
         @Test
@@ -1498,6 +1567,15 @@ class ConvenioJdbcTest {
                 () ->
                         EstadoDeConvenio.deLosMovimientos(
                                 movimientos.deConvenio(convenio.idGuardado())));
+    }
+
+    /** Una celda de la matriz de #460, escrita para que el rojo diga cual. */
+    private static String celda(
+            EstadoDeConvenio estado,
+            LocalDate fecha,
+            @Nullable Object vencidas,
+            @Nullable Object saldo) {
+        return estado + " a " + fecha + ": vencidas " + vencidas + ", saldo " + saldo;
     }
 
     private static ConvenioEnConsulta unaFila(Convenio convenio) {

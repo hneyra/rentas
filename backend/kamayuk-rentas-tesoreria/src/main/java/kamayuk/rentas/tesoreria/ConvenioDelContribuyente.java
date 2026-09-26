@@ -29,8 +29,9 @@ import org.jspecify.annotations.Nullable;
  * @param deudaAcogida lo que se fracciono, congelado a {@code fechaCorte}
  * @param cuotas cuantas cuotas tiene el cronograma
  * @param pagadas cuantas se han cobrado
- * @param vencidas cuantas han vencido sin cobrarse a {@code saldoA}
- * @param saldo lo que queda por cobrar del cronograma
+ * @param vencidas cuantas han vencido sin cobrarse a {@code saldoA}; {@code null} si el convenio no
+ *     esta vigente, porque entonces no se debe nada del convenio (#460)
+ * @param saldo lo que queda por cobrar del cronograma; {@code null} si no esta vigente
  * @param saldoA la fecha a la que se respondio {@code saldo}
  * @param estado en que situacion esta, derivado de sus movimientos y no de una columna
  * @param motivoDelCierre por que se cerro, si esta cerrado
@@ -42,8 +43,8 @@ public record ConvenioDelContribuyente(
         Dinero deudaAcogida,
         int cuotas,
         int pagadas,
-        int vencidas,
-        Dinero saldo,
+        @Nullable Integer vencidas,
+        @Nullable Dinero saldo,
         LocalDate saldoA,
         String estado,
         @Nullable String motivoDelCierre) {
@@ -54,7 +55,6 @@ public record ConvenioDelContribuyente(
         Objects.requireNonNull(
                 fechaCorte, "Toda cifra indica su fecha de calculo (RNF-075, regla 9)");
         Objects.requireNonNull(deudaAcogida, "El convenio necesita lo acogido");
-        Objects.requireNonNull(saldo, "El convenio necesita su saldo");
         Objects.requireNonNull(saldoA, "El saldo indica a que fecha se respondio (regla 9)");
         Objects.requireNonNull(estado, "El convenio necesita su estado");
     }

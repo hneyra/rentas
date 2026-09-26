@@ -199,6 +199,10 @@ public record ConsultaUnificadaResource(
      * ImporteActualizado} separados: {@code deudaAcogida} a la fecha de corte del convenio y {@code
      * saldo} a la de la consulta. Es la fila que mejor enseña por que el importe y su fecha van
      * juntos en un tipo: aplanarlas dejaria dos cifras de dias distintos bajo la misma cabecera.
+     *
+     * <p>{@code vencidas} y {@code saldo} son {@code null} fuera de un convenio vigente (#460): un
+     * preconvenio no acoge deuda y uno cerrado ya la devolvio, asi que la deuda esta en el resumen
+     * de saldos y no aqui. Un cero diria «no debe nada del convenio», que tampoco es la respuesta.
      */
     public record ConvenioDeLaFicha(
             String numero,
@@ -206,8 +210,8 @@ public record ConsultaUnificadaResource(
             ImporteActualizado deudaAcogida,
             int cuotas,
             int pagadas,
-            int vencidas,
-            ImporteActualizado saldo,
+            @Nullable Integer vencidas,
+            @Nullable ImporteActualizado saldo,
             String estado,
             @Nullable String motivoDelCierre) {
 
@@ -219,7 +223,9 @@ public record ConsultaUnificadaResource(
                     convenio.cuotas(),
                     convenio.pagadas(),
                     convenio.vencidas(),
-                    new ImporteActualizado(convenio.saldo(), convenio.saldoA()),
+                    convenio.saldo() == null
+                            ? null
+                            : new ImporteActualizado(convenio.saldo(), convenio.saldoA()),
                     convenio.estado(),
                     convenio.motivoDelCierre());
         }
