@@ -7,6 +7,8 @@ import kamayuk.rentas.sanciones.dominio.ItemDeCorrida;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataRetrievalFailureException;
+import org.springframework.dao.NonTransientDataAccessException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -94,17 +96,18 @@ public class GenerarCorridaDeValores {
                     } else {
                         noProceden++;
                     }
-                } catch (DataAccessException
-                        | CorridaDeValoresRepository.PapeletaYaConValor fallo) {
-                    // La transaccion de este candidato se deshizo entera: sigue PENDIENTE,
-                    // y una proxima llamada lo vuelve a intentar. No se detiene la corrida
-                    // por uno: el resto puede resolverse igual.
+                } catch (DataAccessException fallo) {
+                    // #384: el que sale de los datos de ESTA papeleta no lo arregla ningun
+                    // relanzamiento, y se cierra diciendolo. El resto sigue como antes.
+                    if (esDeSusDatos(fallo) && cerrarPorSusDatos(corrida, item, fallo)) {
+                        noProceden++;
+                    } else {
+                        fallidos++;
+                        avisar(item, corridaId, fallo);
+                    }
+                } catch (CorridaDeValoresRepository.PapeletaYaConValor fallo) {
                     fallidos++;
-                    log.warn(
-                            "No se pudo procesar la papeleta {} de la corrida {}: {}",
-                            item.papeletaId(),
-                            corridaId,
-                            fallo.getMessage());
+                    avisar(item, corridaId, fallo);
                 }
             }
             cursor = lote.get(lote.size() - 1).identificador();
@@ -114,9 +117,71 @@ public class GenerarCorridaDeValores {
     }
 
     /**
+     * Si el fallo sale de los datos de la papeleta, y por tanto ningún reintento lo arregla (#384).
+     *
+     * <p>Es una sola familia de {@link NonTransientDataAccessException}: una lectura que no
+     * devuelve lo que el código espera —{@link DataRetrievalFailureException}, como la {@code
+     * IncorrectResultSizeDataAccessException} de dos resoluciones donde se esperaba una—.
+     *
+     * <p><b>No lo es toda excepción no transitoria</b>, y eso es a propósito. Una consulta mal
+     * escrita o un permiso que falta también son no transitorios, pero no son de esta papeleta:
+     * revientan en todos los candidatos, los arregla un despliegue, y cerrarlos como {@code
+     * NO_PROCEDE} los daría por resueltos y apagaría la alarma de {@link Informe#sinAvance()}, con
+     * la que el proceso batch sale distinto de cero. Siguen contando como fallidos.
+     *
+     * <p><b>Tampoco lo es una restricción violada</b> ({@code DataIntegrityViolationException}),
+     * por la misma razón: un {@code NOT NULL} que el código no rellena o un valor fuera de rango
+     * (SQLState de clase 22 o 23) sale de un defecto del programa tan a menudo como de los datos, y
+     * entonces revienta en todos los candidatos. El único caso de datos que se conoce —la carrera
+     * en que otra corrida ya le dio valor a la papeleta, que {@code papeleta_valor_unico_uq}
+     * rechaza— no llega aquí como {@code DuplicateKeyException}: el repositorio lo traduce a {@link
+     * CorridaDeValoresRepository.PapeletaYaConValor}.
+     */
+    private static boolean esDeSusDatos(DataAccessException fallo) {
+        return fallo instanceof DataRetrievalFailureException;
+    }
+
+    /**
+     * Cierra el candidato como {@code NO_PROCEDE}, en su propia transacción; {@code false} si ni
+     * eso se pudo, y entonces cuenta como fallido y sigue {@code PENDIENTE}.
+     */
+    private boolean cerrarPorSusDatos(
+            CorridaDeValores corrida, ItemDeCorrida item, DataAccessException fallo) {
+        try {
+            procesar.noProcedePorSusDatos(item, fallo, corrida.observacion());
+        } catch (DataAccessException tampoco) {
+            log.warn(
+                    "La papeleta {} de la corrida {} fallo por sus datos y no se pudo cerrar como"
+                            + " NO_PROCEDE: {}",
+                    item.papeletaId(),
+                    corrida.identificador(),
+                    tampoco.getMessage());
+            return false;
+        }
+        log.warn(
+                "La papeleta {} de la corrida {} queda NO_PROCEDE por un error de sus datos: {}",
+                item.papeletaId(),
+                corrida.identificador(),
+                fallo.getMessage());
+        return true;
+    }
+
+    private static void avisar(ItemDeCorrida item, long corridaId, RuntimeException fallo) {
+        // La transaccion de este candidato se deshizo entera: sigue PENDIENTE, y una
+        // proxima llamada lo vuelve a intentar. No se detiene la corrida por uno: el
+        // resto puede resolverse igual.
+        log.warn(
+                "No se pudo procesar la papeleta {} de la corrida {}: {}",
+                item.papeletaId(),
+                corridaId,
+                fallo.getMessage());
+    }
+
+    /**
      * El resultado de una llamada a {@link #generar}.
      *
-     * @param noProceden cuántos esperan una resolución, su notificación o su plazo
+     * @param noProceden cuántos esperan una resolución, su notificación o su plazo, y cuántos se
+     *     cerraron por un error de sus datos que ningún reintento arregla (#384)
      * @param fallidos cuántos reventaron y siguen pendientes para la próxima pasada
      */
     public record Informe(

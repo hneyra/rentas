@@ -1,6 +1,7 @@
 package kamayuk.rentas.sanciones.aplicacion;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -20,6 +21,7 @@ import kamayuk.rentas.sanciones.dominio.TipoDeResolucionDeGerencia;
 import kamayuk.rentas.valores.EmisionDeValoresDeMultas;
 import kamayuk.rentas.valores.ValorDeMulta;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,7 +53,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <ol>
  *   <li>No hay resolución de gerencia que ordene la cobranza —la ordinaria en tránsito, la del
- *       procedimiento sancionador en administrativas—. Se arregla dictándola.
+ *       procedimiento sancionador en administrativas—. Se arregla dictándola. O la hubo, y la
+ *       última que resolvió un recurso dejó la multa sin efecto: entonces no hay nada que arreglar
+ *       (#384). Cuál de todas ordena la cobranza no lo decide una consulta sino {@link
+ *       CorridaDeValores#laQueOrdenaLaCobranza}.
  *   <li>La hay, pero ninguna diligencia surtió efecto. Se arregla notificándola.
  *   <li>Surtió efecto, pero el plazo que concedió todavía corre. Se arregla esperando.
  * </ol>
@@ -172,6 +177,28 @@ public class ProcesarPapeletaDeLaCorrida {
         }
     }
 
+    /**
+     * Cierra el candidato como {@code NO_PROCEDE} por un error de <b>sus datos</b> que ningún
+     * reintento arregla, con el mensaje del error como motivo (#384).
+     *
+     * <p>Lo llama {@link GenerarCorridaDeValores} cuando {@link #procesar} revienta con un error
+     * así, y va en <b>su propia transacción</b>: la de {@link #procesar} ya se deshizo entera, con
+     * lo que hubiera emitido. Sin esto el candidato se quedaba {@code PENDIENTE}, la corrida lo
+     * contaba como «fallido» —que se lee como algo que se arregla relanzando— y cada relanzamiento
+     * terminaba igual, con la única huella en el log del servidor.
+     */
+    @Transactional
+    public Resultado noProcedePorSusDatos(
+            ItemDeCorrida item, DataAccessException fallo, Observacion observacion) {
+        Objects.requireNonNull(item, "No hay candidato que cerrar");
+        Objects.requireNonNull(fallo, "Se cierra diciendo con que error");
+        Objects.requireNonNull(observacion, "Sin observacion no se guarda (regla 10, RNF-052)");
+        corridas.marcarNoProcede(
+                item.identificador(),
+                recortado("Error en sus datos que reintentar no arregla: " + fallo.getMessage()));
+        return Resultado.NO_PROCEDE;
+    }
+
     /** {@code papeleta_masivo_item.motivo} es {@code varchar(200)}. */
     private static String recortado(String motivo) {
         return motivo.length() <= LARGO_DEL_MOTIVO
@@ -191,8 +218,18 @@ public class ProcesarPapeletaDeLaCorrida {
         TipoDeResolucionDeGerencia tipo = corrida.resolucionQueOrdenaLaCobranza();
         LocalDate fechaCriterio = corrida.fechaCriterio();
 
-        Optional<ResolucionDeGerencia> ordena =
-                resoluciones.dePapeleta(papeleta.identificador(), tipo);
+        // #384: TODAS las de la papeleta, y la politica de la corrida decide cual ordena la
+        // cobranza. Pedir al repositorio «la» del tipo suponia una sola, y la administrativa
+        // puede ser varias —la RIS y lo que resuelve cada recurso contra ella—: con dos, la
+        // lectura reventaba y el candidato se quedaba PENDIENTE en cada relanzamiento.
+        List<ResolucionDeGerencia> deLaPapeleta = resoluciones.dePapeleta(papeleta.identificador());
+        Optional<ResolucionDeGerencia> sinEfecto = corrida.laQueDejoLaMultaSinEfecto(deLaPapeleta);
+        if (sinEfecto.isPresent()) {
+            return "La resolucion "
+                    + sinEfecto.get().numero()
+                    + " dejo la multa sin efecto: no hay acto que ordene su cobranza";
+        }
+        Optional<ResolucionDeGerencia> ordena = corrida.laQueOrdenaLaCobranza(deLaPapeleta);
         if (ordena.isEmpty()) {
             return "Sin "
                     + tipo.titulo().toLowerCase(Locale.ROOT)
