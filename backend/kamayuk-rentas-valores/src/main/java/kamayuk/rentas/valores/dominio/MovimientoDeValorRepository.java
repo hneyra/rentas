@@ -19,9 +19,10 @@ public interface MovimientoDeValorRepository {
      * el indice unico parcial de V28 —{@code ON CONFLICT} sobre el, no un {@code SELECT} previo—,
      * porque dos peticiones simultaneas pasan las dos por cualquier comprobacion escrita en Java.
      *
-     * @return el movimiento guardado, o el que ya estaba si este valor ya se habia pasado
+     * @return el movimiento guardado, o el que ya estaba si este valor ya se habia pasado, y cual
+     *     de las dos cosas paso (#444)
      */
-    MovimientoDeValor registrarPase(MovimientoDeValor movimiento);
+    PaseRegistrado registrarPase(MovimientoDeValor movimiento);
 
     /**
      * Registra la respuesta de coactiva al pase: {@link TipoDeMovimiento#ACO} o {@link

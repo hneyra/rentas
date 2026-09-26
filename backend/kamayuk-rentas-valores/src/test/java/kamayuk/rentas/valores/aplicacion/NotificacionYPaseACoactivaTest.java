@@ -32,6 +32,7 @@ import kamayuk.rentas.valores.dominio.MovimientoDeValor;
 import kamayuk.rentas.valores.dominio.Notificacion;
 import kamayuk.rentas.valores.dominio.TipoValor;
 import kamayuk.rentas.valores.dominio.Valor;
+import kamayuk.rentas.valores.dominio.ValorNoCobrable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -319,13 +320,44 @@ class NotificacionYPaseACoactivaTest {
             notificarEl(LocalDate.of(2026, 4, 3));
 
             MovimientoDeValor primero = pasar.pasar("OP-2026-000001", HOY, OBSERVACION);
-            // Otra fecha, y anterior: desde #402 una posterior a hoy ya no llega al registro.
+            // Otra fecha, y anterior: desde #402 una posterior a hoy ya no llega al registro. Y
+            // otra observacion (#444): la de quien repite no puede quedar como la del pase.
             MovimientoDeValor segundo =
-                    pasar.pasar("OP-2026-000001", HOY.minusDays(3), OBSERVACION);
+                    pasar.pasar(
+                            "OP-2026-000001",
+                            HOY.minusDays(3),
+                            Observacion.de("Otro operador repite el pase"));
 
             assertThat(segundo.id()).isEqualTo(primero.id());
             assertThat(segundo.fecha()).isEqualTo(primero.fecha());
             assertThat(movimientos.cuantos()).isEqualTo(1);
+            assertThat(auditados)
+                    .filteredOn(registro -> "valor_movimiento".equals(registro.tabla()))
+                    .as(
+                            "un ALTA del pase, no uno por cada vez que alguien lo repite (#444): la"
+                                    + " bitacora dice quien dio el pase")
+                    .hasSize(1);
+        }
+
+        /**
+         * #444 — Un valor que ya no se cobra no admite actos de cobranza.
+         *
+         * <p>Las pruebas del pase no tenian ningun valor en estado terminal. Aqui el valor esta
+         * notificado y despues PRESCRITO: hasta #444 el pase salia 201 y quedaba para siempre.
+         */
+        @Test
+        @DisplayName("#444 — un valor prescrito no se pasa a coactiva ni se notifica: 409")
+        void unValorPrescritoNoSeCobra() {
+            notificarEl(LocalDate.of(2026, 4, 3));
+            valores.cambiarEstado(valorPorNumero("OP-2026-000001").id(), EstadoDeValor.PRESCRITO);
+            int auditadosAntes = auditados.size();
+
+            assertThatThrownBy(() -> pasar.pasar("OP-2026-000001", HOY, OBSERVACION))
+                    .isInstanceOf(ValorNoCobrable.class)
+                    .hasMessageContaining("PRESCRITO");
+            assertThatThrownBy(() -> notificarEl(HOY)).isInstanceOf(ValorNoCobrable.class);
+            assertThat(movimientos.cuantos()).as("ningun pase").isZero();
+            assertThat(auditados).as("y ningun ALTA").hasSize(auditadosAntes);
         }
 
         @Test
