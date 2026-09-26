@@ -17,12 +17,11 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>El {@code usuarioId} no es un dato mas</h2>
  *
- * <p>Es <b>el</b> dato. {@code PUT /seguridad/usuarios/{id}/clave} solo admite la clave propia
- * —{@code AdministrarSesion} lo comprueba comparando la cuenta del token con la del usuario que el
- * {@code id} nombra—, y hasta este issue la interfaz no tenia forma de saber cual era el suyo: las
- * unicas lecturas que publicaban un {@code usuario.id} eran el <b>padron entero</b> de usuarios y
- * la matriz de otro, las dos detras de un permiso de administracion mucho mayor que «cambiar mi
- * propia contrasena».
+ * <p>Es <b>el</b> dato: hasta #559 las unicas lecturas que publicaban un {@code usuario.id} eran el
+ * <b>padron entero</b> de usuarios y la matriz de otro, las dos detras de un permiso de
+ * administracion. Nacio para el cambio de clave propia, que #437 retiro —la clave se cambia en la
+ * consola de cuenta del emisor, y la autorizacion es de {@code identidad} (ADR-0039)—; la interfaz
+ * lo sigue declarando en su lectura de la sesion.
  *
  * <p>Y sale del token, nunca de un parametro. Esa es la diferencia entre una lectura de la sesion
  * propia y un directorio de personas: no hay donde poner el identificador de otra.

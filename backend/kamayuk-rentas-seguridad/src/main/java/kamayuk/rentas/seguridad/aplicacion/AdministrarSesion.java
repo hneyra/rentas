@@ -92,55 +92,6 @@ public class AdministrarSesion {
         return sesiones.respaldos(paginacion);
     }
 
-    /**
-     * El cambio de contrasena: aqui va el <b>camino</b>, no el almacen (ADR-0005).
-     *
-     * <p>El sistema no guarda claves y no las transporta. Lo unico que hace esta operacion es
-     * comprobar que el usuario existe, dejar constancia de que se pidio el cambio, y devolver donde
-     * se hace: el proveedor OIDC. Ni el metodo ni el cuerpo de la peticion tienen sitio donde poner
-     * una contrasena, que es la unica forma de garantizar que no llega.
-     *
-     * @return el destino al que la interfaz tiene que llevar al usuario
-     */
-    @Transactional
-    public String iniciarCambioDeClave(long usuarioId, Observacion observacion) {
-        Usuario usuario =
-                administracion
-                        .usuario(usuarioId)
-                        .orElseThrow(
-                                () ->
-                                        new ProblemaDeNegocio(
-                                                CodigoDeError.NO_ENCONTRADO,
-                                                "No hay ningun usuario con identificador "
-                                                        + usuarioId));
-
-        exigirQueSeaElPropio(usuario);
-
-        auditoria.registrar(
-                RegistroDeAuditoria.enLaFechaDe(
-                                "usuario", String.valueOf(usuarioId), Operacion.ACCESO, observacion)
-                        .con(null, "{\"cambioDeClave\":\"delegado al proveedor de identidad\"}"));
-
-        return DESTINO_DEL_PROVEEDOR;
-    }
-
-    /**
-     * Solo la propia.
-     *
-     * <p>Cambiar la clave de otro no es administrar: es suplantar. Quien tenga que desbloquear a
-     * alguien lo hace en el proveedor de identidad, que es donde vive la credencial y donde queda
-     * su propia pista.
-     */
-    private void exigirQueSeaElPropio(Usuario usuario) {
-        String enCurso = OrigenContext.actual().usuario();
-        if (!usuario.cuenta().equals(enCurso)) {
-            throw new ProblemaDeNegocio(
-                    CodigoDeError.SIN_PRIVILEGIO,
-                    "Solo se puede cambiar la contrasena propia; la de otro se gestiona en el"
-                            + " proveedor de identidad");
-        }
-    }
-
     private Usuario usuarioEnCurso() {
         String cuenta = OrigenContext.actual().usuario();
         return administracion
@@ -153,14 +104,4 @@ public class AdministrarSesion {
                                                 + cuenta
                                                 + "', que no es un usuario de esta municipalidad"));
     }
-
-    /**
-     * Donde se cambia la contrasena.
-     *
-     * <p>Es una ruta relativa del proveedor y no una URL completa: el emisor concreto es
-     * configuracion del ambiente (ADR-0005) y ponerlo aqui obligaria a recompilar para cambiar de
-     * proveedor. Cuando la iteracion de identidad configure el emisor, este valor saldra de la
-     * configuracion; hasta entonces la interfaz sabe componerlo con el emisor que ya conoce.
-     */
-    private static final String DESTINO_DEL_PROVEEDOR = "/account/password";
 }

@@ -266,7 +266,7 @@ Manual: cap. 4 · contexto acotado: `seguridad`
 | `modulos` | Módulos del sistema | Registro | `GET /api/v1/seguridad/modulos` |
 | `accesos` | Accesos y políticas | Registro | `GET /api/v1/seguridad/accesos` |
 | `cambiar_anio` | Cambiar el año de trabajo | Procesos | `PUT /api/v1/seguridad/sesion/ejercicio` |
-| `cambiar_clave` | Cambiar contraseña | Procesos | `PUT /api/v1/seguridad/usuarios/{id}/clave` |
+| `cambiar_clave` | Cambiar contraseña | Procesos | — (retirada en #437: la clave se cambia en la consola de cuenta del emisor; la opción se queda porque sus permisos llegan por el buzón de `identidad`) |
 | `auditoria` | Auditoría del sistema | Consultas | `GET /api/v1/seguridad/auditoria` |
 | `parametros` | Parámetros del sistema | Registro | `GET /api/v1/seguridad/parametros` |
 | `respaldo` | Copias de seguridad | Procesos | `POST /api/v1/seguridad/respaldos` |

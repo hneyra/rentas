@@ -61,17 +61,11 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <h2>Que mide, y por que hace falta que lo mida asi</h2>
  *
- * <p>Lo que este issue publica es <b>el identificador propio</b>. {@code PUT
- * /seguridad/usuarios/{id}/clave} esta implementado desde hace tiempo y sólo admite la clave propia
- * —{@code AdministrarSesion} compara la cuenta del token con la del usuario que el {@code id}
- * nombra—, y la interfaz no podia llamarlo porque no sabia cual era su {@code id}: las dos unicas
- * lecturas que publican un {@code usuario.id} son el listado entero de usuarios y la matriz de
- * otro, las dos detras de un permiso de administracion mucho mayor.
- *
- * <p>Por eso la prueba que de verdad cierra el AC 4 <b>no mira un campo</b>: encadena las dos
- * operaciones —lee el {@code usuarioId} y con ese numero pide el cambio de clave— y exige 200. Una
- * asercion sobre el campo se quedaria en verde con el identificador de otro dentro; el circuito no,
- * porque {@code exigirQueSeaElPropio} contesta 403.
+ * <p>Lo que este issue publica es <b>el identificador propio</b>, resuelto a la fila de {@code
+ * usuario} de esta municipalidad. Nacio para el cambio de clave propia ({@code PUT
+ * /seguridad/usuarios/{id}/clave}), que #437 retiro: la clave se cambia en la consola de cuenta del
+ * emisor. El AC 4 —el circuito lectura + cambio de clave— se fue con la operacion; lo que sostiene
+ * el dato es el AC 2, que exige el {@code usuarioId} de la fila sembrada y no uno cualquiera.
  *
  * <p>El aislamiento <b>si</b> lo pone RLS aqui, y eso lo separa de {@code
  * MunicipalidadDeLaSesionFronteraTest}: {@code usuario} tiene {@code municipalidad_id NOT NULL} y
@@ -153,9 +147,8 @@ class IdentidadDeLaSesionFronteraTest {
                         new IdentidadDeLaSesion(administracion, sesiones), gestor);
 
         // El orden importa: `usuario.id` es una identidad de todo el cluster, asi que el
-        // ajeno de A queda en el numero siguiente al propio. Es lo que permite que la
-        // mutacion del AC 4 —«devuelve el usuarioId de otro»— apunte a un usuario que
-        // existe y llegue a `exigirQueSeaElPropio` en vez de morir en el 404.
+        // ajeno de A queda en el numero siguiente al propio, un usuario que existe y que el
+        // AC 1 usa como identificador por parametro.
         usuarioDeA = crear(jdbc, transaccion, municipalidadA, CUENTA, NOMBRE_DE_A);
         usuarioAjenoDeA = crear(jdbc, transaccion, municipalidadA, CUENTA_AJENA, "Operador ajeno");
         usuarioDeB = crear(jdbc, transaccion, municipalidadB, CUENTA, NOMBRE_DE_B);
@@ -208,9 +201,7 @@ class IdentidadDeLaSesionFronteraTest {
         assertThat(resultado.getResponse().getStatus())
                 .as(
                         "el comprobador niega TODO: con un acceso del catalogo esto seria 403 y"
-                                + " quien no administra usuarios no podria pedir el cambio de su"
-                                + " propia clave, que es el permiso que este issue existe para no"
-                                + " tener que otorgar")
+                                + " quien no administra usuarios no podria saber quien es")
                 .isEqualTo(200);
         assertThat(comprobador.preguntas)
                 .as("SESION_PROPIA no se comprueba contra el catalogo (ADR-0013)")
@@ -250,9 +241,7 @@ class IdentidadDeLaSesionFronteraTest {
         String cuerpo = cuerpoDe(get(RUTA));
 
         assertThat(numero(cuerpo, "usuarioId"))
-                .as(
-                        "es el dato del issue: sin el, PUT /seguridad/usuarios/{id}/clave no se"
-                                + " puede llamar")
+                .as("es el dato del issue: el id de la fila de ESTA sesion, no uno cualquiera")
                 .isEqualTo(usuarioDeA);
         assertThat(campo(cuerpo, "cuenta")).isEqualTo(CUENTA);
         assertThat(campo(cuerpo, "nombre")).isEqualTo(NOMBRE_DE_A);
@@ -286,42 +275,6 @@ class IdentidadDeLaSesionFronteraTest {
         assertThat(cuerpoDe(get(RUTA)))
                 .as("lo que se lee es lo que quedo registrado, no lo que dijo un cliente")
                 .contains("\"ejercicioDeTrabajo\":2025");
-    }
-
-    // ------------------------------------------------------------------ AC 4
-
-    @Test
-    @DisplayName("AC 4 — con el id que publica, el cambio de la clave PROPIA pasa")
-    void conSuPropioIdElCambioDeClavePasa() throws Exception {
-        comprobador.concedidos.add("cambiar_clave|MODIFICACION");
-
-        long propio = numero(cuerpoDe(get(RUTA)), "usuarioId");
-
-        MvcResult resultado = pedirCambioDeClave(propio);
-
-        assertThat(resultado.getResponse().getStatus())
-                .as(
-                        "el circuito entero: si la lectura publicara el id de otro, esto seria 403"
-                                + " «solo se puede cambiar la contrasena propia». Una asercion"
-                                + " sobre el campo se quedaria en verde con el numero equivocado"
-                                + " dentro")
-                .isEqualTo(200);
-        assertThat(resultado.getResponse().getContentAsString()).contains("PROVEEDOR_DE_IDENTIDAD");
-    }
-
-    @Test
-    @DisplayName("AC 4 — y con el id de otro, la misma peticion es 403: la guarda no se salta")
-    void conElIdDeOtroEs403() throws Exception {
-        comprobador.concedidos.add("cambiar_clave|MODIFICACION");
-
-        MvcResult resultado = pedirCambioDeClave(usuarioAjenoDeA);
-
-        assertThat(resultado.getResponse().getStatus())
-                .as(
-                        "es el contraste de la prueba anterior: sin el, un 200 no diria nada"
-                                + " —podria estar pasando cualquier identificador—")
-                .isEqualTo(403);
-        assertThat(resultado.getResponse().getContentAsString()).contains("propia");
     }
 
     // ------------------------------------------------------------------ aislamiento
@@ -380,23 +333,11 @@ class IdentidadDeLaSesionFronteraTest {
         MvcResult resultado = mvc.perform(get(RUTA)).andReturn();
 
         assertThat(resultado.getResponse().getStatus())
-                .as(
-                        "un cero ahi acabaria en PUT /seguridad/usuarios/0/clave, que es una"
-                                + " peticion sin sentido con aspecto de peticion legitima")
+                .as("un cero ahi seria un usuario inventado con aspecto de usuario" + " legitimo")
                 .isEqualTo(404);
     }
 
     // ------------------------------------------------------------------ apoyo
-
-    private static MvcResult pedirCambioDeClave(long usuarioId) throws Exception {
-        return mvc.perform(
-                        put("/rentas/api/v1/seguridad/usuarios/" + usuarioId + "/clave")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        "{\"observacion\":\"El usuario pidio cambiar su"
-                                                + " contrasena\"}"))
-                .andReturn();
-    }
 
     private static String cuerpoDe(RequestBuilder peticion) throws Exception {
         MvcResult resultado = mvc.perform(peticion).andReturn();
@@ -481,9 +422,8 @@ class IdentidadDeLaSesionFronteraTest {
     /**
      * Concede solo lo que se le dice, y empieza sin nada.
      *
-     * <p>No basta con uno que niegue todo: el cambio de clave del AC 4 exige {@code MODIFICACION}
-     * sobre {@code cambiar_clave}, asi que con la negativa total su 403 vendria del guardia y no de
-     * {@code exigirQueSeaElPropio} —los dos codigos son 403 y no se distinguen—.
+     * <p>Empieza sin nada porque el AC 1 es justo eso: la lectura de la sesion no pregunta al
+     * catalogo, asi que tiene que pasar con un comprobador que no concede ningun acceso.
      */
     private static final class ComprobadorDeMentira implements ComprobadorDeAcceso {
 

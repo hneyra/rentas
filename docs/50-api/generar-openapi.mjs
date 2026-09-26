@@ -1617,13 +1617,10 @@ const OPERACIONES_ADICIONALES = {
         municipalidad: su \`usuarioId\`, su \`cuenta\`, su \`nombre\` y el ejercicio de
         trabajo que tenga registrado.
 
-        **El \`usuarioId\` es lo que ninguna otra lectura publicaba.**
-        \`PUT /seguridad/usuarios/{id}/clave\` sólo admite la clave propia —el servidor
-        compara la cuenta del token con la del usuario que ese \`id\` nombra—, y hasta
-        aquí la interfaz no sabía cuál era el suyo: las dos únicas operaciones que
-        publican un \`usuario.id\` son el listado de usuarios y la matriz de otro, las
-        dos detrás de un permiso de administración mucho mayor que «cambiar mi propia
-        contraseña».
+        **El \`usuarioId\` es lo que ninguna otra lectura publicaba**, y la interfaz lo
+        declara en su lectura de la sesión. Nació para el cambio de la clave propia, que
+        se retiró (#437): la clave se cambia en la consola de cuenta del emisor, que la
+        interfaz compone con su \`oidcRealm\`, y la autorización es de \`identidad\`.
 
         **Sin ningún parámetro, y eso es la decisión.** El sujeto sale de la cuenta del
         token y se resuelve dentro del contexto de tenant. Con un identificador esto
@@ -4477,6 +4474,11 @@ const OPERACIONES_RETIRADAS = new Set([
   'permisos_efectivos_de_usuario',
   'fijar_permisos_de_usuario',
   'permisos_configurados_de_usuario',
+  // #437 — el cambio de clave propia. Devolvia «/account/password», la consola de cuenta
+  // antigua, cuando la interfaz ya abre {realm}/account/account-security/signing-in (#115); su
+  // descripcion prometia una politica de claves que es de Keycloak, y nadie lo llamaba. La
+  // opcion `cambiar_clave` del catalogo se queda: sus permisos llegan por el buzon de identidad.
+  'cambiar_clave',
 ]);
 for (const id of PANTALLAS_RETIRADAS) {
   if (!PANTALLAS[id]) {

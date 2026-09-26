@@ -32,7 +32,6 @@ import kamayuk.rentas.web.ProblemaDeNegocio;
 import kamayuk.rentas.web.RespuestaPaginada;
 import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -68,12 +67,10 @@ public class SesionController {
      * Quien es la sesion: el usuario que hay detras del token, ya resuelto a la fila de {@code
      * usuario} de esta municipalidad (#559, RF-121).
      *
-     * <p><b>Lo que publica y no publicaba nadie es el {@code usuarioId}.</b> {@link
-     * #cambiarClave(long, SolicitudDeCambioDeClave)} solo admite la clave propia, y la interfaz no
-     * tenia forma de saber cual era su identificador: las dos unicas lecturas que publicaban un
-     * {@code usuario.id} —el listado de usuarios y la matriz de otro— estan detras de un permiso de
-     * administracion mucho mayor que «cambiar mi propia contrasena», y deducirlo cruzando la cuenta
-     * del token contra el listado obligaria a otorgarlo.
+     * <p><b>Lo que publica y no publicaba nadie es el {@code usuarioId}</b>, y la interfaz lo
+     * declara en su lectura de la sesion. Nacio para el cambio de clave propia, que se retiro en
+     * #437: la clave se cambia en la consola de cuenta del emisor, que la interfaz compone con su
+     * {@code oidcRealm} (#115), y la autorizacion es de {@code identidad} (ADR-0039).
      *
      * <p><b>Sin ningun parametro</b>, por lo mismo que {@link #municipalidadDeLaSesion()}: el
      * sujeto sale del token y no de la peticion. Con uno, esta lectura seria el padron de usuarios
@@ -156,23 +153,6 @@ public class SesionController {
                 administrar.cambiarEjercicioDeTrabajo(
                         new Ejercicio(cambio.ejercicio()), Observacion.de(cambio.observacion()));
         return SesionResource.de(sesion);
-    }
-
-    /**
-     * Inicia el cambio de contrasena.
-     *
-     * <p><b>No recibe ninguna contrasena, ni la vieja ni la nueva</b>, y esa ausencia es la
-     * garantia: no hay forma de que llegue al servidor porque no hay donde ponerla. Lo que devuelve
-     * es a donde tiene que ir la interfaz, que es el proveedor de identidad (ADR-0005).
-     */
-    @PutMapping(Api.RAIZ + "/seguridad/usuarios/{id}/clave")
-    @RequiereAcceso(acceso = "cambiar_clave", privilegio = Privilegio.MODIFICACION)
-    public CambioDeClaveIniciado cambiarClave(
-            @PathVariable("id") long usuario, @RequestBody SolicitudDeCambioDeClave solicitud) {
-
-        String destino =
-                administrar.iniciarCambioDeClave(usuario, Observacion.de(solicitud.observacion()));
-        return new CambioDeClaveIniciado("PROVEEDOR_DE_IDENTIDAD", destino);
     }
 
     /**
@@ -325,21 +305,6 @@ public class SesionController {
      * ya contesta lo suyo.
      */
     public record CambioDeEjercicio(int ejercicio, @Nullable String observacion) {}
-
-    /**
-     * Cuerpo del cambio de clave. <b>Sin ningun campo de contrasena</b>, a proposito.
-     *
-     * <p><b>{@code observacion} va {@link Nullable} porque es lo que Jackson puede producir</b>
-     * (#30): la clave que el cliente no manda llega nula, la anotacion no la obliga a nada, y
-     * declararla no-nula solo consigue que NullAway se lo crea. Eso es lo que dejaba pasar un
-     * {@code Observacion.de(...)} con un nulo dentro, y con el un {@code NullPointerException} que
-     * el borde no caza: <b>500 con identificador de incidencia</b> donde tocaba un 422. Declarado,
-     * quien lo lea tiene que decidir que hace con el nulo — y el constructor de {@link Observacion}
-     * ya contesta lo suyo.
-     */
-    public record SolicitudDeCambioDeClave(@Nullable String observacion) {}
-
-    public record CambioDeClaveIniciado(String gestionadaPor, String destino) {}
 
     public record SesionResource(
             long id, long usuarioId, OffsetDateTime inicio, @Nullable Integer ejercicioDeTrabajo) {

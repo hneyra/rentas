@@ -1227,12 +1227,5 @@
     "condicionales": [],
     "opcionales": [],
     "enElCuerpo": []
-  },
-  "PUT /seguridad/usuarios/{id}/clave": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
   }
 }

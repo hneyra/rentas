@@ -4673,9 +4673,5 @@
     "usuarioId": "entero",
     "inicio": "instante",
     "ejercicioDeTrabajo": "entero"
-  },
-  "PUT /seguridad/usuarios/{id}/clave": {
-    "gestionadaPor": "texto",
-    "destino": "texto"
   }
 }
