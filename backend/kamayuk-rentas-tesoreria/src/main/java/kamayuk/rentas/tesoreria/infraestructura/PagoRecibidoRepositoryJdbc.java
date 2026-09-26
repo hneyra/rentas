@@ -142,16 +142,6 @@ public class PagoRecibidoRepositoryJdbc extends RepositorioJdbc
     }
 
     @Override
-    public void marcarRechazado(long id, String motivo) {
-        jdbc().sql(
-                        "UPDATE pago_recibido SET estado = 'RECHAZADO', motivo = :motivo"
-                                + " WHERE id = :id AND estado = 'EN_TRANSITO'")
-                .param("motivo", motivo)
-                .param("id", id)
-                .update();
-    }
-
-    @Override
     public List<PagoRecibido> enTransitoDe(long contribuyenteId) {
         return jdbc().sql(
                         "SELECT "
