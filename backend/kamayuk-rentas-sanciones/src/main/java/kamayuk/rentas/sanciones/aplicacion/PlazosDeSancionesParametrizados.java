@@ -142,7 +142,7 @@ public class PlazosDeSancionesParametrizados {
          */
         public PlazoConcedido queConcede(TipoDeResolucionDeGerencia tipo) {
             return switch (tipo) {
-                case ORDINARIA -> new PlazoConcedido("Plazo de pago", leer(CLAVE_ORDINARIA));
+                case ORDINARIA -> new PlazoConcedido(PlazoConcedido.DE_PAGO, leer(CLAVE_ORDINARIA));
                 case SANCIONADORA, ADMINISTRATIVA ->
                         new PlazoConcedido("Plazo para impugnar", leer(CLAVE_RECURSO));
             };
@@ -218,9 +218,17 @@ public class PlazosDeSancionesParametrizados {
      */
     public record PlazoConcedido(String rotulo, Plazo plazo) {
 
+        /** El rotulo del plazo que se concede para pagar: el de la ordinaria. */
+        public static final String DE_PAGO = "Plazo de pago";
+
         public PlazoConcedido {
             Objects.requireNonNull(rotulo, "Un plazo impreso lleva su rotulo");
             Objects.requireNonNull(plazo, "Un plazo concedido lleva su cifra");
+        }
+
+        /** Si es un plazo para pagar, que no tiene sentido donde ya no se debe nada (#413). */
+        public boolean esDePago() {
+            return DE_PAGO.equals(rotulo);
         }
     }
 

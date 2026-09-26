@@ -114,10 +114,16 @@ final class ModeloDeLaResolucionDeGerencia {
         // sale con la cifra nueva sin tocar una linea (regla 5). Y sale SIEMPRE, con el rotulo de
         // su tipo (#410): hasta entonces la RIS no imprimia ningun plazo y su diligencia contaba
         // siete dias habiles.
-        cabecera.add(Campo.de(plazo.rotulo(), plazo.plazo().toString()));
+        boolean extingue = efecto != null && efecto.extingueLaDeuda();
+        // La que deja la multa sin efecto no concede plazo de pago: no hay nada que pagar, y el
+        // papel sellado lo diria durante diez años de reimpresiones (#413). El plazo para
+        // impugnar si se imprime siempre.
+        if (!(extingue && plazo.esDePago())) {
+            cabecera.add(Campo.de(plazo.rotulo(), plazo.plazo().toString()));
+        }
         cabecera.add(Campo.de("Sustento", sustento));
 
-        List<Tabla> tablas = List.of(tablaDeLaDeuda(deuda, aLaFecha));
+        List<Tabla> tablas = List.of(tablaDeLaDeuda(deuda, aLaFecha, extingue));
 
         List<String> pie =
                 List.of(
@@ -141,23 +147,28 @@ final class ModeloDeLaResolucionDeGerencia {
      * quien recorta el cuadro de deuda de un PDF para pegarlo en un informe se lleva la fecha con
      * él (regla 9).
      */
-    private static Tabla tablaDeLaDeuda(@Nullable ObligacionPublica deuda, LocalDate aLaFecha) {
-        List<List<String>> filas =
-                deuda == null
-                        ? List.of(
-                                fila("Insoluto", Dinero.CERO),
-                                fila("Reajuste", Dinero.CERO),
-                                fila("Interes moratorio", Dinero.CERO),
-                                fila("Gastos administrativos", Dinero.CERO),
-                                fila("TOTAL EXIGIBLE", Dinero.CERO))
-                        : List.of(
-                                fila("Insoluto", deuda.insoluto()),
-                                fila("Reajuste", deuda.reajuste()),
-                                fila("Interes moratorio", deuda.interes()),
-                                fila("Gastos administrativos", deuda.gasto()),
-                                fila("TOTAL EXIGIBLE", deuda.total()));
+    private static Tabla tablaDeLaDeuda(
+            @Nullable ObligacionPublica deuda, LocalDate aLaFecha, boolean extingue) {
+        List<List<String>> filas = new ArrayList<>();
+        filas.add(fila("Insoluto", deuda == null ? Dinero.CERO : deuda.insoluto()));
+        filas.add(fila("Reajuste", deuda == null ? Dinero.CERO : deuda.reajuste()));
+        filas.add(fila("Interes moratorio", deuda == null ? Dinero.CERO : deuda.interes()));
+        filas.add(fila("Gastos administrativos", deuda == null ? Dinero.CERO : deuda.gasto()));
+        Dinero total = deuda == null ? Dinero.CERO : deuda.total();
+        if (!extingue) {
+            filas.add(fila("TOTAL EXIGIBLE", total));
+            return Tabla.de(
+                    "Deuda actualizada al " + aLaFecha, List.of("Concepto", "Importe (S/)"), filas);
+        }
+        // La resolucion que deja la multa sin efecto la da de baja en la misma transaccion: el
+        // cuadro dice cuanto se deja sin efecto y que no queda nada exigible, no «TOTAL EXIGIBLE»
+        // sobre lo que el mismo acto extingue (#413).
+        filas.add(fila("TOTAL QUE SE DEJA SIN EFECTO", total));
+        filas.add(fila("SALDO EXIGIBLE TRAS ESTA RESOLUCION", Dinero.de("0.00")));
         return Tabla.de(
-                "Deuda actualizada al " + aLaFecha, List.of("Concepto", "Importe (S/)"), filas);
+                "Deuda que se deja sin efecto al " + aLaFecha,
+                List.of("Concepto", "Importe (S/)"),
+                filas);
     }
 
     private static List<String> fila(String concepto, Dinero importe) {
