@@ -766,7 +766,6 @@ class PredialControllerTest {
                                                 "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"ejercicio\":\"2026\","
                                                         + "\"alcance\":\"RANGO_DE_CODIGO\","
                                                         + "\"codigoDesde\":\"C-002\",\"codigoHasta\":\"C-999\","
-                                                        + "\"recalculaYaEmitidos\":true,"
                                                         + "\"observacion\":\"Emision del tramo alto\"}"))
                         .andReturn();
 
@@ -783,8 +782,8 @@ class PredialControllerTest {
     void soloObservadosRecorreALosDeLaCorridaAnterior() throws Exception {
         sembrarDosContribuyentes();
 
-        // Primera corrida: C-001 esta EMITIDA y sin «recalcula ya emitidos» queda
-        // observado; C-002 esta en BORRADOR y se determina.
+        // Primera corrida: C-001 no tiene predios en el padron y queda observado; C-002 se
+        // determina.
         MvcResult primera =
                 mvc.perform(
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
@@ -797,6 +796,7 @@ class PredialControllerTest {
                 .contains("\"codContribuyente\":\"C-001\"");
         assertThat(determinaciones.determinados).containsExactly(502L);
         determinaciones.determinados.clear();
+        darleSuPredioAlPrimero();
 
         mvc.perform(
                         post("/rentas/api/v1/rentas/predial/calculo-masivo")
@@ -804,7 +804,6 @@ class PredialControllerTest {
                                 .content(
                                         "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"ejercicio\":\"2026\","
                                                 + "\"alcance\":\"OBSERVADOS\","
-                                                + "\"recalculaYaEmitidos\":true,"
                                                 + "\"observacion\":\"Segunda pasada de la campana\"}"))
                 .andReturn();
 
@@ -827,7 +826,6 @@ class PredialControllerTest {
                                 .content(
                                         "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"ejercicio\":\"2026\","
                                                 + "\"alcance\":\"OBSERVADOS\","
-                                                + "\"recalculaYaEmitidos\":true,"
                                                 + "\"observacion\":\"Segunda pasada\"}"))
                 .andReturn();
 
@@ -852,43 +850,29 @@ class PredialControllerTest {
     }
 
     @Test
-    @DisplayName("un contribuyente ya emitido queda observado con su motivo, salvo que se pida")
-    void elYaEmitidoQuedaObservado() throws Exception {
-        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
-        determinaciones.sembrarEmitida(
-                EJERCICIO,
-                7L,
-                DetalleDeterminacionPredio.nuevo(
-                        11L,
-                        Dinero.de("100000.00"),
-                        Dinero.CERO,
-                        Porcentaje.total(),
-                        Dinero.de("100000.00")));
+    @DisplayName("#373 — `recalculaYaEmitidos` se RECHAZA con cualquier valor: no hay nada emitido")
+    void recalculaYaEmitidosSeRechaza() throws Exception {
+        // Ninguna determinacion sale de BORRADOR —no existe el acto que emite—, asi que el
+        // interruptor no decide nada. Quitarlo sin mas no sirve: Spring ignora un campo que no
+        // conoce, y quien lo mandara creeria que tuvo efecto.
+        for (String valor : java.util.List.of("false", "true")) {
+            MvcResult resultado =
+                    mvc.perform(
+                                    post("/rentas/api/v1/rentas/predial/calculo-masivo")
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,"
+                                                            + "\"ejercicio\":\"2026\","
+                                                            + "\"recalculaYaEmitidos\":"
+                                                            + valor
+                                                            + "}"))
+                            .andReturn();
 
-        MvcResult sinRecalcular =
-                mvc.perform(
-                                post("/rentas/api/v1/rentas/predial/calculo-masivo")
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(
-                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"ejercicio\":\"2026\"}"))
-                        .andReturn();
-
-        assertThat(sinRecalcular.getResponse().getContentAsString())
-                .contains("\"codContribuyente\":\"C-001\"")
-                .contains("EMITIDA");
-
-        MvcResult recalculando =
-                mvc.perform(
-                                post("/rentas/api/v1/rentas/predial/calculo-masivo")
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(
-                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"ejercicio\":\"2026\","
-                                                        + "\"recalculaYaEmitidos\":true}"))
-                        .andReturn();
-
-        assertThat(recalculando.getResponse().getContentAsString())
-                .contains("\"observados\":[]")
-                .contains("\"conjunto\":\"2026 v1\"");
+            assertThat(resultado.getResponse().getStatus()).as(valor).isEqualTo(422);
+            assertThat(resultado.getResponse().getContentAsString())
+                    .contains("recalculaYaEmitidos");
+        }
+        assertThat(determinaciones.insertadas).isZero();
     }
 
     // ------------------------------------ la corrida lee el padron al 1 de enero (#328)
@@ -897,11 +881,11 @@ class PredialControllerTest {
      * <b>El que vende durante el ejercicio sigue en la emision del ejercicio</b> (#328, TUO LTM
      * art. 10).
      *
-     * <p>A —C-001— tiene P1 y P al 1 de enero y los declaro en febrero (determinacion EMITIDA con
-     * los dos en el detalle); vende P a B el 15 de marzo; la corrida es de agosto con «recalcula ya
-     * emitidos». Leyendo el padron del dia de la corrida, el detalle trae P y el padron no, salta
-     * {@code PredioAjeno} y A queda observado —fuera de la emision 2026 entera, con P1—. Basta una
-     * venta en enero, antes de la corrida de febrero.
+     * <p>A —C-001— tiene P1 y P al 1 de enero y los declaro en febrero (determinacion con los dos
+     * en el detalle); vende P a B el 15 de marzo; la corrida es de agosto. Leyendo el padron del
+     * dia de la corrida, el detalle trae P y el padron no, salta {@code PredioAjeno} y A queda
+     * observado —fuera de la emision 2026 entera, con P1—. Basta una venta en enero, antes de la
+     * corrida de febrero.
      */
     @Test
     @DisplayName("#328 — el que vendio en marzo sale DETERMINADO por la corrida, no observado")
@@ -913,7 +897,7 @@ class PredialControllerTest {
                 EJERCICIO,
                 7L,
                 501L,
-                EstadoDeDeterminacion.EMITIDA,
+                EstadoDeDeterminacion.BORRADOR,
                 ModalidadDelPredial.TRIMESTRAL,
                 DetalleDeterminacionPredio.nuevo(
                         11L,
@@ -970,7 +954,7 @@ class PredialControllerTest {
                 EJERCICIO,
                 7L,
                 501L,
-                EstadoDeDeterminacion.EMITIDA,
+                EstadoDeDeterminacion.BORRADOR,
                 ModalidadDelPredial.TRIMESTRAL,
                 DetalleDeterminacionPredio.nuevo(
                         11L,
@@ -1049,7 +1033,7 @@ class PredialControllerTest {
                 EJERCICIO,
                 7L,
                 501L,
-                EstadoDeDeterminacion.EMITIDA,
+                EstadoDeDeterminacion.BORRADOR,
                 ModalidadDelPredial.TRIMESTRAL,
                 DetalleDeterminacionPredio.nuevo(
                         11L,
@@ -1126,7 +1110,6 @@ class PredialControllerTest {
                                 + alcance
                                 + "\","
                                 + (sector == null ? "" : "\"sector\":\"" + sector + "\",")
-                                + "\"recalculaYaEmitidos\":true,"
                                 + "\"observacion\":\"Emision anual del ejercicio\"}");
     }
 
@@ -1278,7 +1261,6 @@ class PredialControllerTest {
                                         .content(
                                                 "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,"
                                                         + "\"ejercicio\":\"2026\","
-                                                        + "\"recalculaYaEmitidos\":true,"
                                                         + "\"observacion\":\"Emision anual del"
                                                         + " ejercicio\"}"))
                         .andReturn();
@@ -1476,19 +1458,22 @@ class PredialControllerTest {
     // ---------------------------------------------------------------- utilidades
 
     /**
-     * Dos contribuyentes: C-001 con su determinacion EMITIDA y C-002 en BORRADOR.
+     * Dos contribuyentes: C-001, que la corrida observa por no tener predios en el padron, y C-002,
+     * que se determina.
      *
      * <p>Con uno solo no se puede medir ningun alcance: acotar y no acotar dan el mismo resultado y
      * la prueba no distingue las dos cosas (#577).
      */
     private void sembrarDosContribuyentes() {
-        predios.con(501L, 11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        // C-001 sin predios en el padron al 1 de enero: la corrida lo OBSERVA por una causa real,
+        // `SinPrediosEnElPadron` (#373). Hasta #373 lo observaba por EMITIDA, un estado que ninguna
+        // escritura de produccion produce. `darleSuPredioAlPrimero()` lo resuelve.
         predios.con(502L, 12L, "10002", "CALLE LIMA 200", Porcentaje.total());
         determinaciones.sembrar(
                 EJERCICIO,
                 7L,
                 501L,
-                EstadoDeDeterminacion.EMITIDA,
+                EstadoDeDeterminacion.BORRADOR,
                 ModalidadDelPredial.TRIMESTRAL,
                 DetalleDeterminacionPredio.nuevo(
                         11L,
@@ -1510,9 +1495,14 @@ class PredialControllerTest {
                         Dinero.de("120000.00")));
     }
 
+    /** Lo que resuelve la causa por la que C-001 queda observado en la primera corrida (#373). */
+    private void darleSuPredioAlPrimero() {
+        predios.con(501L, 11L, "10001", "AV. GRAU 100", Porcentaje.total());
+    }
+
     /** Un padron con un contribuyente al que la corrida SI llega a determinar. */
     private void sembrarUnPadronQueSeRecalcula() {
-        determinaciones.sembrarEmitida(
+        determinaciones.sembrarDelEjercicio(
                 EJERCICIO,
                 7L,
                 DetalleDeterminacionPredio.nuevo(
@@ -1527,8 +1517,7 @@ class PredialControllerTest {
         return post("/rentas/api/v1/rentas/predial/calculo-masivo")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                        "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"ejercicio\":\"2026\","
-                                + "\"recalculaYaEmitidos\":true}");
+                        "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"ejercicio\":\"2026\"}");
     }
 
     private static org.springframework.test.web.servlet.RequestBuilder simularIndividual() {
@@ -2481,12 +2470,17 @@ class PredialControllerTest {
         /** Quien recibio determinacion nueva, en orden. Es el CONJUNTO que un alcance acota. */
         private final List<Long> determinados = new ArrayList<>();
 
-        void sembrarEmitida(Ejercicio ejercicio, long id, DetalleDeterminacionPredio... detalle) {
+        /**
+         * La determinacion del ejercicio, en BORRADOR: el unico estado que produccion escribe
+         * (#373).
+         */
+        void sembrarDelEjercicio(
+                Ejercicio ejercicio, long id, DetalleDeterminacionPredio... detalle) {
             sembrar(
                     ejercicio,
                     id,
                     501L,
-                    EstadoDeDeterminacion.EMITIDA,
+                    EstadoDeDeterminacion.BORRADOR,
                     ModalidadDelPredial.TRIMESTRAL,
                     detalle);
         }
@@ -2503,7 +2497,7 @@ class PredialControllerTest {
                 long id,
                 long contribuyenteId,
                 DetalleDeterminacionPredio... detalle) {
-            sembrar(ejercicio, id, contribuyenteId, EstadoDeDeterminacion.EMITIDA, null, detalle);
+            sembrar(ejercicio, id, contribuyenteId, EstadoDeDeterminacion.BORRADOR, null, detalle);
         }
 
         void sembrar(
