@@ -23,6 +23,7 @@ import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.cuentacorriente.AcogimientoAConvenio;
 import kamayuk.rentas.cuentacorriente.CausalDeBaja;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.DeudaAcogida;
 import kamayuk.rentas.cuentacorriente.ExtincionDeDeuda;
 import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
@@ -359,22 +360,20 @@ class ElDevengoSeCristalizaAntesDeEscribirJdbcTest {
         PASE_A_VALOR {
             @Override
             Dinero ejercer(long titular) {
-                enTransaccion(
-                        () -> {
-                            fases.moverAValor(
-                                    EJERCICIO,
-                                    titular,
-                                    TRIBUTO,
-                                    null,
-                                    null,
-                                    null,
-                                    "VALOR-OP-2026-000365",
-                                    DEUDA_EL_DIA_DEL_ACTO,
-                                    ACTO,
-                                    "OP-2026-000365",
-                                    PORQUE);
-                            return Boolean.TRUE;
-                        });
+                Dinero movido =
+                        enTransaccion(
+                                () ->
+                                        fases.moverAValor(
+                                                titular,
+                                                new ClaveDeObligacionPublica(
+                                                        TRIBUTO, EJERCICIO, null, null),
+                                                "VALOR-OP-2026-000365",
+                                                ACTO,
+                                                "OP-2026-000365",
+                                                PORQUE));
+                // Desde #448 el monto lo decide el libro: lo que la cuota debe el dia del acto,
+                // que es lo que la OP congela.
+                assertThat(movido).isEqualTo(DEUDA_EL_DIA_DEL_ACTO);
                 return Dinero.CERO;
             }
         },

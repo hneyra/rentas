@@ -64,18 +64,24 @@ class GenerarCorridaMasivaTest {
                         deuda,
                         new MovimientoDeFase() {
                             @Override
-                            public void moverAValor(
-                                    Ejercicio ejercicio,
+                            public Dinero moverAValor(
                                     long contribuyenteId,
-                                    String tributo,
-                                    @Nullable Integer periodo,
-                                    @Nullable Long predioId,
-                                    @Nullable Long vehiculoId,
+                                    kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica
+                                            obligacion,
                                     String referenciaExterna,
-                                    Dinero monto,
                                     LocalDate fechaValor,
                                     String documentoOrigen,
-                                    Observacion observacion) {}
+                                    Observacion observacion) {
+                                // El libro mueve lo que la obligacion debe (#448): lo que la
+                                // consulta de deuda publica.
+                                return deuda.pendientesDe(contribuyenteId, fechaValor).stream()
+                                        .filter(una -> una.clave().equals(obligacion))
+                                        .map(
+                                                kamayuk.rentas.cuentacorriente.ObligacionPublica
+                                                        ::total)
+                                        .findFirst()
+                                        .orElse(Dinero.CERO);
+                            }
 
                             @Override
                             public Dinero moverACoactiva(

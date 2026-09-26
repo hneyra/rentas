@@ -1,16 +1,22 @@
 package kamayuk.rentas.cuentacorriente.aplicacion;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
 import kamayuk.rentas.cuentacorriente.dominio.Asiento;
 import kamayuk.rentas.cuentacorriente.dominio.AsientoRepository;
 import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeObligacion;
+import kamayuk.rentas.cuentacorriente.dominio.ClaveDeSaldo;
 import kamayuk.rentas.cuentacorriente.dominio.Concepto;
 import kamayuk.rentas.cuentacorriente.dominio.CristalizacionDelDevengo;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
+import kamayuk.rentas.cuentacorriente.dominio.FaseDeLaObligacion;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoProyectado;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoRepository;
 import kamayuk.rentas.cuentacorriente.dominio.TipoAsiento;
@@ -31,8 +37,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Dos pares, y un solo motor: ORDINARIA→VALOR al emitir un valor (#37) y VALOR→COACTIVA al
  * importarlo a un expediente (#407). Son la misma operacion con otras fases, y escribirlas por
  * separado dejaria dos copias del par que la primera modificacion volveria asimetricas. Lo que
- * difiere es <b>cuanto</b>: el paso a VALOR asienta el monto que el valor congelo, y el paso a
- * COACTIVA el que el libro tiene en VALOR (ver {@link MovimientoDeFase#moverACoactiva}).
+ * difiere es <b>cuanto</b>: el paso a VALOR asienta, cuota por cuota, lo que cada cuota ordinaria
+ * debe (#448), y el paso a COACTIVA el que el libro tiene en VALOR (ver {@link
+ * MovimientoDeFase#moverACoactiva}).
  *
  * <p>Las dos escrituras van en la misma transaccion: si la segunda fallara, la primera se revierte
  * con ella. Un abono sin su cargo dejaria una obligacion con menos deuda de la que en realidad
@@ -62,6 +69,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
 
+    /** Las cuotas en el orden del cronograma, para que los pares salgan siempre igual. */
+    private static final Comparator<ClaveDeSaldo> POR_PERIODO =
+            Comparator.comparingInt(ClaveDeSaldo::periodo);
+
     private final RegistrarAsiento registrar;
     private final AsientoRepository asientos;
     private final SaldoRepository saldos;
@@ -89,39 +100,59 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
      * <p>Bloquea la obligacion antes de leerla (#365): cristalizar el devengo es leer el libro y
      * escribir lo que falta, y una cobranza que se colara en medio cristalizaria el mismo interes
      * otra vez. Es el candado que el paso a coactiva ya pedia.
+     *
+     * <p>Cuota por cuota —las del libro, no las de la proyeccion—, y con la fase de cada una <b>a
+     * la fecha</b> ({@link FaseDeLaObligacion}, la regla que tambien corta la consulta): una
+     * corrida masiva emite a su fecha de criterio, y la proyeccion es de hoy.
      */
     @Override
     @Transactional
-    public void moverAValor(
-            Ejercicio ejercicio,
+    public Dinero moverAValor(
             long contribuyenteId,
-            String tributo,
-            @Nullable Integer periodo,
-            @Nullable Long predioId,
-            @Nullable Long vehiculoId,
+            ClaveDeObligacionPublica obligacion,
             String referenciaExterna,
-            Dinero monto,
             LocalDate fechaValor,
             String documentoOrigen,
             Observacion observacion) {
-        ClaveDeObligacion obligacion =
-                new ClaveDeObligacion(contribuyenteId, tributo, ejercicio, predioId, vehiculoId);
-        saldos.bloquear(obligacion);
-        cristalizarElDevengo(obligacion, fechaValor, documentoOrigen, observacion);
-        mover(
-                Fase.ORDINARIA,
-                Fase.VALOR,
-                ejercicio,
-                contribuyenteId,
-                tributo,
-                periodo,
-                predioId,
-                vehiculoId,
-                referenciaExterna,
-                monto,
-                fechaValor,
-                documentoOrigen,
-                observacion);
+        ClaveDeObligacion clave = claveDe(contribuyenteId, obligacion);
+        saldos.bloquear(clave);
+        cristalizarElDevengo(clave, fechaValor, documentoOrigen, observacion);
+
+        // Las cuotas salen del libro y no de la proyeccion, como en el paso a coactiva: el libro es
+        // la fuente, y se lee DESPUES de cristalizar, que acaba de escribir en el.
+        Map<ClaveDeSaldo, List<Asiento>> porCuota = new TreeMap<>(POR_PERIODO);
+        for (Asiento asiento : asientos.deTodosLosPeriodosDe(clave)) {
+            porCuota.computeIfAbsent(ClaveDeSaldo.de(asiento), cuota -> new ArrayList<>())
+                    .add(asiento);
+        }
+
+        Dinero movido = Dinero.CERO;
+        for (Map.Entry<ClaveDeSaldo, List<Asiento>> cuota : porCuota.entrySet()) {
+            List<Asiento> deLaCuota = cuota.getValue();
+            if (FaseDeLaObligacion.a(deLaCuota, fechaValor) != Fase.ORDINARIA) {
+                continue;
+            }
+            Dinero debe = calculo.deudaActualizadaA(deLaCuota, fechaValor, redondeo).total();
+            if (!debe.esPositivo()) {
+                continue;
+            }
+            mover(
+                    Fase.ORDINARIA,
+                    Fase.VALOR,
+                    obligacion.ejercicio(),
+                    contribuyenteId,
+                    obligacion.tributo(),
+                    periodoDelAsiento(cuota.getKey()),
+                    obligacion.predioId(),
+                    obligacion.vehiculoId(),
+                    referenciaExterna,
+                    debe,
+                    fechaValor,
+                    documentoOrigen,
+                    observacion);
+            movido = movido.mas(debe);
+        }
+        return movido;
     }
 
     /**
@@ -140,13 +171,7 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
             LocalDate fechaValor,
             String documentoOrigen,
             Observacion observacion) {
-        ClaveDeObligacion clave =
-                new ClaveDeObligacion(
-                        contribuyenteId,
-                        obligacion.tributo(),
-                        obligacion.ejercicio(),
-                        obligacion.predioId(),
-                        obligacion.vehiculoId());
+        ClaveDeObligacion clave = claveDe(contribuyenteId, obligacion);
         saldos.bloquear(clave);
         List<Asiento> delLibro = asientos.deTodosLosPeriodosDe(clave);
 
@@ -196,6 +221,21 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
     }
 
     // ------------------------------------------------------------------
+
+    private static ClaveDeObligacion claveDe(
+            long contribuyenteId, ClaveDeObligacionPublica obligacion) {
+        return new ClaveDeObligacion(
+                contribuyenteId,
+                obligacion.tributo(),
+                obligacion.ejercicio(),
+                obligacion.predioId(),
+                obligacion.vehiculoId());
+    }
+
+    /** 0 en la proyeccion es «anual», y en el asiento eso es nulo. */
+    private static @Nullable Integer periodoDelAsiento(ClaveDeSaldo cuota) {
+        return cuota.periodo() == 0 ? null : cuota.periodo();
+    }
 
     private void mover(
             Fase salida,
@@ -275,8 +315,7 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
                                 devengo.parte(),
                                 TipoAsiento.CARGO,
                                 fila.fase(),
-                                // 0 en la proyeccion es «anual», y en el asiento eso es nulo.
-                                fila.clave().periodo() == 0 ? null : fila.clave().periodo(),
+                                periodoDelAsiento(fila.clave()),
                                 fila.clave().predioId(),
                                 fila.clave().vehiculoId(),
                                 null,

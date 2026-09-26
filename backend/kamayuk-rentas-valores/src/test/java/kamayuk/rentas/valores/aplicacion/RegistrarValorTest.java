@@ -57,7 +57,7 @@ class RegistrarValorTest {
     void preparar() {
         repositorio = new RepositorioDeMentira();
         deuda = new DeudaDeMentira();
-        movimiento = new MovimientoDeMentira();
+        movimiento = new MovimientoDeMentira(deuda);
         auditados = new ArrayList<>();
         Clock reloj = Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
         servicio = new RegistrarValor(repositorio, deuda, movimiento, auditados::add, reloj);
@@ -127,6 +127,33 @@ class RegistrarValorTest {
         assertThat(registrado.monto()).isEqualTo(Dinero.de(300));
         assertThat(registrado.documentoOrigen()).isEqualTo(guardado.numero());
         assertThat(registrado.referenciaExterna()).isEqualTo("VALOR-" + guardado.numero());
+    }
+
+    /**
+     * #448 — Si el libro no pasa a VALOR lo que el valor congelo, no hay valor.
+     *
+     * <p>El valor congela la obligacion agregada y el libro mueve cuota por cuota: si alguna esta
+     * en otra fase, las dos cifras se separan, y emitir igual dejaria un titulo por deuda que la
+     * fase VALOR no cuenta.
+     */
+    @Test
+    @DisplayName("#448 — si el libro mueve otra cifra que la congelada, el valor no se emite")
+    void loMovidoTieneQueSerLoCongelado() {
+        deuda.con(obligacionSimple("ARBITRIO", EJERCICIO_DEUDA, 88L, null, Dinero.de(300)));
+        movimiento.conElLibroEn(Dinero.de(200));
+
+        assertThatThrownBy(
+                        () ->
+                                servicio.emitir(
+                                        TipoValor.ORDEN_DE_PAGO,
+                                        7L,
+                                        List.of(
+                                                new SelectorDeObligacion(
+                                                        "ARBITRIO", EJERCICIO_DEUDA, 88L, null)),
+                                        OBSERVACION))
+                .isInstanceOf(RegistrarValor.LoMovidoNoEsLoCongelado.class)
+                .hasMessageContaining("debe 300")
+                .hasMessageContaining("solo tiene 200");
     }
 
     /**
@@ -544,24 +571,43 @@ class RegistrarValorTest {
         }
     }
 
+    /**
+     * El libro que mueve a VALOR lo que la obligacion debe (#448): el total que la consulta de
+     * deuda publica para esa clave, salvo que la prueba le diga que el libro tiene otra cosa.
+     */
     private static final class MovimientoDeMentira implements MovimientoDeFase {
 
+        private final DeudaDeMentira deuda;
         private final List<Movimiento> movimientos = new ArrayList<>();
+        private @Nullable Dinero loQueTieneElLibro;
+
+        MovimientoDeMentira(DeudaDeMentira deuda) {
+            this.deuda = deuda;
+        }
+
+        /** Como si en ORDINARIA hubiera otra cifra que la que la consulta publico. */
+        void conElLibroEn(Dinero monto) {
+            loQueTieneElLibro = monto;
+        }
 
         @Override
-        public void moverAValor(
-                Ejercicio ejercicio,
+        public Dinero moverAValor(
                 long contribuyenteId,
-                String tributo,
-                @Nullable Integer periodo,
-                @Nullable Long predioId,
-                @Nullable Long vehiculoId,
+                kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica obligacion,
                 String referenciaExterna,
-                Dinero monto,
                 LocalDate fechaValor,
                 String documentoOrigen,
                 Observacion observacion) {
+            Dinero monto =
+                    loQueTieneElLibro != null
+                            ? loQueTieneElLibro
+                            : deuda.obligaciones.stream()
+                                    .filter(una -> una.clave().equals(obligacion))
+                                    .map(ObligacionPublica::total)
+                                    .findFirst()
+                                    .orElse(Dinero.CERO);
             movimientos.add(new Movimiento(referenciaExterna, monto, documentoOrigen));
+            return monto;
         }
 
         /** Emitir no pasa nada a coactiva: eso lo hace la importacion al expediente (#407). */

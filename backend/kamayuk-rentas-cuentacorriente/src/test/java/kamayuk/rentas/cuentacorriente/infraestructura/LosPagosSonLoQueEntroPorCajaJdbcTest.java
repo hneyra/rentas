@@ -21,6 +21,7 @@ import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.cuentacorriente.CausalDeBaja;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.MovimientoDelLibro;
 import kamayuk.rentas.cuentacorriente.MovimientosDelLibro;
 import kamayuk.rentas.cuentacorriente.ObligacionDelDeudor;
@@ -290,14 +291,9 @@ class LosPagosSonLoQueEntroPorCajaJdbcTest {
         // 4. El pase a valor: el par AJUSTE de una orden de pago sobre el predio 8.
         emitir(contribuyente, "PREDIAL", 8L, Dinero.de("250.00"));
         fases.moverAValor(
-                EJERCICIO,
                 contribuyente,
-                "PREDIAL",
-                1,
-                8L,
-                null,
+                new ClaveDeObligacionPublica("PREDIAL", EJERCICIO, 8L, null),
                 "OP-2026-000447",
-                Dinero.de("250.00"),
                 LocalDate.of(2026, 7, 1),
                 "OP-2026-000447",
                 Observacion.de("Se emite la orden de pago"));

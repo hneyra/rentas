@@ -2,9 +2,7 @@ package kamayuk.rentas.cuentacorriente;
 
 import java.time.LocalDate;
 import kamayuk.rentas.dominio.Dinero;
-import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Mueve una obligacion de una fase de cobranza a otra, sin alterar cuanto se debe (V2; ARQ-06 de
@@ -26,40 +24,38 @@ import org.jspecify.annotations.Nullable;
 public interface MovimientoDeFase {
 
     /**
-     * Mueve exactamente {@code monto} de la fase ordinaria a la fase {@link
-     * kamayuk.rentas.cuentacorriente.dominio.Fase#VALOR} de una obligacion.
+     * Pasa a la fase {@link kamayuk.rentas.cuentacorriente.dominio.Fase#VALOR} lo que una
+     * obligacion debe en fase ordinaria a {@code fechaValor}, <b>cuota por cuota</b> (#448).
      *
-     * <p>Asienta un abono en fase ordinaria y un cargo por el mismo importe en fase valor,
-     * atomicamente: el total que debe el contribuyente no cambia, solo la fase en la que el libro
-     * lo cuenta. El monto es el que quien llama ya congelo —no se relee la deuda aqui—, porque este
-     * contexto no sabe congelar nada, solo asentar lo que le piden (regla 2).
+     * <p>Por cada cuota que a esa fecha esta en ORDINARIA y debe algo, un abono en ordinaria y un
+     * cargo en valor por <b>lo que esa cuota debe</b> y con <b>su</b> periodo, atomicamente: el
+     * total que debe el contribuyente no cambia, solo la fase en la que el libro lo cuenta. Una
+     * cuota que a esa fecha no vencio, que ya se pago o que esta en otra fase no se toca.
      *
-     * <p>Antes del par carga, en cada cuota de la obligacion, el reajuste y el interes devengados
-     * que el libro todavia no tenia (#365): el par adelanta el ultimo movimiento, y sin ese cargo
-     * el libro perderia al dia siguiente el interes que la OP acaba de congelar.
+     * <p>Hasta #448 quien llamaba pasaba el periodo y el monto, y no los podia saber: {@code
+     * valores} tiene la obligacion agregada, asi que pasaba periodo nulo y el total, y el par caia
+     * en una fila anual nueva —VALOR por 0,00— mientras las cuotas, que son las que la cobranza, la
+     * extincion y el acogimiento leen, seguian en ORDINARIA. Cuales son las cuotas lo sabe este
+     * contexto, y por eso el puerto ya no las pregunta.
      *
-     * @param ejercicio el ejercicio de la obligacion que se mueve
+     * <p>Antes de los pares carga, en cada cuota de la obligacion, el reajuste y el interes
+     * devengados que el libro todavia no tenia (#365): el par adelanta el ultimo movimiento, y sin
+     * ese cargo el libro perderia al dia siguiente el interes que la OP acaba de congelar.
+     *
      * @param contribuyenteId a quien se le cobra
-     * @param tributo el tributo de la obligacion, tal como lo nombra quien pide el movimiento
-     * @param periodo la cuota o el mes, si el tributo se divide; {@code null} si no aplica
-     * @param predioId la unidad, si la obligacion es predial o de arbitrios
-     * @param vehiculoId la unidad, si la obligacion es vehicular
+     * @param obligacion que obligacion pasa a valor
      * @param referenciaExterna como entra el valor que origina el movimiento, sin clave foranea
      *     (ARQ-01 §4 regla 2)
-     * @param monto siempre positivo; el mismo en el abono y en el cargo
-     * @param fechaValor fecha a la que se imputan los dos asientos
+     * @param fechaValor fecha a la que se imputan los asientos, y a la que se mide lo que se debe
      * @param documentoOrigen el numero del valor que origina el movimiento
      * @param observacion por que se mueve (regla 10)
+     * @return lo que se paso a VALOR, la suma de las cuotas; quien llama lo compara con lo que
+     *     congelo, y si no coincide el libro no es el que leyo
      */
-    void moverAValor(
-            Ejercicio ejercicio,
+    Dinero moverAValor(
             long contribuyenteId,
-            String tributo,
-            @Nullable Integer periodo,
-            @Nullable Long predioId,
-            @Nullable Long vehiculoId,
+            ClaveDeObligacionPublica obligacion,
             String referenciaExterna,
-            Dinero monto,
             LocalDate fechaValor,
             String documentoOrigen,
             Observacion observacion);
@@ -88,7 +84,8 @@ public interface MovimientoDeFase {
      *       deuda que no existe.
      * </ul>
      *
-     * <p>El par va, como el de {@link #moverAValor}, en la fila anual (periodo nulo).
+     * <p>El par va en la fila anual (periodo nulo). El de {@link #moverAValor} ya no, desde #448;
+     * este sigue asi hasta que #308 decida que pasa con la fase COACTIVA.
      *
      * <p><b>A diferencia de {@link #moverAValor}, no cristaliza el devengo antes del par</b>
      * (#365): cuanto entra en coactiva lo decide el libro, y cristalizar antes lo cambiaria, que es
