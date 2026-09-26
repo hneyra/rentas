@@ -98,7 +98,10 @@ public record DeterminacionPredialResource(
                             predio.valuoAfecto().toString(),
                             predio.baseImponiblePredio().toString(),
                             predio.porcentajeRegistradoDelPredio().valor().toPlainString(),
-                            predio.titularidadCompleta()));
+                            predio.titularidadCompleta(),
+                            predio.autovaluoDeclarado() == null
+                                    ? null
+                                    : predio.autovaluoDeclarado().toString()));
         }
         List<TramoAplicado> tramos = new ArrayList<>();
         for (AporteDeTramo aporte : calculada.tramos()) {
@@ -160,6 +163,10 @@ public record DeterminacionPredialResource(
      *     predio esta ponderada por una titularidad que no cubre el predio entero — la
      *     determinacion es correcta para lo registrado, y lo que no puede pasar es que salga sin
      *     que nada la acompañe
+     * @param autovaluoDeclarado lo que declaro el contribuyente cuando {@code autovaluo} es el que
+     *     {@code catastro} sello (#362); nulo cuando no hay dos cifras que comparar —el autovaluo
+     *     es el declarado, o nadie declaro—. La diferencia entre los dos es la subvaluacion
+     *     declarada, que es lo que la fiscalizacion busca
      */
     public record PredioDeLaBase(
             long predioId,
@@ -172,7 +179,8 @@ public record DeterminacionPredialResource(
             String valuoAfecto,
             String baseImponible,
             String porcentajeRegistradoDelPredio,
-            boolean titularidadCompleta) {}
+            boolean titularidadCompleta,
+            @Nullable String autovaluoDeclarado) {}
 
     /**
      * Un tramo del articulo 13 y lo que aporto.

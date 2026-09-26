@@ -948,6 +948,23 @@ const DESCRIPCIONES = {
     **rechazan** con 422 en vez de ignorarse: una corrida «correcta» a quien pidió además los
     arbitrios sólo se notaría al buscar los recibos que nadie generó.
   `),
+  // Rentas · Determinaciones (#362). La primera frase es la del prototipo, tal cual.
+  predial_individual: bloque(`
+    Determina el impuesto de un contribuyente sobre el autovalúo acumulado de todos sus predios en
+    el distrito, con la escala progresiva acumulativa y el mínimo imponible de 0.6 % de la UIT.
+
+    **Cuando manda la valuación sellada, la declarada viaja al lado** (#362). Si \`catastro\`
+    selló la valuación del predio, el \`autovaluo\` de \`predios[]\` es el sellado (#38, AC-2) y
+    \`autovaluoDeclarado\` es lo que declaró el contribuyente; con \`simulacion: false\` se
+    guarda además en \`determinacion_predio_detalle.autovaluo_declarado\` (V33). Es **nulo**
+    cuando no hay dos cifras que comparar: el autovalúo es el declarado, o nadie declaró. La
+    diferencia entre las dos es la subvaluación declarada, que es lo que la fiscalización busca.
+
+    **Sin \`predios\` en el cuerpo se recalcula con lo ya declarado del mismo ejercicio**, y lo
+    declarado es lo que el contribuyente declaró, no el autovalúo guardado: tras una determinación
+    con la sellada, aquel es la cifra de \`catastro\`. Hasta #362 el recálculo la tomaba por
+    declarada y la discrepancia se borraba al primer recálculo.
+  `),
   // Seguridad (#543)
   permisos: bloque(`
     Fija los niveles de accesibilidad de un grupo (RF-121). Recibe la lista **completa** de
@@ -3496,6 +3513,11 @@ const OPERACIONES_ADICIONALES = {
         la pregunta no tiene sujeto. Un contribuyente que existe y todavía no tiene determinación de
         ese ejercicio es **204**: la respuesta es «todavía no». Devolver lo mismo en los dos casos es
         el defecto que #546 midió.
+
+        **\`autovaluoDeclarado\` sale de la fila** (#362, V33): lo que declaró el contribuyente
+        cuando el \`autovaluo\` es el que \`catastro\` selló (\`origenDelAutovaluo: SELLADO\`).
+        Nulo cuando no hay dos cifras que comparar —el autovalúo es el declarado, o nadie
+        declaró— y en las filas anteriores a V33, que no lo guardaban: no hay de dónde rellenarlo.
 
         Exige LECTURA sobre \`predial_individual\`: leer una determinación no es determinarla.
       `),

@@ -1,5 +1,6 @@
 package kamayuk.rentas.nucleo.infraestructura;
 
+import java.math.BigDecimal;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -48,7 +49,7 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
     private static final String COLUMNAS_DETALLE =
             "t.id, t.predio_id, t.autovaluo, t.valuo_exonerado, t.porcentaje_propiedad,"
                     + " t.base_imponible_predio, t.autovaluo_origen, t.valuacion_conjunto_id,"
-                    + " t.valuacion_huella";
+                    + " t.valuacion_huella, t.autovaluo_declarado";
 
     public DeterminacionRepositoryJdbc(JdbcClient jdbc) {
         super(jdbc);
@@ -125,12 +126,14 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                                     + " (municipalidad_id, ejercicio, determinacion_id, predio_id,"
                                     + "  autovaluo, valuo_exonerado, porcentaje_propiedad,"
                                     + "  base_imponible_predio, autovaluo_origen,"
-                                    + "  valuacion_conjunto_id, valuacion_huella)"
+                                    + "  valuacion_conjunto_id, valuacion_huella,"
+                                    + "  autovaluo_declarado)"
                                     + " VALUES ("
                                     + MUNICIPALIDAD_ACTUAL
                                     + ", :ejercicio, :determinacionId, :predioId, :autovaluo,"
                                     + "  :exonerado, :porcentaje, :baseImponiblePredio,"
-                                    + "  :origen, :conjuntoDeLaValuacion, :huellaDeLaValuacion)")
+                                    + "  :origen, :conjuntoDeLaValuacion, :huellaDeLaValuacion,"
+                                    + "  :autovaluoDeclarado)")
                     .param("ejercicio", determinacion.ejercicio().valor())
                     .param("determinacionId", id)
                     .param("predioId", fila.predioId())
@@ -141,6 +144,14 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                     .param("origen", fila.origen().name())
                     .param("conjuntoDeLaValuacion", fila.valuacionConjuntoId())
                     .param("huellaDeLaValuacion", fila.valuacionHuella())
+                    // La declarada, cuando mando la sellada (#362, V33): sin esta linea la cifra
+                    // que la fiscalizacion contrasta se quedaba en memoria.
+                    .param(
+                            "autovaluoDeclarado",
+                            fila.autovaluoDeclarado() == null
+                                    ? null
+                                    : fila.autovaluoDeclarado().valor(),
+                            java.sql.Types.NUMERIC)
                     .update();
         }
 
@@ -298,6 +309,11 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                 new Dinero(fila.getBigDecimal("base_imponible_predio")),
                 OrigenDelAutovaluo.valueOf(fila.getString("autovaluo_origen")),
                 fila.getObject("valuacion_conjunto_id", Long.class),
-                fila.getString("valuacion_huella"));
+                fila.getString("valuacion_huella"),
+                dineroONulo(fila.getBigDecimal("autovaluo_declarado")));
+    }
+
+    private static @Nullable Dinero dineroONulo(@Nullable BigDecimal valor) {
+        return valor == null ? null : new Dinero(valor);
     }
 }

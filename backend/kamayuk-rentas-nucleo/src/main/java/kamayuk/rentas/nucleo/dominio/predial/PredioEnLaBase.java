@@ -40,8 +40,10 @@ import org.jspecify.annotations.Nullable;
  *     declarada
  * @param valuacionHuella la huella con que `catastro` la sello; {@code null} si es declarada
  * @param autovaluoDeclarado <b>el otro</b> autovaluo, cuando manda la valuacion sellada y ademas
- *     habia declaracion. Se guarda para que la discrepancia se pueda ver en vez de descubrirse en
- *     ventanilla; {@code null} cuando no hay dos cifras que comparar
+ *     habia declaracion. Se guarda —{@link #comoDetalle()} lo pasa a {@code
+ *     determinacion_predio_detalle.autovaluo_declarado}, V33— y se publica, para que la
+ *     discrepancia se pueda ver en vez de descubrirse en ventanilla; {@code null} cuando no hay dos
+ *     cifras que comparar. Hasta #362 este parrafo decia lo mismo y la cifra solo vivia en memoria
  */
 public record PredioEnLaBase(
         long predioId,
@@ -150,6 +152,16 @@ public record PredioEnLaBase(
                             + autovaluo
                             + "): la parte exonerada es una parte del autovaluo, no otra cifra");
         }
+        // Solo hay «otro» autovaluo cuando mando la sellada (#362). En DECLARADO, `comoDetalle`
+        // lo perderia sin decir nada: la declarada ya es `autovaluo`.
+        if (autovaluoDeclarado != null && origenDelAutovaluo != OrigenDelAutovaluo.SELLADO) {
+            throw new IllegalArgumentException(
+                    "El predio "
+                            + predioId
+                            + " se determino con su autovaluo DECLARADO y trae otro declarado al"
+                            + " lado: solo hay dos cifras que comparar cuando manda la sellada"
+                            + " (#362)");
+        }
     }
 
     /** La parte del autovaluo que si esta afecta, antes de ponderar por el % de propiedad. */
@@ -157,7 +169,10 @@ public record PredioEnLaBase(
         return autovaluo.menos(valuoExonerado);
     }
 
-    /** El detalle que se guarda de este predio, con de donde salio su autovaluo (#38). */
+    /**
+     * El detalle que se guarda de este predio, con de donde salio su autovaluo (#38) y, si mando la
+     * sellada, lo que se habia declarado (#362).
+     */
     public DetalleDeterminacionPredio comoDetalle() {
         if (origenDelAutovaluo == OrigenDelAutovaluo.SELLADO) {
             return DetalleDeterminacionPredio.sellado(
@@ -167,7 +182,8 @@ public record PredioEnLaBase(
                     porcentajePropiedad,
                     baseImponiblePredio,
                     java.util.Objects.requireNonNull(valuacionConjuntoId),
-                    java.util.Objects.requireNonNull(valuacionHuella));
+                    java.util.Objects.requireNonNull(valuacionHuella),
+                    autovaluoDeclarado);
         }
         return DetalleDeterminacionPredio.nuevo(
                 predioId, autovaluo, valuoExonerado, porcentajePropiedad, baseImponiblePredio);

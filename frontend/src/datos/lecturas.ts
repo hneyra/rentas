@@ -274,6 +274,11 @@ export interface PredioGuardado {
   readonly origenDelAutovaluo: string;
   readonly valuacionConjuntoId: number | null;
   readonly valuacionHuella: string | null;
+  /**
+   * Lo que declaro el contribuyente cuando `autovaluo` es el que `catastro` sello (#362, V33).
+   * Nulo cuando no hay dos cifras que comparar, y en las filas anteriores a V33.
+   */
+  readonly autovaluoDeclarado: string | null;
 }
 
 /**

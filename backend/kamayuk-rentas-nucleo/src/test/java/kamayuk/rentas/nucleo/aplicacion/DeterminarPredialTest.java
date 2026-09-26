@@ -581,7 +581,82 @@ class DeterminarPredialTest {
                             "la declarada NO desaparece: si desapareciera, la discrepancia se"
                                     + " descubriria en ventanilla con el papel ya notificado")
                     .isEqualTo(Dinero.de("100000.00"));
+            // Y viaja al detalle que se GUARDA (#362): hasta #362 esta prueba se quedaba en la
+            // linea de arriba, el objeto en memoria, y la cifra no llegaba a ninguna tabla. Que
+            // llegue a la base y a las dos respuestas lo mide `LaDeclaradaSeGuardaAlLadoTest`.
+            assertThat(enLaBase.comoDetalle().autovaluoDeclarado())
+                    .isEqualTo(Dinero.de("100000.00"));
             assertThat(calculada.cabecera().baseImponible()).isEqualTo(Dinero.de("180000.00"));
+        }
+
+        @Test
+        @DisplayName(
+                "#362 — recalcular tras una SELLADO toma la declarada guardada, no la sellada, y si"
+                        + " la sellada ya no esta manda la declarada")
+        void elRecalculoTomaLaDeclaradaGuardada() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+            determinaciones.sembrarDelEjercicio(
+                    EJERCICIO,
+                    7L,
+                    DetalleDeterminacionPredio.sellado(
+                            11L,
+                            Dinero.de("180000.00"),
+                            Dinero.CERO,
+                            Porcentaje.total(),
+                            Dinero.de("180000.00"),
+                            42L,
+                            "a".repeat(64),
+                            Dinero.de("100000.00")));
+            // `catastro` retiro la cifra: una valuacion nueva, con motivo y sin cifra.
+            valuaciones.sinCifra(EJERCICIO, 11L, "Ficha observada", "PORCENTAJE_DE_ACTUALIZACION");
+
+            PredioEnLaBase enLaBase = recalcularSinPredios().predios().get(0);
+
+            assertThat(enLaBase.autovaluoSellado()).isFalse();
+            assertThat(enLaBase.autovaluo())
+                    .as("lo que firmo el contribuyente, no lo que `catastro` sello la otra vez")
+                    .isEqualTo(Dinero.de("100000.00"));
+        }
+
+        @Test
+        @DisplayName(
+                "#362 — una SELLADO sin declarada guardada no da la sellada por declarada: sin"
+                        + " valuacion vigente, el predio se nombra")
+        void unaSelladaSinDeclaradaNoSeRellenaConLaSellada() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+            // Una fila anterior a V33, o un predio que nadie declaro: SELLADO y sin la otra cifra.
+            determinaciones.sembrarDelEjercicio(
+                    EJERCICIO,
+                    7L,
+                    DetalleDeterminacionPredio.sellado(
+                            11L,
+                            Dinero.de("180000.00"),
+                            Dinero.CERO,
+                            Porcentaje.total(),
+                            Dinero.de("180000.00"),
+                            42L,
+                            "a".repeat(64),
+                            null));
+            valuaciones.sinCifra(EJERCICIO, 11L, "Ficha observada", "PORCENTAJE_DE_ACTUALIZACION");
+
+            assertThatThrownBy(this::recalcularSinPredios)
+                    .as(
+                            "hasta #362 esto se determinaba con 180 000 como DECLARADO: una cifra"
+                                    + " que el contribuyente nunca firmo, sin que nada lo dijera")
+                    .isInstanceOf(DeterminarPredial.PredioSinAutovaluo.class)
+                    .hasMessageContaining("10001");
+        }
+
+        private DeterminacionPredialCalculada recalcularSinPredios() {
+            return servicio()
+                    .determinar(
+                            new DeterminarPredial.Peticion(
+                                    EJERCICIO,
+                                    "C-001",
+                                    List.of(),
+                                    ModalidadDelPredial.TRIMESTRAL,
+                                    true),
+                            PORQUE);
         }
 
         @Test

@@ -1,6 +1,7 @@
 package kamayuk.rentas.nucleo.dominio.predial;
 
 import java.util.Objects;
+import java.util.Optional;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Porcentaje;
 import org.jspecify.annotations.Nullable;
@@ -32,6 +33,12 @@ import org.jspecify.annotations.Nullable;
  *     null} cuando el autovaluo es declarado
  * @param valuacionHuella la huella con que {@code catastro} sello esa valuacion; {@code null}
  *     cuando el autovaluo es declarado
+ * @param autovaluoDeclarado el autovaluo que declaro el contribuyente cuando <b>mando la
+ *     sellada</b> (#362, V33). Solo puede tener valor en {@link OrigenDelAutovaluo#SELLADO}: en
+ *     {@link OrigenDelAutovaluo#DECLARADO} la declarada <b>es</b> {@code autovaluo}, y guardarla
+ *     dos veces invitaria a que difieran. {@code null} cuando no hay dos cifras que comparar. Para
+ *     preguntar «que declaro el contribuyente» no se lee este campo sino {@link
+ *     #autovaluoDeclaradoSegunElOrigen()}
  */
 public record DetalleDeterminacionPredio(
         @Nullable Long id,
@@ -42,7 +49,8 @@ public record DetalleDeterminacionPredio(
         Dinero baseImponiblePredio,
         OrigenDelAutovaluo origen,
         @Nullable Long valuacionConjuntoId,
-        @Nullable String valuacionHuella) {
+        @Nullable String valuacionHuella,
+        @Nullable Dinero autovaluoDeclarado) {
 
     public DetalleDeterminacionPredio {
         if (predioId <= 0) {
@@ -88,6 +96,44 @@ public record DetalleDeterminacionPredio(
             throw new IllegalArgumentException(
                     "La base imponible del predio no puede ser negativa");
         }
+        // La misma guarda que `determinacion_detalle_declarado_ck` (V33). Una declarada al lado de
+        // un autovaluo que ya ES el declarado seria la misma cifra dos veces, y el dia que
+        // difirieran nadie sabria cual de las dos firmo el contribuyente (#362).
+        if (autovaluoDeclarado != null) {
+            if (origen != OrigenDelAutovaluo.SELLADO) {
+                throw new IllegalArgumentException(
+                        "El predio "
+                                + predioId
+                                + " es DECLARADO y trae aparte un autovaluo declarado: en"
+                                + " DECLARADO la declarada es el autovaluo, y solo se guarda al"
+                                + " lado cuando manda la sellada (#362)");
+            }
+            if (autovaluoDeclarado.esNegativo()) {
+                throw new IllegalArgumentException("El autovaluo declarado no puede ser negativo");
+            }
+        }
+    }
+
+    /**
+     * Lo que declaro el contribuyente para este predio, <b>segun el origen</b> (#362): el propio
+     * {@code autovaluo} si es {@link OrigenDelAutovaluo#DECLARADO}, y el que se guardo al lado si
+     * es {@link OrigenDelAutovaluo#SELLADO}. Vacio si mando la sellada y nadie habia declarado —o
+     * si la fila es anterior a V33, que no lo guardaba—.
+     *
+     * <p>Es la unica regla para esa pregunta, y la usan el recalculo individual y la corrida
+     * masiva. Hasta #362 las dos leian {@code autovaluo} sin mirar el origen: tras una
+     * determinacion SELLADO, el «declarado» del recalculo era la cifra sellada, y la discrepancia
+     * con lo que el contribuyente firmo se borraba en la primera corrida.
+     *
+     * <p>Vacio no se rellena con {@code autovaluo}: eso seria volver a dar la sellada por
+     * declarada. Si la sellada sigue estando, manda ella y no hace falta otra cifra; si ya no esta,
+     * el predio se queda sin autovaluo y se dice, en vez de determinarse con una cifra que nadie
+     * declaro.
+     */
+    public Optional<Dinero> autovaluoDeclaradoSegunElOrigen() {
+        return origen == OrigenDelAutovaluo.DECLARADO
+                ? Optional.of(autovaluo)
+                : Optional.ofNullable(autovaluoDeclarado);
     }
 
     /** Un detalle nuevo, todavia sin guardar, de un predio sin ninguna parte exonerada. */
@@ -115,6 +161,7 @@ public record DetalleDeterminacionPredio(
                 baseImponiblePredio,
                 OrigenDelAutovaluo.DECLARADO,
                 null,
+                null,
                 null);
     }
 
@@ -124,6 +171,11 @@ public record DetalleDeterminacionPredio(
      * <p>Exige el conjunto y la huella en la firma, no los admite despues: si se pudieran anadir a
      * posteriori, existiria un instante en que un detalle SELLADO no dice de donde salio, y ese es
      * el instante en que alguien lo guarda.
+     *
+     * <p>La declarada va en la firma por lo mismo (#362): si llegara despues, el detalle que se
+     * guarda podria salir sin ella, que es exactamente lo que pasaba.
+     *
+     * @param autovaluoDeclarado lo que declaro el contribuyente; {@code null} si no declaro
      */
     public static DetalleDeterminacionPredio sellado(
             long predioId,
@@ -132,7 +184,8 @@ public record DetalleDeterminacionPredio(
             Porcentaje porcentajePropiedad,
             Dinero baseImponiblePredio,
             long valuacionConjuntoId,
-            String valuacionHuella) {
+            String valuacionHuella,
+            @Nullable Dinero autovaluoDeclarado) {
         return new DetalleDeterminacionPredio(
                 null,
                 predioId,
@@ -142,7 +195,8 @@ public record DetalleDeterminacionPredio(
                 baseImponiblePredio,
                 OrigenDelAutovaluo.SELLADO,
                 valuacionConjuntoId,
-                valuacionHuella);
+                valuacionHuella,
+                autovaluoDeclarado);
     }
 
     /** La parte del autovaluo que si esta afecta, antes de ponderar por el % de propiedad. */
