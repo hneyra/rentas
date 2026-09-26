@@ -2,7 +2,10 @@ package kamayuk.rentas.cuentacorriente.aplicacion;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
+import kamayuk.rentas.cuentacorriente.ConsultaDeLoOriginado;
+import kamayuk.rentas.cuentacorriente.ObligacionOriginada;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.dominio.DeudaActualizada;
 import kamayuk.rentas.cuentacorriente.dominio.ObligacionConDeuda;
@@ -10,14 +13,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Implementa {@link ConsultaDeDeudaPublica} sobre {@link ConsultarDeuda} (#25).
+ * Implementa {@link ConsultaDeDeudaPublica} (#25) y {@link ConsultaDeLoOriginado} (#342) sobre
+ * {@link ConsultarDeuda}.
  *
  * <p>Filtrar aqui, o en {@code ConsultarDeuda#todasLasObligacionesDe}, dejaria sin sus filas en
  * 0,00 a la constancia de no adeudo, que las imprime como «Cancelado»: {@link #todasDe} las
  * devuelve todas, y {@link #pendientesDe} las filtra con la regla del puerto (#401).
  */
 @Service
-public class ConsultaDeDeudaCuentaCorriente implements ConsultaDeDeudaPublica {
+public class ConsultaDeDeudaCuentaCorriente
+        implements ConsultaDeDeudaPublica, ConsultaDeLoOriginado {
 
     private final ConsultarDeuda consulta;
 
@@ -47,6 +52,24 @@ public class ConsultaDeDeudaCuentaCorriente implements ConsultaDeDeudaPublica {
     @Transactional(readOnly = true)
     public List<ObligacionPublica> pendientesDe(long contribuyenteId, LocalDate fecha) {
         return ConsultaDeDeudaPublica.super.pendientesDe(contribuyenteId, fecha);
+    }
+
+    /**
+     * La deuda que originaron esos documentos (#342). Mismo mapeo que {@link #todasDe}: la fila
+     * publica de cada clave de saldo es la de una obligacion, mas su periodo y sus documentos.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<ObligacionOriginada> deLoOriginadoPor(
+            long contribuyenteId, Set<String> documentosDeOrigen, LocalDate fecha) {
+        return consulta.deLoOriginadoPor(contribuyenteId, documentosDeOrigen, fecha).stream()
+                .map(
+                        originada ->
+                                new ObligacionOriginada(
+                                        aPublica(originada.obligacion()),
+                                        originada.obligacion().periodoDesde(),
+                                        originada.documentos()))
+                .toList();
     }
 
     private static ObligacionPublica aPublica(ObligacionConDeuda obligacion) {

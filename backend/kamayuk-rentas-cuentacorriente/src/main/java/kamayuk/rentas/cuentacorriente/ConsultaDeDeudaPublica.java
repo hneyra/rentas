@@ -28,9 +28,15 @@ public interface ConsultaDeDeudaPublica {
      *
      * <p>Una obligacion cobrada, dada de baja o prescrita sigue aqui con sus cuatro partes en 0,00:
      * {@code ConsultarDeuda} netea los cargos contra los abonos y no descarta el grupo. Es lo que
-     * necesita quien tiene que distinguir «saldada» de «nunca asentada» —el estado de cuenta de
-     * fiscalizacion, la composicion de un expediente, la liquidacion de costas—, o quien solo suma.
-     * Quien lee la lista como «lo que debe» pide {@link #pendientesDe}.
+     * necesita quien tiene que distinguir «saldada» de «nunca asentada» —la composicion de un
+     * expediente, la liquidacion de costas—, o quien solo suma. Quien lee la lista como «lo que
+     * debe» pide {@link #pendientesDe}.
+     *
+     * <p><b>No dice de donde viene la deuda</b>: agrupa todos los periodos de un tributo, un
+     * ejercicio y una unidad, y la deuda ordinaria y la determinada de oficio sobre la misma unidad
+     * salen en una sola fila. Quien necesita solo lo que origino un acto suyo pregunta a {@link
+     * ConsultaDeLoOriginado}; el estado de cuenta de fiscalizacion casaba estas filas por su clave
+     * y se llevaba la deuda ordinaria (#342).
      *
      * <p>Hasta #401 se llamaba {@code deTodoElContribuyente} y su javadoc prometia «todas las
      * obligaciones con deuda»; devolvia estas, y cada consumidor lo creia o no por su cuenta. El

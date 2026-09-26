@@ -34,7 +34,9 @@ import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.fiscalizacion.aplicacion.DeteccionDeOmisos;
 import kamayuk.rentas.fiscalizacion.aplicacion.EstadoDeCuentaDeFiscalizacion;
+import kamayuk.rentas.fiscalizacion.dobles.LibroEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.LiquidacionesEnMemoria;
+import kamayuk.rentas.fiscalizacion.dobles.ResolucionesEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.TitularesDeMentira;
 import kamayuk.rentas.fiscalizacion.dominio.ComparacionHalladoDeclarado;
 import kamayuk.rentas.fiscalizacion.infraestructura.DeteccionRepositoryJdbc;
@@ -204,7 +206,8 @@ class OrdenDeLaDeteccionFronteraTest {
                                         envolver(
                                                 new EstadoDeCuentaDeFiscalizacion(
                                                         new LiquidacionesEnMemoria(),
-                                                        (contribuyenteId, fecha) -> List.of()),
+                                                        new ResolucionesEnMemoria(),
+                                                        new LibroEnMemoria()),
                                                 gestor),
                                         new PadronVacio(),
                                         RELOJ))

@@ -34,6 +34,7 @@ import kamayuk.rentas.fiscalizacion.infraestructura.DeteccionRepositoryJdbc;
 import kamayuk.rentas.fiscalizacion.infraestructura.LiquidacionRepositoryJdbc;
 import kamayuk.rentas.fiscalizacion.infraestructura.MuestraDelProgramaRepositoryJdbc;
 import kamayuk.rentas.fiscalizacion.infraestructura.ProgramaFiscalizacionRepositoryJdbc;
+import kamayuk.rentas.fiscalizacion.infraestructura.ResolucionDeDeterminacionRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
@@ -102,6 +103,9 @@ class VaciosQueNoSeConfundenFronteraTest {
     /** El contribuyente que SÍ fue fiscalizado, y cuya liquidación quedó cancelada. */
     private static final String FISCALIZADO = "F-000001";
 
+    /** La RDF de la liquidación cancelada: lo único por lo que el estado de cuenta pregunta. */
+    private static final String RDF_DE_LA_CANCELADA = "RDF-2026-000546";
+
     /** El que nunca lo fue. Está en el padrón, y eso es lo único que tiene. */
     private static final String NUNCA_FISCALIZADO = "F-000002";
 
@@ -137,7 +141,9 @@ class VaciosQueNoSeConfundenFronteraTest {
         sembrarMuestra(
                 municipalidadA, programaConMuestra, predioFiscalizado, contribuyenteFiscalizado);
 
-        // La liquidación CANCELADA: existe, y el libro dice que no queda saldo.
+        // La liquidación CANCELADA: existe, se transfirió, y el libro dice que lo que originó su
+        // RDF ya no tiene saldo. Sin la RDF, desde #342 la línea sale sin cifra —no se transfirió
+        // nada— y el cero de este contribuyente dejaría de ser un cero de verdad.
         long conjunto = crearConjuntoSellado(municipalidadA);
         long acta =
                 crearActa(
@@ -147,6 +153,7 @@ class VaciosQueNoSeConfundenFronteraTest {
                         predioFiscalizado);
         long liquidacion = crearLiquidacion(municipalidadA, acta);
         crearDetalle(municipalidadA, liquidacion, conjunto, predioFiscalizado);
+        crearResolucion(municipalidadA, liquidacion, contribuyenteFiscalizado, predioFiscalizado);
 
         // ── La municipalidad B ────────────────────────────────────────────
         // El programa de la vecina EXISTE, y desde A tiene que ser un 404: si la
@@ -185,7 +192,10 @@ class VaciosQueNoSeConfundenFronteraTest {
                                                 gestor),
                                         envolver(
                                                 new EstadoDeCuentaDeFiscalizacion(
-                                                        liquidaciones, new LibroSinSaldo()),
+                                                        liquidaciones,
+                                                        new ResolucionDeDeterminacionRepositoryJdbc(
+                                                                jdbc),
+                                                        new LibroSinSaldo()),
                                                 gestor),
                                         directorio,
                                         RELOJ))
@@ -426,29 +436,38 @@ class VaciosQueNoSeConfundenFronteraTest {
     }
 
     /**
-     * El libro sin ningun asiento vivo: la liquidacion se cobro y no queda saldo.
+     * El libro sin ningun asiento vivo: lo que origino la RDF se cobro y no queda saldo.
      *
      * <p>Es lo que hace comparable el AC 5: el cero de este contribuyente es un cero DE VERDAD, y
      * el del que nunca fue fiscalizado no era ninguna cifra.
+     *
+     * <p>Desde #342 contesta a la pregunta que el estado de cuenta hace de verdad —que origino la
+     * RDF—, y solo si se le pregunta por la de la liquidacion sembrada.
      */
     private static final class LibroSinSaldo
-            implements kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica {
+            implements kamayuk.rentas.cuentacorriente.ConsultaDeLoOriginado {
 
         @Override
-        public List<kamayuk.rentas.cuentacorriente.ObligacionPublica> todasDe(
-                long contribuyenteId, LocalDate aLaFecha) {
+        public List<kamayuk.rentas.cuentacorriente.ObligacionOriginada> deLoOriginadoPor(
+                long contribuyenteId, Set<String> documentosDeOrigen, LocalDate aLaFecha) {
+            if (!documentosDeOrigen.contains(RDF_DE_LA_CANCELADA)) {
+                return List.of();
+            }
             return List.of(
-                    new kamayuk.rentas.cuentacorriente.ObligacionPublica(
-                            "PREDIAL",
-                            new kamayuk.rentas.dominio.Ejercicio(2024),
-                            predioFiscalizado,
-                            null,
-                            aLaFecha,
-                            kamayuk.rentas.dominio.Dinero.CERO,
-                            kamayuk.rentas.dominio.Dinero.CERO,
-                            kamayuk.rentas.dominio.Dinero.CERO,
-                            kamayuk.rentas.dominio.Dinero.CERO,
-                            "ORDINARIA"));
+                    new kamayuk.rentas.cuentacorriente.ObligacionOriginada(
+                            new kamayuk.rentas.cuentacorriente.ObligacionPublica(
+                                    "PREDIAL",
+                                    new kamayuk.rentas.dominio.Ejercicio(2024),
+                                    predioFiscalizado,
+                                    null,
+                                    aLaFecha,
+                                    kamayuk.rentas.dominio.Dinero.CERO,
+                                    kamayuk.rentas.dominio.Dinero.CERO,
+                                    kamayuk.rentas.dominio.Dinero.CERO,
+                                    kamayuk.rentas.dominio.Dinero.CERO,
+                                    "ORDINARIA"),
+                            0,
+                            Set.of(RDF_DE_LA_CANCELADA)));
         }
     }
 
@@ -614,6 +633,64 @@ class VaciosQueNoSeConfundenFronteraTest {
                 liquidacionId,
                 conjuntoId,
                 predioId);
+    }
+
+    /**
+     * La transferencia de la liquidacion: su papel, las dos versiones de ficha y la fila de la
+     * resolucion, como las deja {@code TransferirARentas} (#342).
+     */
+    private static void crearResolucion(
+            long municipalidadId, long liquidacionId, long contribuyenteId, long predioId) {
+        long anterior = crearFicha(municipalidadId, predioId, 1);
+        long nueva = crearFicha(municipalidadId, predioId, 2);
+        long documento =
+                ejecutarComoApp(
+                        municipalidadId,
+                        "INSERT INTO documento_emitido (municipalidad_id, tipo, numero, ejercicio,"
+                                + " referencia, datos, formato, resumen, fecha_emision,"
+                                + " usuario_emision, observacion)"
+                                + " VALUES (?, 'RDF', ?, 2026, 'LIQ-546-0001', CAST(? AS jsonb),"
+                                + "         'PDF', repeat('f', 64), ?, 'siembra',"
+                                + "         'resolucion de prueba') RETURNING id",
+                        municipalidadId,
+                        RDF_DE_LA_CANCELADA,
+                        "{\"titulo\":\"Resolucion de determinacion\",\"subtitulo\":null,"
+                                + "\"aLaFecha\":\"2026-04-02\",\"cabecera\":[],\"tablas\":[],"
+                                + "\"pie\":[],\"duplicado\":null}",
+                        LocalDate.of(2026, 4, 2));
+        ejecutarComoApp(
+                municipalidadId,
+                "INSERT INTO resolucion_determinacion (municipalidad_id, numero, documento_id,"
+                        + " liquidacion_id, contribuyente_id, predio_id, ficha_anterior_id,"
+                        + " ficha_nueva_id, fecha, documento_sustento, sustento, base_legal,"
+                        + " usuario_registro, fecha_registro, observacion)"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTA-546', 'sustento de prueba',"
+                        + "         'Codigo Tributario, arts. 76 y 77', 'siembra', now(),"
+                        + "         'transferencia de prueba') RETURNING id",
+                municipalidadId,
+                RDF_DE_LA_CANCELADA,
+                documento,
+                liquidacionId,
+                contribuyenteId,
+                predioId,
+                anterior,
+                nueva,
+                LocalDate.of(2026, 4, 2));
+    }
+
+    private static long crearFicha(long municipalidadId, long predioId, int version) {
+        return ejecutarComoApp(
+                municipalidadId,
+                "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
+                        + " area_terreno, uso, vigencia_desde, origen, documento_origen,"
+                        + " observacion, usuario_registro)"
+                        + " VALUES (?, ?, 'UNICA', ?, 300.00, 'CASA_HABITACION', ?,"
+                        + "         'DECLARACION_JURADA', 'DJ-546', 'ficha', 'siembra')"
+                        + " RETURNING id",
+                municipalidadId,
+                predioId,
+                version,
+                LocalDate.of(2024, 1, version));
     }
 
     private static long ejecutarComoApp(long municipalidadId, String sql, Object... valores) {

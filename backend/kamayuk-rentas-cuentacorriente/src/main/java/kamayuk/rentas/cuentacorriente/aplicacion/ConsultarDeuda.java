@@ -23,6 +23,7 @@ import kamayuk.rentas.cuentacorriente.dominio.CriterioDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.CriterioDeDeudaPorContribuyente;
 import kamayuk.rentas.cuentacorriente.dominio.DeudaActualizada;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
+import kamayuk.rentas.cuentacorriente.dominio.LoOriginadoPor;
 import kamayuk.rentas.cuentacorriente.dominio.ObligacionConDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.ProyeccionDelSaldo;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoProyectado;
@@ -259,6 +260,59 @@ public class ConsultarDeuda {
                             deuda));
         }
         return obligaciones;
+    }
+
+    /**
+     * La deuda que originaron esos documentos, una fila por clave de saldo (#342).
+     *
+     * <p>Que clave cuenta lo decide {@link LoOriginadoPor}, que es pura; aqui solo se leen los
+     * asientos —una consulta, la misma que {@link #todasLasObligacionesDe}— y se calcula cada clave
+     * con la misma funcion y la misma definicion de fase que aquel. Cada fila es <b>una</b> clave
+     * de saldo, asi que su {@code periodoDesde} y su {@code periodoHasta} son el mismo periodo.
+     *
+     * @param documentos vacio da una lista vacia, sin leer el libro
+     */
+    @Transactional(readOnly = true)
+    public List<Originada> deLoOriginadoPor(
+            long contribuyenteId, Set<String> documentos, LocalDate fecha) {
+        if (documentos.isEmpty()) {
+            return List.of();
+        }
+        List<Originada> originadas = new ArrayList<>();
+        for (Map.Entry<ClaveDeSaldo, LoOriginadoPor.Originada> grupo :
+                LoOriginadoPor.clavesDe(repositorio.deContribuyente(contribuyenteId), documentos)
+                        .entrySet()) {
+            ClaveDeSaldo clave = grupo.getKey();
+            List<Asiento> delGrupo = grupo.getValue().asientos();
+            originadas.add(
+                    new Originada(
+                            new ObligacionConDeuda(
+                                    clave.tributo(),
+                                    clave.ejercicio(),
+                                    clave.predioId(),
+                                    clave.vehiculoId(),
+                                    clave.periodo(),
+                                    clave.periodo(),
+                                    faseMasAvanzadaDe(
+                                            ProyeccionDelSaldo.de(delGrupo, reloj.instant())),
+                                    calculo.deudaActualizadaA(delGrupo, fecha, redondeo)),
+                            grupo.getValue().documentos()));
+        }
+        return originadas;
+    }
+
+    /**
+     * Una clave de saldo que unos documentos originaron, con su deuda (#342).
+     *
+     * @param obligacion la deuda de la clave, con {@code periodoDesde == periodoHasta}
+     * @param documentos los preguntados que la originaron, normalizados
+     */
+    public record Originada(ObligacionConDeuda obligacion, Set<String> documentos) {
+
+        public Originada {
+            Objects.requireNonNull(obligacion, "La deuda originada es una obligacion del libro");
+            documentos = Set.copyOf(documentos);
+        }
     }
 
     /** {@code periodo} nulo es anual, igual que en {@link ClaveDeSaldo#de(Asiento)}. */

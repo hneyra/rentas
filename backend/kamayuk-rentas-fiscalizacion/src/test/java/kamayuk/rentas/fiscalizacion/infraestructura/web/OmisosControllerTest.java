@@ -19,7 +19,9 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.fiscalizacion.aplicacion.DeteccionDeOmisos;
 import kamayuk.rentas.fiscalizacion.aplicacion.EstadoDeCuentaDeFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dobles.DeteccionDeMentira;
+import kamayuk.rentas.fiscalizacion.dobles.LibroEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.LiquidacionesEnMemoria;
+import kamayuk.rentas.fiscalizacion.dobles.ResolucionesEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.TitularesDeMentira;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
 import kamayuk.rentas.fiscalizacion.dominio.FilaDeOmisos;
@@ -93,7 +95,8 @@ class OmisosControllerTest {
                                         new DeteccionDeOmisos(deteccion, titulares),
                                         new EstadoDeCuentaDeFiscalizacion(
                                                 new LiquidacionesEnMemoria(),
-                                                (contribuyenteId, fecha) -> List.of()),
+                                                new ResolucionesEnMemoria(),
+                                                new LibroEnMemoria()),
                                         directorio,
                                         Clock.fixed(
                                                 HOY.atStartOfDay(ZoneOffset.UTC).toInstant(),

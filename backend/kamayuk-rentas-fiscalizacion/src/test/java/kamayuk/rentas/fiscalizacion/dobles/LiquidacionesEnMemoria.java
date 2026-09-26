@@ -123,11 +123,15 @@ public final class LiquidacionesEnMemoria implements LiquidacionRepository {
         return correlativos.merge(ejercicio.valor(), 1L, Long::sum);
     }
 
+    /** El orden del contrato: la mas reciente primero, por acta y por version (#342). */
     @Override
     public List<Liquidacion> deContribuyente(long contribuyenteId) {
         return guardadas.stream()
                 .filter(l -> contribuyenteId == contribuyentePorActa.getOrDefault(l.actaId(), -1L))
-                .sorted(Comparator.comparingInt(Liquidacion::version).reversed())
+                .sorted(
+                        Comparator.comparingLong(Liquidacion::actaId)
+                                .thenComparingInt(Liquidacion::version)
+                                .reversed())
                 .toList();
     }
 

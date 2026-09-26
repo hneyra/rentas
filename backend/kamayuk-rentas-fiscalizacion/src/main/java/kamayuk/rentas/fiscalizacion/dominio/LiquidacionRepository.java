@@ -54,7 +54,15 @@ public interface LiquidacionRepository {
      */
     long siguienteCorrelativo(Ejercicio ejercicio);
 
-    /** Las liquidaciones que se le hicieron a un contribuyente, para su estado de cuenta. */
+    /**
+     * Las liquidaciones que se le hicieron a un contribuyente, para su estado de cuenta: de la
+     * <b>más reciente a la más antigua</b>, por acta y, dentro de un acta, por versión.
+     *
+     * <p>El orden es contrato y no presentación: el estado de cuenta conserva una línea por
+     * ejercicio y unidad y se queda con la primera que le llega. Hasta #342 la consulta ordenaba
+     * por {@code acta_id} ascendente, y con dos actas sobre la misma unidad —una segunda visita—
+     * ganaba la liquidación del acta más antigua, con su condición.
+     */
     List<Liquidacion> deContribuyente(long contribuyenteId);
 
     /**

@@ -18,6 +18,7 @@ import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.compartido.TenantContext;
+import kamayuk.rentas.cuentacorriente.ObligacionOriginada;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.dominio.Asiento;
 import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
@@ -35,6 +36,7 @@ import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -228,6 +230,64 @@ class ConsultaDeDeudaCuentaCorrienteTest {
     }
 
     /**
+     * #342 — la deuda que origino una RDF, separada de la ordinaria de la misma unidad.
+     *
+     * <p>La siembra distingue: en el mismo vehiculo y el mismo ejercicio conviven las cuatro cuotas
+     * ordinarias ({@code ALTA-1}), el cargo de oficio sin periodo y la multa de la RDF, un abono de
+     * recibo contra el cargo de oficio, y el cargo de <b>otra</b> RDF sobre otro vehiculo. Con solo
+     * el cargo de la RDF en el libro, casar por clave y casar por documento darian lo mismo.
+     */
+    @Test
+    @DisplayName(
+            "#342 — deLoOriginadoPor trae las claves de saldo de la RDF, no la deuda ordinaria")
+    void loOriginadoPorLaRdf() throws SQLException {
+        long quien = crearContribuyente("D-PORT-342", "80500342");
+        for (int cuota = 1; cuota <= 4; cuota++) {
+            asentarEn(quien, TipoAsiento.CARGO, "VEHICULAR", cuota, 7L, "120.00", "ALTA-1");
+        }
+        asentarEn(quien, TipoAsiento.CARGO, "VEHICULAR", null, 7L, "100.00", "RDF-2026-000004");
+        asentarEn(
+                quien, TipoAsiento.CARGO, "MULTA_TRIBUTARIA", null, 7L, "30.00", "RDF-2026-000004");
+        asentarEn(quien, TipoAsiento.ABONO, "VEHICULAR", null, 7L, "40.00", "RECIBO 001-0000342");
+        asentarEn(quien, TipoAsiento.CARGO, "VEHICULAR", null, 8L, "70.00", "RDF-2026-000009");
+        LocalDate fecha = LocalDate.of(2026, 6, 1);
+
+        List<ObligacionOriginada> originadas =
+                puerto.deLoOriginadoPor(quien, java.util.Set.of("RDF-2026-000004"), fecha);
+
+        assertThat(originadas)
+                .as(
+                        "el cargo de oficio neto del abono del recibo (100 - 40) y la multa: ni las"
+                                + " cuatro cuotas de ALTA-1 ni el vehiculo 8 de la otra RDF")
+                .extracting(
+                        o -> o.obligacion().tributo(),
+                        o -> o.obligacion().vehiculoId(),
+                        ObligacionOriginada::periodo,
+                        o -> o.obligacion().total())
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("VEHICULAR", 7L, 0, Dinero.de("60.00")),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "MULTA_TRIBUTARIA", 7L, 0, Dinero.de("30.00")));
+        assertThat(originadas)
+                .allSatisfy(
+                        o -> {
+                            assertThat(o.originadaPor("RDF-2026-000004")).isTrue();
+                            assertThat(o.obligacion().fecha()).isEqualTo(fecha);
+                        });
+        assertThat(puerto.todasDe(quien, fecha))
+                .as(
+                        "todasDe no cambia para sus otros consumidores: sigue juntando la ordinaria"
+                                + " y la de oficio del vehiculo 7 en una fila")
+                .filteredOn(o -> "VEHICULAR".equals(o.tributo()) && o.vehiculoId() == 7L)
+                .singleElement()
+                .extracting(ObligacionPublica::total)
+                .isEqualTo(Dinero.de("540.00"));
+        assertThat(puerto.deLoOriginadoPor(quien, java.util.Set.of(), fecha))
+                .as("sin documentos no hay nada originado")
+                .isEmpty();
+    }
+
+    /**
      * #401 — la siembra que distingue: la misma persona con una obligacion que debe y otra pagada.
      * Con las dos debiendo, {@code todasDe} y {@code pendientesDe} devolverian lo mismo.
      */
@@ -272,6 +332,32 @@ class ConsultaDeDeudaCuentaCorrienteTest {
                         monto,
                         LocalDate.of(2026, 3, 1),
                         tipo == TipoAsiento.CARGO ? "RES-PRUEBA-0401" : "RECIBO 001-0000401"),
+                OBSERVACION);
+    }
+
+    private void asentarEn(
+            long contribuyente,
+            TipoAsiento tipo,
+            String tributo,
+            @Nullable Integer periodo,
+            long vehiculoId,
+            String monto,
+            String documento) {
+        registrarAsiento.asentar(
+                Asiento.nuevo(
+                        new Ejercicio(2026),
+                        contribuyente,
+                        tributo,
+                        Concepto.INSOLUTO,
+                        tipo,
+                        Fase.ORDINARIA,
+                        periodo,
+                        null,
+                        vehiculoId,
+                        null,
+                        Dinero.de(monto),
+                        LocalDate.of(2026, 3, 1),
+                        documento),
                 OBSERVACION);
     }
 

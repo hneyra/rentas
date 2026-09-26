@@ -13,9 +13,11 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Regla 9 y RNF-075. La deuda de cada línea es un {@link ImporteActualizado}, que lleva el
  * importe y el día al que corresponde en el mismo objeto: no existe «la deuda», existe la deuda
- * actualizada a una fecha. Y cuando el libro todavía no tiene nada de esa obligación —lo que hoy es
- * siempre, porque la transferencia a rentas es #52 y el importe es #198— la línea sale <b>sin</b>
- * importe en vez de con un cero: un cero se lee como «no debe nada».
+ * actualizada a una fecha, y es la de lo que <b>originó la RDF</b> de la liquidación, no la de toda
+ * la deuda de la unidad (#342). Cuando la fiscalización no originó nada en el libro —la liquidación
+ * no se transfirió, o su RDF no asentó ningún cargo, que es lo que hace hoy mientras el importe
+ * siga en #198— la línea sale <b>sin</b> importe en vez de con un cero: un cero se lee como «no
+ * debe nada».
  *
  * <p>{@code total} es {@code null} si alguna línea no tiene cifra. Un total parcial presentado como
  * total es peor que ningún total, porque nadie lo distingue del completo.
@@ -28,10 +30,10 @@ import org.jspecify.annotations.Nullable;
  * javadoc dice de sí mismo que hay que evitar.
  *
  * <p>Lo que los separa es {@code fiscalizado}, y no el {@code total}: {@code total} ya viaja en
- * {@code null} —hoy, siempre— cuando alguna línea no tiene cifra, así que un nulo solo no dice cuál
- * de las dos cosas pasa. Con la marca, {@code fiscalizado: false} con {@code lineas: []} es «no hay
- * procedimiento», y {@code fiscalizado: true} con {@code total} en cero es «lo hubo y no queda
- * saldo».
+ * {@code null} —hoy, casi siempre (#198)— cuando alguna línea no tiene cifra, así que un nulo solo
+ * no dice cuál de las dos cosas pasa. Con la marca, {@code fiscalizado: false} con {@code lineas:
+ * []} es «no hay procedimiento», y {@code fiscalizado: true} con {@code total} en cero es «lo hubo
+ * y no queda saldo».
  *
  * @param codContribuyente el código del fiscalizado
  * @param fechaDeConsulta el día al que están todas las cifras

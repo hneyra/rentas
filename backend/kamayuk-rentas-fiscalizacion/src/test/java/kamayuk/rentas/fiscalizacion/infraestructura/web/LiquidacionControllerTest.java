@@ -25,6 +25,7 @@ import kamayuk.rentas.fiscalizacion.aplicacion.ReliquidarFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dobles.ActasEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.DeclaracionesDeMentira;
 import kamayuk.rentas.fiscalizacion.dobles.DeteccionDeMentira;
+import kamayuk.rentas.fiscalizacion.dobles.LibroEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.LiquidacionesEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.MovimientosDeLiquidacionEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.PadronDeMentira;
@@ -145,8 +146,7 @@ class LiquidacionControllerTest {
                                                 new TitularesDeMentira()
                                                         .con(PREDIO, CONTRIBUYENTE)),
                                         new EstadoDeCuentaDeFiscalizacion(
-                                                liquidaciones,
-                                                (contribuyenteId, fecha) -> java.util.List.of()),
+                                                liquidaciones, resoluciones, new LibroEnMemoria()),
                                         directorio,
                                         reloj))
                         .setControllerAdvice(new ManejadorDeErrores())

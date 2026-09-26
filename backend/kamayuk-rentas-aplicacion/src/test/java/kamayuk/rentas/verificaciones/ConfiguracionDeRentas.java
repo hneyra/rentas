@@ -451,9 +451,13 @@ public final class ConfiguracionDeRentas implements ConfiguracionDeLasVerificaci
                 // escribir, en vez de dejar que acta_fisc_vehiculo_fk lo rechace como un 500.
                 // Contesta un boolean: ni un metodo que escriba.
                 ".nucleo.PadronVehicular",
-                // Cuanto se debe a una fecha, para el estado de cuenta de fiscalizacion (RF-056).
-                // Arista al reves de las otras: la excepcion de ARQ-01 §4 regla 2.
-                ".cuentacorriente.ConsultaDeDeudaPublica",
+                // Cuanto se debe a una fecha de lo que origino cada RDF, para el estado de cuenta
+                // de fiscalizacion (RF-056). Arista al reves de las otras: la excepcion de ARQ-01
+                // §4 regla 2. Hasta #342 era `ConsultaDeDeudaPublica`, que devuelve toda la deuda
+                // de la unidad sin decir de donde viene; ya no lo usa nadie aqui, y se retiro.
+                // Contestan una lista: ni un metodo que escriba.
+                ".cuentacorriente.ConsultaDeLoOriginado",
+                ".cuentacorriente.ObligacionOriginada",
                 ".cuentacorriente.ObligacionPublica",
                 // Como se llaman los tributos del libro (#553). Es un enumerado: lo que aporta es
                 // que fiscalizacion no declare su propio literal.
