@@ -142,6 +142,8 @@ class ActaVehicularControllerTest {
                             return java.util.Set.of();
                         }
                     },
+                    // Un acta vehicular no pregunta por la muestra (#397).
+                    (programa, predio) -> true,
                     new ProgramaFiscalizacionRepository() {
                         @Override
                         public ProgramaFiscalizacion insertar(ProgramaFiscalizacion programa) {

@@ -135,6 +135,10 @@ class RegistrarDeclaracionJuradaTest {
                                 parametros,
                                 new FichaFija(),
                                 new PadronDePrueba(),
+                                envolver(
+                                        new kamayuk.rentas.nucleo.aplicacion.PadronVehicularRentas(
+                                                new kamayuk.rentas.nucleo.infraestructura
+                                                        .VehiculoRepositoryJdbc(jdbc))),
                                 new AuditoriaJdbc(jdbc, RELOJ)));
     }
 
@@ -280,6 +284,70 @@ class RegistrarDeclaracionJuradaTest {
                             Observacion.de("Predio sin ficha catastral registrada todavia"));
 
             assertThat(guardada.fichaCatastralId()).isNull();
+        }
+
+        @Test
+        @DisplayName(
+                "#397 — un predio que no esta en el padron no se declara: la DJ no se registra")
+        void unPredioFueraDelPadronNoSeDeclara() throws SQLException {
+            // Desde V6 ninguna clave foranea lo impide (D-18). Hasta #397 esto era 201: la DJ
+            // declaraba la nada, y con el numero de OTRO predio lo conciliaba y lo sacaba de
+            // omisos. Su gemela —un predio que SI esta, sin ficha— es la de arriba, y registra.
+            String codigo = nuevoContribuyente();
+            long antes = filas("SELECT count(*) FROM declaracion_jurada");
+
+            assertThatThrownBy(
+                            () ->
+                                    registrar.registrar(
+                                            EJERCICIO,
+                                            codigo,
+                                            TipoDeDeclaracion.PU,
+                                            999_999L,
+                                            null,
+                                            LocalDate.of(2026, 3, 1),
+                                            Observacion.de("Predio tecleado mal")))
+                    .isInstanceOf(RegistrarDeclaracionJurada.PredioFueraDelPadron.class)
+                    .hasMessageContaining("999999");
+            assertThat(filas("SELECT count(*) FROM declaracion_jurada")).isEqualTo(antes);
+        }
+
+        @Test
+        @DisplayName("#397 — una PU sin predio no se registra: no conciliaria nada")
+        void unaPuSinPredioNoSeRegistra() throws SQLException {
+            String codigo = nuevoContribuyente();
+
+            assertThatThrownBy(
+                            () ->
+                                    registrar.registrar(
+                                            EJERCICIO,
+                                            codigo,
+                                            TipoDeDeclaracion.PU,
+                                            null,
+                                            null,
+                                            LocalDate.of(2026, 3, 1),
+                                            Observacion.de("PU sin predio")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("falta el predio");
+        }
+
+        @Test
+        @DisplayName(
+                "#397 — una VEHICULAR de un vehiculo que no existe es VehiculoInexistente, no un 500")
+        void unaVehicularDeUnVehiculoInexistente() throws SQLException {
+            String codigo = nuevoContribuyente();
+
+            assertThatThrownBy(
+                            () ->
+                                    registrar.registrar(
+                                            EJERCICIO,
+                                            codigo,
+                                            TipoDeDeclaracion.VEHICULAR,
+                                            null,
+                                            999_999L,
+                                            LocalDate.of(2026, 3, 1),
+                                            Observacion.de("Vehiculo tecleado mal")))
+                    .as("hasta #397 llegaba al INSERT y dj_vehiculo_fk salia como 500")
+                    .isInstanceOf(RegistrarDeclaracionJurada.VehiculoInexistente.class);
         }
 
         @Test
@@ -933,6 +1001,27 @@ class RegistrarDeclaracionJuradaTest {
      * guarda lo que devuelve —no la resolucion de vigencia, que es de {@code catastro}—.
      */
     private static final class FichaFija implements LectorDeFichas {
+
+        /**
+         * Lo que `catastro` contesta (#397): un predio que no esta en `predio_de_prueba` esta fuera
+         * del padron, y uno que esta sin ficha vigente, sin ficha.
+         */
+        @Override
+        public kamayuk.rentas.catastro.InscripcionDelPredio inscripcionEn(
+                long predioId, LocalDate fecha) {
+            boolean esta =
+                    Boolean.TRUE.equals(
+                            jdbc().sql(
+                                            "SELECT EXISTS (SELECT 1 FROM predio_de_prueba"
+                                                    + " WHERE id = :predioId)")
+                                    .param("predioId", predioId)
+                                    .query(Boolean.class)
+                                    .single());
+            if (!esta) {
+                return new kamayuk.rentas.catastro.InscripcionDelPredio.FueraDelPadron();
+            }
+            return LectorDeFichas.super.inscripcionEn(predioId, fecha);
+        }
 
         @Override
         public java.util.Optional<kamayuk.rentas.dominio.AreaM2> areaDeLaVersion(long fichaId) {

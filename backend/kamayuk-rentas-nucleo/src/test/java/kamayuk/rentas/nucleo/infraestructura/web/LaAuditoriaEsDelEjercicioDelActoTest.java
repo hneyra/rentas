@@ -361,6 +361,7 @@ class LaAuditoriaEsDelEjercicioDelActoTest {
                         null,
                         null,
                         null,
+                        null,
                         new AuditoriaJdbc(jdbc, reloj)));
     }
 

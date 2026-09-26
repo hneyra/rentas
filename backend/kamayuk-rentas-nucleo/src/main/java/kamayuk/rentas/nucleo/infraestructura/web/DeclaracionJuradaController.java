@@ -261,8 +261,12 @@ public class DeclaracionJuradaController {
             return DeclaracionJuradaResource.de(acto.ejecutar());
         } catch (RegistrarDeclaracionJurada.DeclaracionInexistente noEsta) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
-        } catch (RegistrarDeclaracionJurada.ContribuyenteInexistente sinPadron) {
+        } catch (RegistrarDeclaracionJurada.ContribuyenteInexistente
+                | RegistrarDeclaracionJurada.VehiculoInexistente sinPadron) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(sinPadron));
+        } catch (RegistrarDeclaracionJurada.PredioFueraDelPadron fueraDelPadron) {
+            // 422 y no 404 (#397): la ruta —la DJ— existe; lo que no vale es el predio del cuerpo.
+            throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(fueraDelPadron));
         } catch (DeclaracionJurada.TransicionIlegal ilegal) {
             // 409 y no 422: la peticion es correcta, lo que no admite el acto es el estado en que
             // esta la declaracion. La interfaz distingue las dos cosas para saber si reintentar

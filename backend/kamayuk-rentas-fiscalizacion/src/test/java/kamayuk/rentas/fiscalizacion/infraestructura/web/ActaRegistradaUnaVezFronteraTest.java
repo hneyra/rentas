@@ -125,6 +125,8 @@ class ActaRegistradaUnaVezFronteraTest {
                 envolver(
                         new RegistrarActaFiscalizacion(
                                 retencion.sobre(new ActaFiscalizacionRepositoryJdbc(jdbc)),
+                                // Solo actas vehiculares: la muestra no se pregunta (#397).
+                                (programa, predio) -> true,
                                 new ProgramaFiscalizacionRepositoryJdbc(jdbc),
                                 new SinFichas(),
                                 padron,

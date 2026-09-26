@@ -3,6 +3,7 @@ package kamayuk.rentas.catastro.infraestructura;
 import java.time.LocalDate;
 import java.util.Optional;
 import kamayuk.rentas.catastro.CaracteristicasDelPredio;
+import kamayuk.rentas.catastro.InscripcionDelPredio;
 import kamayuk.rentas.catastro.LectorDeCaracteristicas;
 import kamayuk.rentas.catastro.LectorDeFichas;
 import kamayuk.rentas.catastro.LectorDeFichasEconomicas;
@@ -68,6 +69,21 @@ public class CaracteristicasDelPredioHttp
     @Override
     public Optional<Long> fichaVigenteEn(long predioId, LocalDate fecha) {
         return identificador(caracteristicas(predioId, fecha), "fichaId");
+    }
+
+    /**
+     * Los tres estados en UNA peticion (#397): {@code enElPadron} decide si el predio esta, y
+     * {@code fichaId} si tiene ficha. {@link #fichaVigenteEn} los colapsa; esto no.
+     */
+    @Override
+    public InscripcionDelPredio inscripcionEn(long predioId, LocalDate fecha) {
+        JsonNode cuerpo = caracteristicas(predioId, fecha);
+        if (!cuerpo.path("enElPadron").asBoolean()) {
+            return new InscripcionDelPredio.FueraDelPadron();
+        }
+        return identificador(cuerpo, "fichaId")
+                .<InscripcionDelPredio>map(InscripcionDelPredio.ConFicha::new)
+                .orElseGet(InscripcionDelPredio.SinFicha::new);
     }
 
     @Override

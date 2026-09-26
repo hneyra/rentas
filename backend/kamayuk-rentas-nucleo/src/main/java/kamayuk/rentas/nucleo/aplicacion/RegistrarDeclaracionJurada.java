@@ -6,11 +6,13 @@ import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
+import kamayuk.rentas.catastro.InscripcionDelPredio;
 import kamayuk.rentas.catastro.LectorDeFichas;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.nucleo.PadronVehicular;
 import kamayuk.rentas.nucleo.dominio.DeclaracionJurada;
 import kamayuk.rentas.nucleo.dominio.DeclaracionJuradaRepository;
 import kamayuk.rentas.nucleo.dominio.EstadoDeDeclaracion;
@@ -83,6 +85,7 @@ public class RegistrarDeclaracionJurada {
     private final LectorDeParametros parametros;
     private final LectorDeFichas fichas;
     private final DirectorioDeContribuyentes padron;
+    private final PadronVehicular vehiculos;
     private final Auditoria auditoria;
 
     public RegistrarDeclaracionJurada(
@@ -91,12 +94,14 @@ public class RegistrarDeclaracionJurada {
             LectorDeParametros parametros,
             LectorDeFichas fichas,
             DirectorioDeContribuyentes padron,
+            PadronVehicular vehiculos,
             Auditoria auditoria) {
         this.repositorio = repositorio;
         this.plantilla = plantilla;
         this.parametros = parametros;
         this.fichas = fichas;
         this.padron = padron;
+        this.vehiculos = vehiculos;
         this.auditoria = auditoria;
     }
 
@@ -119,6 +124,7 @@ public class RegistrarDeclaracionJurada {
             Observacion observacion) {
 
         long contribuyenteId = contribuyenteDe(codigoContribuyente);
+        exigirVehiculo(vehiculoId);
 
         DeclaracionJurada nueva =
                 DeclaracionJurada.nueva(
@@ -258,11 +264,33 @@ public class RegistrarDeclaracionJurada {
         return contribuyente.id();
     }
 
+    /**
+     * La ficha vigente del predio declarado, o nula si esta en el padron sin ficha; y si no esta en
+     * el padron, la DJ no se registra (#397).
+     *
+     * <p>Desde {@code V6} ninguna clave foranea ata la DJ al predio (D-18). Hasta #397 un {@code
+     * predioId} tecleado que no existe daba 201: la DJ declaraba la nada, y si el numero era de
+     * otro predio lo CONCILIABA y lo sacaba de omisos —el peor error de ADR-0015—. Se pregunta a
+     * {@code catastro} por HTTP y no a {@code predio_ref}: la proyeccion llega con desfase y, donde
+     * no se alimenta, rechazaria todas las DJ.
+     */
     private @Nullable Long fichaVigenteA(@Nullable Long predioId, LocalDate fecha) {
         if (predioId == null) {
             return null;
         }
-        return fichas.fichaVigenteEn(predioId, fecha).orElse(null);
+        return switch (fichas.inscripcionEn(predioId, fecha)) {
+            case InscripcionDelPredio.FueraDelPadron fuera ->
+                    throw new PredioFueraDelPadron(predioId, fecha);
+            case InscripcionDelPredio.SinFicha sinFicha -> null;
+            case InscripcionDelPredio.ConFicha conFicha -> conFicha.fichaId();
+        };
+    }
+
+    /** El vehiculo declarado esta en el padron vehicular, o la DJ no se escribe (#397). */
+    private void exigirVehiculo(@Nullable Long vehiculoId) {
+        if (vehiculoId != null && !vehiculos.estaEnElPadron(vehiculoId)) {
+            throw new VehiculoInexistente(vehiculoId);
+        }
     }
 
     private LocalDate fechaLimiteDe(Ejercicio ejercicio) {
@@ -332,6 +360,33 @@ public class RegistrarDeclaracionJurada {
                             + " del ejercicio "
                             + ejercicio
                             + " en esta municipalidad");
+        }
+    }
+
+    /** El predio declarado no esta en el padron de {@code catastro} a la fecha de la DJ (#397). */
+    public static final class PredioFueraDelPadron extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        PredioFueraDelPadron(long predioId, LocalDate fecha) {
+            super(
+                    "El predio "
+                            + predioId
+                            + " no esta en el padron de catastro al "
+                            + fecha
+                            + ": una declaracion jurada declara un predio que existe. Revise el"
+                            + " numero de predio");
+        }
+    }
+
+    /** El vehiculo declarado no esta en el padron vehicular (#397). */
+    public static final class VehiculoInexistente extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        VehiculoInexistente(long vehiculoId) {
+            super(
+                    "No hay ningun vehiculo con identificador "
+                            + vehiculoId
+                            + " en el padron vehicular");
         }
     }
 
