@@ -5,6 +5,7 @@ import { Armazon, useHoja, type AccionesDelSistema } from '@kamayuk/shell';
 import { Alerta, Boton, Icono, ProveedorDeTema, type ConfiguracionDeTema } from '@kamayuk/ui';
 
 import { MandoDeTema } from './preferencias/MandoDeTema.tsx';
+import { MandoDelEjercicio } from './sesion/MandoDelEjercicio.tsx';
 import { useCabeceraDeLaSesion } from './datos/useCabeceraDeLaSesion.ts';
 import { useCatalogoPermitido, type CatalogoDeLaSesion } from './datos/useCatalogoPermitido.ts';
 import { traducirCatalogo } from './catalogo.ts';
@@ -311,6 +312,11 @@ function ArmazonDelSistema({ vuelta }: { readonly vuelta: VueltaFallida | null }
         escudo={<Icono nombre="escudo" tamano={28} />}
         catalogo={catalogo}
         cuenta={cabecera.cuenta}
+        // El ejercicio de trabajo, en el hueco que el armazon reserva para el control de la sesion
+        // (#391). Es la unica escritura que el backend sirve a esta interfaz, y hasta #391 no tenia
+        // donde pulsarse: `seg-aud` y `territorio` mandaban a «Seguridad · Sistema», que no escribe.
+        // `marco` no se pasa: ver el javadoc de `sesion/MandoDelEjercicio.tsx`.
+        enLaBarra={<MandoDelEjercicio />}
         opcionesDeSesion={[
           {
             rotulo: t('Mi perfil'),

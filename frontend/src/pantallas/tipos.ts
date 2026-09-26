@@ -139,9 +139,10 @@ export const VERBOS_QUE_ESCRIBEN: ReadonlySet<Verbo> = new Set<Verbo>(['POST', '
  *
  * Que la pantalla pueda guardar hoy. No puede: de las 15, la unica cuya escritura el backend sirve
  * es `seg-sis` —`PUT /seguridad/sesion/ejercicio`, la unica escritura encendida de esta interfaz—
- * y ni siquiera esa pasa por el pie. Lo que afirma es lo que el artboard dice de la hoja: que lo
- * que se hace ahi es escribir. Que el boton llegue a hacerlo es otro asunto, y `ACCIONES` es quien
- * lo tiene.
+ * y ni siquiera esa pasa por el pie: desde #391 se fija con el mando de la barra
+ * (`sesion/MandoDelEjercicio.tsx`), no desde `seg-sis`. Lo que afirma es lo que el artboard dice de
+ * la hoja: que lo que se hace ahi es escribir. Que el boton llegue a hacerlo es otro asunto, y
+ * `ACCIONES` es quien lo tiene.
  */
 export function laHojaEscribe(hoja: Hoja): boolean {
   return hoja.operaciones.some((operacion) => VERBOS_QUE_ESCRIBEN.has(operacion.verbo));

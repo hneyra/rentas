@@ -28,7 +28,7 @@ import { catalogoDeClaves } from '../src/i18n/catalogo-de-claves.ts';
  *
  * <h2>Y por que el locale se REGENERA en vez de escribirse</h2>
  *
- * Porque son `MEDIDO: 967 entradas de es.json`, y salen del dato: a mano se quedan viejas a la
+ * Porque son `MEDIDO: 979 entradas de es.json`, y salen del dato: a mano se quedan viejas a la
  * primera pantalla nueva. `KAMAYUK_REGENERAR=1 yarn vitest run verificaciones/el-locale-esta-completo` lo
  * vuelve a escribir, que es el mismo trato que `kamayuk-lib` da a su archivo de temas.
  */
@@ -114,6 +114,22 @@ const LITERALES = [
   'Claro',
   'Oscuro',
   'El del sistema',
+  // Las del mando del ejercicio de la barra (#391), escritas como `t('…')`; y el NOMBRE de la
+  // opcion que falta, que se lee por variable —`t(CAMBIAR_EL_EJERCICIO.nombre)`— como los dos de
+  // #311, y por eso `i18next-cli` no lo ve.
+  'Ejercicio',
+  'sin fijar',
+  'Ejercicio de trabajo: {{valor}}. Cambiarlo queda registrado.',
+  'Cambiar el ejercicio de trabajo pide el privilegio especial sobre «{{opcion}}», que esta cuenta no tiene.',
+  'Cambiar el año de trabajo',
+  'Cambiar el ejercicio de trabajo',
+  'El ejercicio es de la sesion, no de esta pestana: al cambiarlo cambia para todos los modulos. Queda registrado con su observacion y con la cuenta que lo cambio.',
+  'El ano de trabajo. Si no se admite, el sistema lo dira.',
+  'AAAA',
+  'Observacion',
+  'Por que se cambia. Queda en la auditoria junto con la cuenta que lo cambio.',
+  'Cancelar',
+  'Cambiar el ejercicio',
 ] as const;
 
 /** Lo que el plural tiene que decir, que es lo unico que no puede ser su clave. */

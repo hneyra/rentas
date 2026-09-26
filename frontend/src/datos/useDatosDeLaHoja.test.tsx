@@ -461,6 +461,17 @@ describe('una pantalla que es de un ejercicio de la sesion', () => {
     await waitFor(() => {
       expect(result.current.ausencia.enElCampo).toBe('falta el ejercicio');
     });
+    // **Y el remedio que dice se puede seguir** (#391). Hasta #391 mandaba a «Seguridad · Sistema»,
+    // una definicion interpretada sin conector cuyo desplegable no manda nada: la frase se fija
+    // ENTERA, porque lo que estaba mal no era la palabra del hueco sino a donde mandaba.
+    expect(result.current.ausencia.explicacion).toBe(
+      'Esta pantalla es de un ejercicio concreto, y la sesion no tiene ninguno fijado. Se fija ' +
+        'con el mando «Ejercicio» de la barra de arriba, que se ofrece a las cuentas con permiso ' +
+        'para cambiarlo, y vale para todos los modulos a la vez. Hasta que lo tenga no se pide ' +
+        'nada, porque el ano de hoy no es el ejercicio de trabajo de nadie y una bitacora del ' +
+        'ejercicio equivocado contesta igual de bien que la correcta.',
+    );
+    expect(result.current.ausencia.explicacion).not.toContain('Seguridad · Sistema');
     // **Ni una ida a la bitacora.** Lo contrario seria mandarla sin el parametro y ensenar el 422
     // como si fuera una averia; y lo OTRO contrario —poner el ano de hoy— seria ensenar la
     // bitacora de un ejercicio que nadie eligio, con cara de ser la buena.

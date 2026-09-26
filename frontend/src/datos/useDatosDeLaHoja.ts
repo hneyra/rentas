@@ -91,14 +91,25 @@ const SIN_SUJETO: Ausencia = {
  *
  * **No es un caso teorico**: medido contra la instalacion, la cuenta `administrador` contesta
  * `ejercicioDeTrabajo: null` (ver `sesionMedida.ts`). Es el estado que hay hoy, no el raro.
+ *
+ * <h2>El remedio que dice tiene que poder seguirse (#391)</h2>
+ *
+ * Hasta #391 mandaba a fijarlo «en Seguridad · Sistema», y alli no se escribe nada: `seg-sis` es
+ * una definicion interpretada sin conector, y su desplegable y su motivo no mandan ninguna
+ * peticion. La cuenta seguia el remedio, volvia y leia la misma frase — atribuyendole a un paso
+ * que ya habia dado el no poder abrir la hoja. Hoy el sitio es el mando «Ejercicio» de la barra
+ * (`sesion/MandoDelEjercicio.tsx`), que hace el `PUT /seguridad/sesion/ejercicio`; y como solo se
+ * ofrece a quien tiene `especial` sobre `cambiar_anio`, la frase lo dice en vez de prometerselo a
+ * cualquiera. La fija entera `useDatosDeLaHoja.test.tsx`.
  */
 const SIN_EJERCICIO: Ausencia = {
   enElCampo: 'falta el ejercicio',
   explicacion:
-    'Esta pantalla es de un ejercicio concreto, y la sesion no tiene ninguno fijado: se fija en ' +
-    'Seguridad · Sistema, y vale para todos los modulos a la vez. Hasta que lo tenga no se pide ' +
-    'nada, porque el ano de hoy no es el ejercicio de trabajo de nadie y una bitacora del ' +
-    'ejercicio equivocado contesta igual de bien que la correcta.',
+    'Esta pantalla es de un ejercicio concreto, y la sesion no tiene ninguno fijado. Se fija con ' +
+    'el mando «Ejercicio» de la barra de arriba, que se ofrece a las cuentas con permiso para ' +
+    'cambiarlo, y vale para todos los modulos a la vez. Hasta que lo tenga no se pide nada, ' +
+    'porque el ano de hoy no es el ejercicio de trabajo de nadie y una bitacora del ejercicio ' +
+    'equivocado contesta igual de bien que la correcta.',
   tono: 'info',
 };
 
@@ -147,6 +158,14 @@ const VACIO: Ausencia = {
  * sea claves, y el inventario del locale las deriva de alli (ver `i18n/catalogo-de-claves.ts`). El
  * `detalle` que viene del backend no es ninguna clave, y `t()` devuelve tal cual lo que no conoce
  * —sin separadores de espacio de nombre, ver `i18n.ts`—, asi que pasarlo no le hace nada.
+ *
+ * <h2>Lo llama tambien el mando del ejercicio (#391)</h2>
+ *
+ * Es la primera escritura de esta interfaz que se puede pulsar, y lo que contesta cuando no la
+ * acepta —el 422 de una observacion corta o de un ejercicio fuera de rango, un 403 sin el
+ * privilegio— es un peldano de la misma escalera. Dibujarlo aqui y alli con la misma frase es lo
+ * que evita dos escaleras que dicen cosas distintas del mismo 403; y asi `api/escalera.ts` sigue
+ * teniendo un solo consumidor que la dibuja, que es lo que vigila `escalera.test.ts`.
  */
 function alFallar(
   error: unknown,
