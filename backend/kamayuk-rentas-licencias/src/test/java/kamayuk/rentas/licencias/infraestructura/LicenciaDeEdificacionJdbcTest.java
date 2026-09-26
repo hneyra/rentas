@@ -674,6 +674,81 @@ class LicenciaDeEdificacionJdbcTest {
                     .isZero();
         }
 
+        /**
+         * #452 — La ficha y la emision dicen lo mismo de lo que falta.
+         *
+         * <p>La regla estaba escrita dos veces: la ficha daba por buenas las secciones con que no
+         * estuvieran vacias, y la emision exigia los dos profesionales que firman y un documento
+         * presentado. Con listas vacias —la siembra de las demas pruebas— coincidian. La que las
+         * separa es la parcial: un proyectista de estructuras solo y un plano sin presentar.
+         */
+        @Test
+        @DisplayName(
+                "#452 — con secciones a medias, la ficha dice lo que la emision rechaza: la misma"
+                        + " regla")
+        void laFichaYLaEmisionDicenLoMismo() {
+            String expediente =
+                    presentarFue(TipoDeTramiteDeEdificacion.LICENCIA_DE_OBRA, null, HOY);
+            String recibo = cobrar(DERECHO_EDIFICACION);
+            enContexto(() -> completar.completarTerreno(expediente, terreno("A", "3"), PORQUE));
+            enContexto(() -> completar.completarProyecto(expediente, proyecto(), PORQUE));
+            enContexto(
+                    () ->
+                            completar.completarValorizacion(
+                                    expediente,
+                                    List.of(
+                                            new CompletarSeccionDelFue.Estructura(
+                                                    1,
+                                                    PartidaDeEdificacion.MUROS,
+                                                    'A',
+                                                    new AreaM2(new BigDecimal("40.00")))),
+                                    PORQUE));
+            enContexto(
+                    () ->
+                            completar.completarProfesionales(
+                                    expediente,
+                                    List.of(
+                                            new CompletarSeccionDelFue.Profesional(
+                                                    TipoDeProfesional.PROYECTISTA_ESTRUCTURAS,
+                                                    "HUAMAN, LUIS",
+                                                    "CIP",
+                                                    "45211")),
+                                    PORQUE));
+            enContexto(
+                    () ->
+                            completar.completarDocumentos(
+                                    expediente,
+                                    List.of(
+                                            new CompletarSeccionDelFue.Requisito(
+                                                    "PLANOS DE ARQUITECTURA", false, null)),
+                                    PORQUE));
+
+            ConsultaDeFue.FichaDelFue ficha =
+                    enContexto(() -> consulta.porExpediente(expediente, HOY)).orElseThrow();
+            EmitirLicenciaDeEdificacion.SeccionesIncompletas rechazo =
+                    org.assertj.core.api.Assertions.catchThrowableOfType(
+                            EmitirLicenciaDeEdificacion.SeccionesIncompletas.class,
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    emitir.emitir(
+                                                            expediente,
+                                                            HOY,
+                                                            HOY.plusMonths(36),
+                                                            recibo,
+                                                            FormatoDeDocumento.PDF,
+                                                            PORQUE)));
+
+            assertThat(rechazo).as("la emision la rechaza: faltan quienes firman").isNotNull();
+            assertThat(ficha.seccionesFaltantes())
+                    .as(
+                            "la ficha tiene que decir lo mismo que la emision: si dice que no falta"
+                                    + " nada, la ventanilla manda al administrado a un rechazo")
+                    .containsExactlyElementsOf(rechazo.faltantes())
+                    .containsExactly(SeccionDelFue.PROFESIONALES, SeccionDelFue.DOCUMENTOS);
+            assertThat(ficha.estaCompleto()).isFalse();
+        }
+
         @Test
         @DisplayName("completar una seccion dos veces la VERSIONA: la anterior queda entera")
         void seVersiona() {

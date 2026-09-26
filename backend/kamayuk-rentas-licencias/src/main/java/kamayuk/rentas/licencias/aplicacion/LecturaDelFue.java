@@ -1,7 +1,6 @@
 package kamayuk.rentas.licencias.aplicacion;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +24,7 @@ import kamayuk.rentas.licencias.dominio.ProfesionalDelFue;
 import kamayuk.rentas.licencias.dominio.ProyectoDelFue;
 import kamayuk.rentas.licencias.dominio.RequisitoDelFue;
 import kamayuk.rentas.licencias.dominio.SeccionDelFue;
+import kamayuk.rentas.licencias.dominio.SeccionesDelFue;
 import kamayuk.rentas.licencias.dominio.TerrenoDelFue;
 import kamayuk.rentas.licencias.dominio.TipoDeMovimientoDeEdificacion;
 import kamayuk.rentas.licencias.dominio.VigenciaDeLaLicencia;
@@ -204,26 +204,15 @@ public class LecturaDelFue {
                 contribuyentes.porIds(Set.of(fue.contribuyenteId()));
         List<EstructuraDelProyecto> estructuras = expedientes.valorizacionVigente(id);
 
-        List<SeccionDelFue> faltantes = new ArrayList<>();
         Optional<TerrenoDelFue> terreno = expedientes.terrenoVigente(id);
         Optional<ProyectoDelFue> proyecto = expedientes.proyectoVigente(id);
         List<ProfesionalDelFue> profesionales = expedientes.profesionalesVigentes(id);
         List<RequisitoDelFue> requisitos = expedientes.requisitosVigentes(id);
-        if (terreno.isEmpty()) {
-            faltantes.add(SeccionDelFue.TERRENO);
-        }
-        if (proyecto.isEmpty()) {
-            faltantes.add(SeccionDelFue.PROYECTO);
-        }
-        if (estructuras.isEmpty()) {
-            faltantes.add(SeccionDelFue.VALORIZACION);
-        }
-        if (profesionales.isEmpty()) {
-            faltantes.add(SeccionDelFue.PROFESIONALES);
-        }
-        if (requisitos.isEmpty()) {
-            faltantes.add(SeccionDelFue.DOCUMENTOS);
-        }
+        // Lo que falta lo decide la misma regla que la emision (#452): una seccion a medias no
+        // es una seccion completa porque no este vacia.
+        List<SeccionDelFue> faltantes =
+                new SeccionesDelFue(terreno, proyecto, estructuras, profesionales, requisitos)
+                        .faltantes();
 
         return new DatosDeLaFicha(
                 filaDe(
@@ -240,7 +229,7 @@ public class LecturaDelFue {
                 requisitos,
                 historial,
                 vigencias,
-                List.copyOf(faltantes),
+                faltantes,
                 fechaDelActo(fue, historial));
     }
 
