@@ -133,6 +133,9 @@ class DeterminacionVehicularDeUnSoloConjuntoTest {
                 .numero("VEHICULAR_ALICUOTA", null, ValorNormativo.de(alicuota))
                 .numero("VEHICULAR_MINIMO_UIT", null, ValorNormativo.de("1.5"))
                 .numero("UIT", null, ValorNormativo.de(uit))
+                // Desde #378 el impuesto se redondea en su punto, con la politica del conjunto.
+                .numero("REDONDEO", "IMPUESTO_VEHICULAR", ValorNormativo.de("2"))
+                .texto("REDONDEO", "IMPUESTO_VEHICULAR", "HALF_UP")
                 .construir();
     }
 
