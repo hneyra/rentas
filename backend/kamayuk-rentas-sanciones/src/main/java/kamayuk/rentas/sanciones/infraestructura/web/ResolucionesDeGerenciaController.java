@@ -1,6 +1,8 @@
 package kamayuk.rentas.sanciones.infraestructura.web;
 
 import java.time.LocalDate;
+import java.util.EnumSet;
+import java.util.Set;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
@@ -128,7 +130,7 @@ public class ResolucionesDeGerenciaController {
     @RequiereAcceso(acceso = ACCESO_ORDINARIA, privilegio = Privilegio.REGISTRO)
     public DiligenciaResource notificarDeTransito(
             @PathVariable String numero, @RequestBody PeticionDeNotificacionDeResolucion peticion) {
-        return diligenciar(numero, peticion);
+        return diligenciar(numero, DE_TRANSITO, peticion);
     }
 
     /** La cédula de notificación de una resolución administrativa. */
@@ -137,7 +139,7 @@ public class ResolucionesDeGerenciaController {
     @RequiereAcceso(acceso = ACCESO_NOTIFICACION, privilegio = Privilegio.REGISTRO)
     public DiligenciaResource notificarAdministrativa(
             @PathVariable String id, @RequestBody PeticionDeNotificacionDeResolucion peticion) {
-        return diligenciar(id, peticion);
+        return diligenciar(id, ADMINISTRATIVAS, peticion);
     }
 
     // ------------------------------------------------------------------
@@ -201,14 +203,28 @@ public class ResolucionesDeGerenciaController {
         }
     }
 
+    /**
+     * Lo que cada ruta de notificacion notifica (#415). Las dos llevan accesos distintos, y el caso
+     * de uso comprueba el tipo: por la puerta de un perfil no se diligencia la resolucion del otro.
+     */
+    private static final Set<TipoDeResolucionDeGerencia> DE_TRANSITO =
+            EnumSet.of(
+                    TipoDeResolucionDeGerencia.ORDINARIA, TipoDeResolucionDeGerencia.SANCIONADORA);
+
+    private static final Set<TipoDeResolucionDeGerencia> ADMINISTRATIVAS =
+            EnumSet.of(TipoDeResolucionDeGerencia.ADMINISTRATIVA);
+
     private DiligenciaResource diligenciar(
-            String numero, PeticionDeNotificacionDeResolucion peticion) {
+            String numero,
+            Set<TipoDeResolucionDeGerencia> admitidos,
+            PeticionDeNotificacionDeResolucion peticion) {
 
         Observacion observacion = PeticionesDeSanciones.observacionDe(peticion.observacion());
         try {
             NotificarResolucionDeGerencia.Diligencia diligencia =
                     notificar.registrar(
                             numero,
+                            admitidos,
                             new NotificarResolucionDeGerencia.Peticion(
                                     PeticionesDeSanciones.fechaDe(
                                             peticion.fechaDeNotificacion(), "fechaDeNotificacion"),
