@@ -50,11 +50,14 @@ public interface MovimientosDelLibro {
     /**
      * El historial de pagos del contribuyente, entre dos fechas opcionales, paginado (RF-048).
      *
-     * <p>Un pago es un asiento {@code ABONO} de concepto {@code PAGO}. Los demas abonos no salen
-     * todos por {@link #altasYBajasDe}: ahi van solo los que nacen de un <b>acto</b> de alta o de
-     * baja (#640), y el abono con que una cobranza cancela el insoluto no es ninguna de las dos
-     * cosas. La distincion la mantiene {@code cuentacorriente} y no quien pregunta, que es justo el
-     * conocimiento que este puerto existe para no repartir.
+     * <p>Un pago es un asiento de dinero que entro por caja: el {@code ABONO} con que una cobranza
+     * extingue una parte del desglose —insoluto, reajuste, interes o gasto—, que no nacio de una
+     * baja de deuda y que nadie ha reversado (#447). No es un abono de concepto {@code PAGO}, que
+     * ningun camino de cobranza escribe. Un abono de cobranza no sale por {@link #altasYBajasDe}:
+     * ahi van solo los que nacen de un <b>acto</b> de alta o de baja (#640). La distincion la
+     * mantiene {@code cuentacorriente} y no quien pregunta, que es justo el conocimiento que este
+     * puerto existe para no repartir; y es la misma que cuenta la recaudacion, de modo que lo
+     * recaudado es la suma de estos pagos.
      *
      * <p>Paginado, a diferencia de {@link ConsultaDeDeudaPublica#todasDe}: las obligaciones con
      * deuda de un contribuyente son pocas, pero sus pagos son los de todos los anios que lleve

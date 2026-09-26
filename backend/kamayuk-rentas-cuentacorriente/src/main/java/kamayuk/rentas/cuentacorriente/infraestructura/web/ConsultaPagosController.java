@@ -21,9 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * {@code consulta_pagos}: {@code GET /api/v1/consultas/pagos} (RF-048, #25).
  *
- * <p>El historial de pagos de un contribuyente: cada fila es el asiento {@code ABONO} de concepto
- * {@code PAGO} con que se registro el cobro, con su {@code documentoOrigen} como recibo y su fecha
- * valor (regla 9, RNF-075). Reusa {@link AsientoResource}, la misma forma que {@code
+ * <p>El historial de pagos de un contribuyente: cada fila es uno de los asientos {@code ABONO} con
+ * que la cobranza extinguio una parte del desglose —insoluto, reajuste, interes o gasto—, con su
+ * {@code documentoOrigen} como recibo y su fecha valor (regla 9, RNF-075). Un recibo que cobra tres
+ * partes son tres filas. Las bajas de deuda y los cobros anulados no salen; el criterio es el mismo
+ * que el de la recaudacion (#447). Reusa {@link AsientoResource}, la misma forma que {@code
  * consulta_altas_bajas} —es la misma tabla, filtrada distinto—.
  *
  * <p><b>{@code medioDePago} es un filtro que el contrato declara y esta pantalla no resuelve</b>:

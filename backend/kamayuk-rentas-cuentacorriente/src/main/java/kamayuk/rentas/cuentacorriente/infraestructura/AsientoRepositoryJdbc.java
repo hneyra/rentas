@@ -307,6 +307,17 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
                 AsientoRepositoryJdbc::mapear);
     }
 
+    /**
+     * El historial de pagos de un contribuyente (RF-048): un asiento por fila, cada uno de los que
+     * {@link #ES_DINERO_COBRADO} reconoce como dinero que entro por caja (#447).
+     *
+     * <p>Hasta #447 filtraba por un {@code ABONO} de concepto {@code PAGO}, que <b>ningun camino de
+     * cobranza escribe</b> —la cobranza abona las cuatro partes del desglose—, asi que la operacion
+     * devolvia cero filas de cualquier contribuyente que hubiera pagado. Ahora pregunta lo mismo
+     * que {@link #recaudacion} y con el mismo texto: si las dos cadenas fueran distintas, el panel
+     * contaria como recaudado un recibo que el historial del contribuyente no enseña, o al reves, y
+     * ninguna de las dos pareceria mal.
+     */
     @Override
     public Pagina<Asiento> pagos(CriterioDePagos criterio, Paginacion paginacion) {
         List<String> condiciones = new ArrayList<>();
@@ -314,12 +325,7 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
 
         condiciones.add("c.codigo_contribuyente = :codigo");
         parametros.put("codigo", criterio.codigoContribuyente());
-        // Un pago es un ABONO de concepto PAGO (ver CriterioDePagos). Los demas abonos no
-        // son todos «movimientos de deuda»: el de una cobranza tambien es un ABONO de
-        // INSOLUTO, y desde #640 lo que separa un acto de un cobro es `acto`, no el
-        // concepto.
-        condiciones.add("a.tipo = 'ABONO'");
-        condiciones.add("a.concepto = 'PAGO'");
+        condiciones.add(ES_DINERO_COBRADO);
 
         if (criterio.desde() != null) {
             condiciones.add("a.fecha_valor >= :desde");
@@ -440,17 +446,47 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
      * alta ni de una baja —una emision, una cobranza, una reversion— y {@code <>} descartaria esas
      * filas enteras, que son casi todas.
      */
-    private static final String NO_ES_UNA_BAJA_DE_DEUDA =
-            "   AND a.acto IS DISTINCT FROM 'BAJA_DEUDA'";
+    private static final String NO_ES_UNA_BAJA_DE_DEUDA = "a.acto IS DISTINCT FROM 'BAJA_DEUDA'";
+
+    /**
+     * Que asiento es <b>dinero que entro</b> por caja: la unica respuesta del libro, y la comparten
+     * {@link #recaudacion} y {@link #pagos} (#447).
+     *
+     * <p>Cuatro condiciones, y cada una deja fuera una forma que el libro si escribe:
+     *
+     * <ul>
+     *   <li>{@code tipo = 'ABONO'}: el cargo con que la cobranza cristaliza el devengo no es dinero
+     *       que entro, y la reversion de un abono se escribe como cargo;
+     *   <li>los cuatro {@link #CONCEPTOS_DE_COBRANZA}: el par {@code AJUSTE} de un pase a valor, la
+     *       condonacion o el acogimiento a un convenio mueven deuda, no la cobran;
+     *   <li>{@link #NO_ES_UNA_BAJA_DE_DEUDA}: el abono de una baja es un {@code ABONO INSOLUTO}
+     *       columna a columna igual que el de un cobro;
+     *   <li>que <b>nadie lo haya reversado</b>: un recibo anulado conserva sus asientos (V2), y
+     *       contarlo daria por cobrado un recibo que ya no vale.
+     * </ul>
+     *
+     * <p>Existe como constante y no como dos copias porque hubo dos copias: {@link #pagos}
+     * preguntaba por un concepto {@code PAGO} que nadie escribe mientras {@link #recaudacion}
+     * contaba los cobros de verdad, y el historial de pagos salia vacio de cualquier contribuyente
+     * que hubiera pagado sin que ninguna prueba lo notara. Va entre parentesis para que se pueda
+     * encadenar con {@code AND} en cualquier sitio de un {@code WHERE}.
+     */
+    private static final String ES_DINERO_COBRADO =
+            "(a.tipo = 'ABONO'"
+                    + " AND a.concepto IN "
+                    + CONCEPTOS_DE_COBRANZA
+                    + " AND "
+                    + NO_ES_UNA_BAJA_DE_DEUDA
+                    + " AND NOT EXISTS ("
+                    + "       SELECT 1 FROM cuenta_corriente_asiento r"
+                    + "        WHERE r.municipalidad_id = a.municipalidad_id"
+                    + "          AND r.asiento_reversado_id = a.id))";
 
     /**
      * Lo cobrado de esos tributos entre dos fechas, agregado en el motor (#53, RF-073, RF-074).
      *
-     * <p>Los tres filtros dicen lo mismo que su contrato: {@code tipo = 'ABONO'} —el cargo con que
-     * la cobranza cristaliza el devengo no es dinero que entro—, los cuatro {@link
-     * #CONCEPTOS_DE_COBRANZA} —los otros abonos mueven deuda, no la cobran— y que <b>nadie lo haya
-     * reversado</b>, porque un recibo anulado conserva sus asientos (V2) y sumarlos daria por
-     * recaudado un recibo que ya no vale.
+     * <p>Lo que cuenta es {@link #ES_DINERO_COBRADO}, el mismo criterio con que {@link #pagos}
+     * lista el historial de cada contribuyente (#447): lo recaudado es la suma de esos pagos.
      *
      * <p>El mes sale de {@code fecha_valor} y el ejercicio de la columna homonima: son cosas
      * distintas y las dos ciertas. Un recibo de marzo de 2026 que cobra deuda de 2025 cae en el mes
@@ -495,17 +531,11 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
                 + "       CAST(extract(month FROM a.fecha_valor) AS integer) AS mes,"
                 + "       a.fase, sum(a.monto) AS recaudado, count(*) AS abonos"
                 + DESDE
-                + " WHERE a.tipo = 'ABONO'"
+                + " WHERE "
+                + ES_DINERO_COBRADO
                 + filtroDeTributo
-                + "   AND a.concepto IN "
-                + CONCEPTOS_DE_COBRANZA
-                + NO_ES_UNA_BAJA_DE_DEUDA
                 + "   AND a.fecha_valor >= :desde"
                 + "   AND a.fecha_valor <= :hasta"
-                + "   AND NOT EXISTS ("
-                + "         SELECT 1 FROM cuenta_corriente_asiento r"
-                + "          WHERE r.municipalidad_id = a.municipalidad_id"
-                + "            AND r.asiento_reversado_id = a.id)"
                 + " GROUP BY a.tributo, a.ejercicio,"
                 + "          extract(month FROM a.fecha_valor), a.fase"
                 + " ORDER BY a.tributo, a.ejercicio,"
