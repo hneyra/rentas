@@ -152,10 +152,12 @@ class DeterminarArbitriosTest {
                                 return ParametrosSellados.de(ejercicio, 1).construir();
                             }
 
+                            // Desde #361 el caso de uso lee los parametros por el id que
+                            // resolvio: el conjunto es el mismo, y sigue sin tasas.
                             @Override
                             public ParametrosSellados porConjunto(
                                     IdentificadorDeConjunto identificador) {
-                                throw new UnsupportedOperationException();
+                                return vigenteEn(EJERCICIO);
                             }
 
                             @Override
@@ -188,7 +190,12 @@ class DeterminarArbitriosTest {
 
             @Override
             public ParametrosSellados porConjunto(IdentificadorDeConjunto identificador) {
-                throw new UnsupportedOperationException("esta prueba no recalcula");
+                // No recalcula, pero desde #361 lee los parametros por el id que acaba de
+                // resolver: una sola resolucion, y las tasas del mismo conjunto que se guarda.
+                if (identificador.valor() != CONJUNTO) {
+                    throw new ConjuntoNoSellado(identificador);
+                }
+                return vigenteEn(EJERCICIO);
             }
 
             @Override

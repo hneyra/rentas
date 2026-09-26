@@ -7,6 +7,7 @@ import kamayuk.rentas.coactiva.dominio.TipoDeActoCoactivo;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametroSinPublicar;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -71,10 +72,9 @@ public class ArancelDeCostasParametrizado {
     /** El arancel que rige a esa fecha, resuelto de un solo conjunto. */
     public Vigente aLaFechaDe(LocalDate fechaDeLaLiquidacion) {
         Ejercicio ejercicio = Ejercicio.de(fechaDeLaLiquidacion);
-        return new Vigente(
-                ejercicio,
-                parametros.vigenteEn(ejercicio),
-                parametros.conjuntoVigenteEn(ejercicio).valor());
+        // Una resolucion, no dos (#361): los parametros y el id del mismo conjunto.
+        ConjuntoVigente conjunto = parametros.vigenteConSuConjunto(ejercicio);
+        return new Vigente(ejercicio, conjunto.parametros(), conjunto.id());
     }
 
     /**

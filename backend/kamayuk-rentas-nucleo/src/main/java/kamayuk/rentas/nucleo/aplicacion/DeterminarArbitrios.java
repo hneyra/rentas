@@ -22,6 +22,7 @@ import kamayuk.rentas.nucleo.dominio.arbitrios.CuotaDeArbitrio;
 import kamayuk.rentas.nucleo.dominio.arbitrios.CuotaDeArbitrioRepository;
 import kamayuk.rentas.nucleo.dominio.arbitrios.Servicio;
 import kamayuk.rentas.nucleo.dominio.arbitrios.TitularPrincipalRepository;
+import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.springframework.stereotype.Service;
@@ -98,8 +99,10 @@ public class DeterminarArbitrios {
                         .principalDe(predioId, fecha)
                         .orElseThrow(() -> new PredioSinTitular(predioId));
 
-        ParametrosSellados sellados = parametros.vigenteEn(ejercicio);
-        long conjuntoId = parametros.conjuntoVigenteEn(ejercicio).valor();
+        // Una resolucion, no dos (#361): los parametros y el id del mismo conjunto.
+        ConjuntoVigente conjunto = parametros.vigenteConSuConjunto(ejercicio);
+        ParametrosSellados sellados = conjunto.parametros();
+        long conjuntoId = conjunto.id();
 
         String claveDeTasa =
                 caracteristicasDelPredio.sectorCodigo() + ":" + caracteristicasDelPredio.uso();

@@ -6,6 +6,7 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Un {@link LectorDeParametros} con los plazos que la prueba decide.
@@ -23,6 +24,9 @@ public final class ParametrosDeMentira implements LectorDeParametros {
     private final Map<String, String> textos = new LinkedHashMap<>();
 
     private boolean sinSellar;
+
+    /** El ejercicio de la ultima resolucion: {@link #CONJUNTO} es el suyo. */
+    private @Nullable Ejercicio ultimoResuelto;
 
     /**
      * Ningun conjunto sellado rige el ejercicio, que es lo que ocurre <b>hoy</b> en todas las
@@ -57,9 +61,22 @@ public final class ParametrosDeMentira implements LectorDeParametros {
         return constructor.construir();
     }
 
+    /**
+     * Los parametros del conjunto que este doble resolvio por ultima vez.
+     *
+     * <p>Hasta #361 lanzaba {@code UnsupportedOperationException} —«#39 no recalcula»—, y era
+     * cierto mientras {@code PlazosParametrizados} pedia los parametros por ejercicio. Desde #361
+     * los pide <b>por el identificador</b> que acaba de resolver, que es lo que hace que los dos
+     * salgan del mismo conjunto: {@link #CONJUNTO} es el del ultimo ejercicio preguntado, y
+     * cualquier otro no esta sellado.
+     */
     @Override
     public ParametrosSellados porConjunto(IdentificadorDeConjunto identificador) {
-        throw new UnsupportedOperationException("#39 no recalcula: resuelve por ejercicio");
+        Ejercicio delConjunto = ultimoResuelto;
+        if (delConjunto == null || identificador.valor() != CONJUNTO) {
+            throw new ConjuntoNoSellado(identificador);
+        }
+        return vigenteEn(delConjunto);
     }
 
     @Override
@@ -67,6 +84,7 @@ public final class ParametrosDeMentira implements LectorDeParametros {
         if (sinSellar) {
             throw new EjercicioSinSellar(ejercicio);
         }
+        ultimoResuelto = ejercicio;
         return IdentificadorDeConjunto.de(CONJUNTO);
     }
 }

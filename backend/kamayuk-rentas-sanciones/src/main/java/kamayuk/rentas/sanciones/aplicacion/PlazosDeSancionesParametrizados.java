@@ -10,6 +10,7 @@ import java.util.Set;
 import kamayuk.rentas.dominio.CalendarioHabil;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Plazo;
+import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametroSinPublicar;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -82,10 +83,9 @@ public class PlazosDeSancionesParametrizados {
     /** Los plazos de sanciones que rigen a esa fecha, resueltos una sola vez. */
     public Vigentes aLaFechaDe(LocalDate fechaDelHecho) {
         Ejercicio ejercicio = Ejercicio.de(fechaDelHecho);
-        return new Vigentes(
-                ejercicio,
-                parametros.vigenteEn(ejercicio),
-                parametros.conjuntoVigenteEn(ejercicio).valor());
+        // Una resolucion, no dos (#361): los parametros y el id del mismo conjunto.
+        ConjuntoVigente conjunto = parametros.vigenteConSuConjunto(ejercicio);
+        return new Vigentes(ejercicio, conjunto.parametros(), conjunto.id());
     }
 
     /**

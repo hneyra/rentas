@@ -225,6 +225,9 @@ public class DeterminarPredial {
                                 () -> new ContribuyenteInexistente(peticion.codContribuyente()));
         exigirQueNoHayaUnBeneficioSinRegla(contribuyente, peticion.ejercicio());
 
+        // La UNICA resolucion del conjunto en toda la determinacion (#361): de ella salen el
+        // cuadro, el redondeo, el derecho, los vencimientos y el `conjunto_id` que se guarda, y
+        // `calcular` la recibe en vez de volver a preguntar.
         CuadroPredialParametrizado.Vigente vigente = cuadro.vigenteEn(peticion.ejercicio());
         PoliticasDeRedondeo redondeo = vigente.redondeo();
 
@@ -247,12 +250,7 @@ public class DeterminarPredial {
 
         Determinacion calculada =
                 registro.calcular(
-                        peticion.ejercicio(),
-                        contribuyente.id(),
-                        detalle,
-                        tramos,
-                        minimo,
-                        peticion.modalidad());
+                        vigente, contribuyente.id(), detalle, tramos, minimo, peticion.modalidad());
 
         List<AporteDeTramo> aportes =
                 TramosProgresivosAcumulativos.desglosar(calculada.baseImponible(), tramos);

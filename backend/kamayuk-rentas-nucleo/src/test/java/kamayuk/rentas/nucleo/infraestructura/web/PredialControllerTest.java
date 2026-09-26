@@ -1992,7 +1992,7 @@ class PredialControllerTest {
                                 beneficios.getOrDefault(contribuyenteId, List.of()).stream()
                                         .filter(beneficio -> beneficio.rigeEn(fecha))
                                         .toList(),
-                        new RegistrarDeterminacionPredial(determinaciones, lector, auditoria),
+                        new RegistrarDeterminacionPredial(determinaciones, auditoria),
                         RELOJ);
         /* El rastro de la corrida (#523) va contra un repositorio en memoria: lo que
         esta prueba mira es el transporte, y que la corrida se escriba de verdad lo

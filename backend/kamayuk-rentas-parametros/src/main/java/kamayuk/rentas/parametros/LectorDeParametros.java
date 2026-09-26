@@ -21,6 +21,11 @@ import kamayuk.rentas.dominio.Ejercicio;
  * <p>Confundirlas es el defecto que ARQ-09 §3 describe: si entre la emision y el recalculo se sello
  * una version nueva —un arancel corregido, una ordenanza modificada a mitad de ano—, resolver por
  * ejercicio devuelve otros parametros y el recalculo da otra cifra, sin ningun error de por medio.
+ *
+ * <p><b>Quien necesita los parametros Y el identificador —para calcular y para guardar con que se
+ * calculo— los pide juntos, con {@link #vigenteConSuConjunto}</b> (#361). Pedir {@link #vigenteEn}
+ * y despues {@link #conjuntoVigenteEn} son dos resoluciones independientes, y la segunda puede
+ * contestar otro conjunto: la fila guardaria el identificador de uno y la cifra de otro.
  */
 public interface LectorDeParametros {
 
@@ -68,6 +73,30 @@ public interface LectorDeParametros {
      * sin que nada falle.
      */
     IdentificadorDeConjunto conjuntoVigenteEn(Ejercicio ejercicio);
+
+    /**
+     * El conjunto que rige hoy el ejercicio <b>con</b> sus parametros, de una sola resolucion
+     * (#361). Para quien calcula con los parametros y guarda el identificador.
+     *
+     * <h2>Por que no basta con {@link #vigenteEn} y {@link #conjuntoVigenteEn}</h2>
+     *
+     * <p>Cada una es una resolucion: en produccion, una pregunta por red a {@code normativa} con su
+     * propio repliegue al conjunto cacheado si no contesta. Dos llamadas pueden contestar dos
+     * conjuntos —un sellado entre ambas, o {@code normativa} caida en una y de vuelta en la otra—,
+     * y quien las junta guarda un identificador que no es el de las cifras con que calculo. Aqui se
+     * resuelve una vez y los parametros se leen <b>por ese identificador</b>, con {@link
+     * #porConjunto}, que ya no decide nada por red.
+     *
+     * <p><b>Por que es {@code default}</b>: por lo mismo que {@link #loQueYaEstaDescargado} —el
+     * puerto lo implementan veintitantos dobles de prueba—, y porque la composicion es la correcta
+     * para cualquier implementacion que cumpla el contrato de las otras dos. La de produccion,
+     * {@code LectorDeParametrosCacheados}, no necesita otra: su {@link #vigenteEn} ya era
+     * exactamente esto, sin devolver el identificador.
+     */
+    default ConjuntoVigente vigenteConSuConjunto(Ejercicio ejercicio) {
+        IdentificadorDeConjunto identificador = conjuntoVigenteEn(ejercicio);
+        return new ConjuntoVigente(identificador, porConjunto(identificador));
+    }
 
     /**
      * Las senias del conjunto que este sistema <b>ya tiene descargado</b> para el ejercicio, si hay

@@ -334,13 +334,25 @@ class LaCoberturaDeLaPrescripcionJdbcTest {
                     .construir();
         }
 
+        /** El ejercicio de la ultima resolucion: el conjunto sembrado es el suyo. */
+        private Ejercicio ultimoResuelto = new Ejercicio(2026);
+
+        /**
+         * Los del conjunto sembrado, leidos por su identificador: desde #361 {@code
+         * PlazosParametrizados} resuelve el conjunto una vez y lee los parametros por el id que le
+         * salio, en vez de preguntar dos veces. Hasta entonces este doble lanzaba aqui.
+         */
         @Override
         public ParametrosSellados porConjunto(IdentificadorDeConjunto identificador) {
-            throw new UnsupportedOperationException("#39 resuelve por ejercicio del hecho");
+            if (identificador.valor() != conjunto) {
+                throw new ConjuntoNoSellado(identificador);
+            }
+            return vigenteEn(ultimoResuelto);
         }
 
         @Override
         public IdentificadorDeConjunto conjuntoVigenteEn(Ejercicio ejercicio) {
+            ultimoResuelto = ejercicio;
             return IdentificadorDeConjunto.de(conjunto);
         }
     }

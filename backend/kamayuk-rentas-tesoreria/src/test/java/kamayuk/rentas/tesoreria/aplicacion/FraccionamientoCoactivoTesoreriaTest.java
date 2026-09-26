@@ -241,9 +241,18 @@ class FraccionamientoCoactivoTesoreriaTest {
             return constructor.construir();
         }
 
+        /**
+         * El conjunto de cada ejercicio, por su identificador.
+         *
+         * <p>Hasta #361 los cuatro ejercicios contestaban el MISMO identificador —1— con cuatro
+         * contenidos distintos, y {@code porConjunto} devolvia siempre el de {@link #SELLADO}: un
+         * doble incoherente que solo funcionaba porque {@code CondicionesParametrizadas} pedia los
+         * parametros por ejercicio. Desde #361 los lee por el identificador que resolvio, asi que
+         * cada ejercicio tiene el suyo: 2026 sigue siendo el 1.
+         */
         @Override
         public ParametrosSellados porConjunto(IdentificadorDeConjunto identificador) {
-            return vigenteEn(SELLADO);
+            return vigenteEn(new Ejercicio(SELLADO.valor() - 1 + (int) identificador.valor()));
         }
 
         @Override
@@ -251,7 +260,7 @@ class FraccionamientoCoactivoTesoreriaTest {
             if (ejercicio.valor() == SIN_SELLAR) {
                 throw new EjercicioSinSellar(ejercicio);
             }
-            return IdentificadorDeConjunto.de(1);
+            return IdentificadorDeConjunto.de(ejercicio.valor() - SELLADO.valor() + 1L);
         }
     }
 }

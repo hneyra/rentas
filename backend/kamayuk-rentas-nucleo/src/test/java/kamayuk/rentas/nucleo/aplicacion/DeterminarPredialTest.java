@@ -1094,6 +1094,138 @@ class DeterminarPredialTest {
         }
     }
 
+    /**
+     * #361 — El conjunto sellado se resuelve <b>una vez</b> por determinacion.
+     *
+     * <p>Hasta #361 se resolvia cuatro: dos en {@code cuadro.vigenteEn} —los parametros por un
+     * lado, el identificador por otro— y dos en {@code RegistrarDeterminacionPredial.calcular}. De
+     * la primera salian los tramos, la UIT, el minimo, el derecho y los vencimientos; de la cuarta,
+     * el {@code conjunto_id} que se guarda. Con {@code normativa} sellando «2026 v2» a mitad de la
+     * operacion —o intermitente, con el repliegue al cacheado en una llamada y no en la otra—, la
+     * determinacion decia haber salido de un conjunto que no la produjo.
+     *
+     * <p>La siembra que lo distingue es {@link
+     * kamayuk.rentas.parametros.NormativaQueCambiaEntreLlamadas}: v1 y v2 difieren en la alicuota
+     * del tramo 1, en la UIT y en el derecho de emision. Con el doble de siempre —el mismo conjunto
+     * a cualquier pregunta— esta prueba sale verde con el defecto dentro.
+     */
+    @Nested
+    @DisplayName("#361 — una sola resolucion del conjunto por determinacion")
+    class UnaSolaResolucionDelConjunto {
+
+        @Test
+        @DisplayName(
+                "con el conjunto cambiando entre llamadas, el conjunto_id guardado reproduce el"
+                        + " monto al centimo")
+        void elConjuntoGuardadoReproduceElMonto() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+            kamayuk.rentas.parametros.NormativaQueCambiaEntreLlamadas normativa =
+                    new kamayuk.rentas.parametros.NormativaQueCambiaEntreLlamadas(
+                            IdentificadorDeConjunto.de(1L),
+                            cuadroDeLaVersion(1, "5500.00", "0.2", "4.50"),
+                            IdentificadorDeConjunto.de(2L),
+                            cuadroDeLaVersion(2, "5350.00", "0.4", "5.00"));
+
+            DeterminacionPredialCalculada determinada =
+                    servicioConElLector(normativa)
+                            .determinar(
+                                    new DeterminarPredial.Peticion(
+                                            EJERCICIO,
+                                            "C-001",
+                                            List.of(declarado(11L, "100000.00")),
+                                            ModalidadDelPredial.TRIMESTRAL,
+                                            false),
+                                    PORQUE);
+
+            int resoluciones = normativa.resoluciones();
+            Determinacion cabecera = determinada.cabecera();
+            CuadroPredialParametrizado.Vigente delGuardado =
+                    new CuadroPredialParametrizado(normativa)
+                            .delConjunto(EJERCICIO, cabecera.conjuntoId());
+            Dinero reproducido =
+                    kamayuk.rentas.nucleo.dominio.predial.MinimoImponible.aplicarSobreBase(
+                            kamayuk.rentas.nucleo.dominio.predial.TramosProgresivosAcumulativos
+                                    .calcular(
+                                            cabecera.baseImponible(),
+                                            delGuardado.tramos(),
+                                            delGuardado.redondeo()),
+                            cabecera.baseImponible(),
+                            delGuardado.minimoImponible());
+            // Suaves: el rojo tiene que decir a la vez CUANTAS resoluciones hubo y QUE cifra se
+            // mezclo, que son las dos cosas que #361 mide.
+            org.assertj.core.api.SoftAssertions.assertSoftly(
+                    blando -> {
+                        blando.assertThat(resoluciones)
+                                .as(
+                                        "una determinacion resuelve el conjunto UNA vez: cada"
+                                                + " resolucion de mas es otra pregunta por red a"
+                                                + " normativa, con su propio repliegue, y puede"
+                                                + " contestar otro conjunto")
+                                .isEqualTo(1);
+                        blando.assertThat(reproducido)
+                                .as(
+                                        "recalcular con el conjunto_id que la fila guarda tiene"
+                                                + " que dar el mismo centimo (ARQ-09 §3, regla 6):"
+                                                + " si no, la fila dice haber salido de un"
+                                                + " conjunto que no la produjo")
+                                .isEqualTo(cabecera.montoDeterminado());
+                        blando.assertThat(determinada.nombreDelConjunto())
+                                .as("la respuesta nombra el mismo conjunto que la fila guarda")
+                                .isEqualTo(delGuardado.nombreDelConjunto());
+                        blando.assertThat(determinada.uit())
+                                .as("la UIT publicada es la del conjunto guardado")
+                                .isEqualTo(delGuardado.uit());
+                        blando.assertThat(determinada.derechoDeEmision())
+                                .as("y el derecho de emision tambien")
+                                .isEqualTo(delGuardado.derechoDeEmision());
+                    });
+        }
+
+        private DeterminarPredial servicioConElLector(LectorDeParametros lector) {
+            return new DeterminarPredial(
+                    new PadronPredialDelEjercicio(determinaciones),
+                    predios,
+                    new SinCaracteristicas(),
+                    new DirectorioDePrueba(),
+                    new CuadroPredialParametrizado(lector),
+                    valuaciones,
+                    beneficios,
+                    new RegistrarDeterminacionPredial(determinaciones, auditoria),
+                    RELOJ);
+        }
+
+        /**
+         * Un cuadro completo, con las tres cifras que distinguen una version de otra: la UIT, la
+         * alicuota del tramo 1 y el derecho de emision. Lo demas es igual en las dos a proposito
+         * —la base se redondea igual—, para que la unica diferencia sea la que se mide.
+         */
+        private ParametrosSellados cuadroDeLaVersion(
+                int version, String uit, String alicuotaDelTramo1, String derecho) {
+            return ParametrosSellados.de(EJERCICIO, version)
+                    .numero("UIT", null, ValorNormativo.de(uit))
+                    .numero("TRAMO_PREDIAL", "1", ValorNormativo.de(alicuotaDelTramo1))
+                    .numero("TRAMO_PREDIAL_LIMITE", "1", ValorNormativo.de("15"))
+                    .numero("TRAMO_PREDIAL", "2", ValorNormativo.de("0.6"))
+                    .numero("TRAMO_PREDIAL_LIMITE", "2", ValorNormativo.de("60"))
+                    .numero("TRAMO_PREDIAL", "3", ValorNormativo.de("1.0"))
+                    .numero("PREDIAL_MINIMO", null, ValorNormativo.de("0.6"))
+                    .numero("DERECHO_EMISION_PREDIAL", null, ValorNormativo.de(derecho))
+                    .texto("PREDIAL_VENCIMIENTO", "1", "2026-02-27")
+                    .texto("PREDIAL_VENCIMIENTO", "2", "2026-05-29")
+                    .texto("PREDIAL_VENCIMIENTO", "3", "2026-08-31")
+                    .texto("PREDIAL_VENCIMIENTO", "4", "2026-11-30")
+                    .numero("REDONDEO", "IMPUESTO_POR_TRAMO", ValorNormativo.de("2"))
+                    .texto("REDONDEO", "IMPUESTO_POR_TRAMO", "HALF_UP")
+                    .numero("REDONDEO", "BASE_DEL_CONTRIBUYENTE", ValorNormativo.de("2"))
+                    .texto("REDONDEO", "BASE_DEL_CONTRIBUYENTE", "HALF_UP")
+                    .numero("REDONDEO", "BASE_IMPONIBLE_DEL_PREDIO", ValorNormativo.de("2"))
+                    .texto("REDONDEO", "BASE_IMPONIBLE_DEL_PREDIO", "HALF_UP")
+                    .numero("REDONDEO", "CUOTA", ValorNormativo.de("2"))
+                    .texto("REDONDEO", "CUOTA", "HALF_UP")
+                    .construir();
+        }
+    }
+
     /** Cual de las tres piezas de #359 le falta al conjunto. */
     private enum LoQueFalta {
         DERECHO_DE_EMISION,
@@ -1181,7 +1313,7 @@ class DeterminarPredialTest {
                 new CuadroPredialParametrizado(lector),
                 valuaciones,
                 beneficios,
-                new RegistrarDeterminacionPredial(determinaciones, lector, auditoria),
+                new RegistrarDeterminacionPredial(determinaciones, auditoria),
                 reloj);
     }
 

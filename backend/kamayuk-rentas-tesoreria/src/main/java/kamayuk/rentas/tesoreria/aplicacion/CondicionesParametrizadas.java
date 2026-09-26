@@ -8,6 +8,7 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.dominio.PuntoDeRedondeo;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametroSinPublicar;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -84,9 +85,9 @@ public class CondicionesParametrizadas {
      */
     public Vigentes aLaFechaDe(LocalDate fechaDelConvenio, Alicuota porcentajeInicial) {
         Ejercicio ejercicio = Ejercicio.de(fechaDelConvenio);
-        ParametrosSellados sellados = parametros.vigenteEn(ejercicio);
-        long conjuntoId = parametros.conjuntoVigenteEn(ejercicio).valor();
-        return new Vigentes(ejercicio, sellados, conjuntoId, porcentajeInicial);
+        // Una resolucion, no dos (#361): los parametros y el id del mismo conjunto.
+        ConjuntoVigente conjunto = parametros.vigenteConSuConjunto(ejercicio);
+        return new Vigentes(ejercicio, conjunto.parametros(), conjunto.id(), porcentajeInicial);
     }
 
     /** Lo que el conjunto sellado dice del fraccionamiento, ya resuelto. */

@@ -30,6 +30,7 @@ import kamayuk.rentas.nucleo.dominio.vehicular.BaseImponibleVehicular;
 import kamayuk.rentas.nucleo.dominio.vehicular.ImpuestoVehicular;
 import kamayuk.rentas.nucleo.dominio.vehicular.OrigenDeLaBase;
 import kamayuk.rentas.nucleo.dominio.vehicular.PropietarioAlPrimeroDeEnero;
+import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.springframework.stereotype.Service;
@@ -123,13 +124,20 @@ public class RegistrarDeterminacionVehicular {
             throw new VehiculoNoAfecto(vehiculo, ejercicio);
         }
 
+        // UNA resolucion del conjunto para todo el calculo (#361): la tabla de valores
+        // referenciales, la alicuota, el minimo y el `conjunto_id` que se guarda salen de ella.
+        // Hasta #361 eran tres —la tabla resolvia la suya, y aqui se pedian los parametros y el
+        // id por separado—, y la base podia salir de la tabla de un conjunto y la fila guardar
+        // otro.
+        ConjuntoVigente conjuntoVigente = parametros.vigenteConSuConjunto(ejercicio);
+        ParametrosSellados sellados = conjuntoVigente.parametros();
+        long conjuntoId = conjuntoVigente.id();
+
         ValorReferencial valorReferencial =
                 valoresReferenciales
-                        .de(vehiculo, ejercicio)
+                        .de(vehiculo, ejercicio, conjuntoVigente.identificador())
                         .orElseThrow(() -> new SinValorReferencial(vehiculo, ejercicio));
 
-        ParametrosSellados sellados = parametros.vigenteEn(ejercicio);
-        long conjuntoId = parametros.conjuntoVigenteEn(ejercicio).valor();
         Alicuota alicuota =
                 Alicuota.de(
                         sellados.exigirNumero(LlavesDelConjunto.VEHICULAR_ALICUOTA, null)
