@@ -21,8 +21,10 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
+import kamayuk.rentas.sanciones.dominio.CriterioDeNotificacion;
 import kamayuk.rentas.sanciones.dominio.CriterioDelProcedimiento;
 import kamayuk.rentas.sanciones.dominio.FaseDelProcedimiento;
+import kamayuk.rentas.sanciones.dominio.NotificacionAdministrativa;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
 import kamayuk.rentas.sanciones.dominio.ProcedimientoSancionador;
 import org.junit.jupiter.api.AfterAll;
@@ -60,12 +62,16 @@ class ProcedimientoSancionadorRepositoryJdbcTest {
 
     private static final LocalDate FECHA_ACTA = LocalDate.of(2026, 8, 10);
 
+    /** El motivo que distingue las preventivas de #411 en el reporte de vencidas. */
+    private static final String FRONTERA = "Frontera del plazo 411";
+
     private static BaseDeDatosDePrueba base;
     private static long municipalidadA;
     private static long municipalidadB;
     private static TransactionTemplate transaccion;
     private static PapeletaRepositoryJdbc papeletas;
     private static ProcedimientoSancionadorRepositoryJdbc repositorio;
+    private static NotificacionAdministrativaRepositoryJdbc notificaciones;
     private static JdbcClient jdbc;
 
     private static long administradoDeA;
@@ -88,6 +94,7 @@ class ProcedimientoSancionadorRepositoryJdbcTest {
         transaccion = new TransactionTemplate(new TenantTransactionManager(pool));
         papeletas = new PapeletaRepositoryJdbc(jdbc);
         repositorio = new ProcedimientoSancionadorRepositoryJdbc(jdbc);
+        notificaciones = new NotificacionAdministrativaRepositoryJdbc(jdbc);
     }
 
     @AfterAll
@@ -187,8 +194,12 @@ class ProcedimientoSancionadorRepositoryJdbcTest {
         long previa = crearNotificacionPrevia("NP-0003", FECHA_ACTA, (short) 5, "EMITIDA");
         acta("AC-PREV-02", previa);
 
-        // 2026-08-10 + 5 dias = 2026-08-15. El dia 14 sigue abierta; el 16 no.
+        // 2026-08-10 + 5 dias = 2026-08-15. El dia 14 sigue abierta, el 15 TAMBIEN
+        // —es el ultimo dia para subsanar (#411)—, y el 16 ya no.
         assertThat(faseDe("AC-PREV-02", LocalDate.of(2026, 8, 14)))
+                .isEqualTo(FaseDelProcedimiento.PREVENTIVA);
+        assertThat(faseDe("AC-PREV-02", LocalDate.of(2026, 8, 15)))
+                .as("el dia del vencimiento el administrado todavia esta en plazo (#411)")
                 .isEqualTo(FaseDelProcedimiento.PREVENTIVA);
         assertThat(faseDe("AC-PREV-02", LocalDate.of(2026, 8, 16)))
                 .isEqualTo(FaseDelProcedimiento.CONSTATADA);
@@ -196,6 +207,69 @@ class ProcedimientoSancionadorRepositoryJdbcTest {
         // Y la fila dice a que fecha lo dijo (regla 9, RNF-075).
         assertThat(filaDe("AC-PREV-02", LocalDate.of(2026, 8, 16)).faseAlDia())
                 .isEqualTo(LocalDate.of(2026, 8, 16));
+    }
+
+    /**
+     * #411: la fase, el reporte de vencidas y el dominio dicen lo mismo sobre si una preventiva
+     * sigue viva, <b>tambien el ultimo dia</b>.
+     *
+     * <p>El javadoc de {@link FaseDelProcedimiento} prometia que la grilla y el reporte «nunca
+     * pueden discrepar», y lo cumplian entre ellos: las dos copias SQL daban por vencido el ultimo
+     * dia, y las dos discrepaban de {@link NotificacionAdministrativa#vencidaA}, que es la que
+     * aplica la subsanacion. La siembra pone una preventiva a cada lado de la frontera y una
+     * <b>en</b> ella; la prueba de encima miraba los dias 14 y 16 de un plazo que vence el 15.
+     */
+    @Test
+    @DisplayName(
+            "el ultimo dia del plazo la fase sigue PREVENTIVA, y fase, reporte y dominio coinciden"
+                    + " (#411)")
+    void laFaseElReporteYElDominioCoincidenEnLaFrontera() {
+        // FECHA_ACTA = 2026-08-10: con 9, 10 y 11 dias vencen el 19, el 20 y el 21.
+        LocalDate corte = LocalDate.of(2026, 8, 20);
+        List<NotificacionAdministrativa> previas =
+                List.of(
+                        preventiva("NP-411-A", (short) 9),
+                        preventiva("NP-411-B", (short) 10),
+                        preventiva("NP-411-C", (short) 11));
+        for (NotificacionAdministrativa previa : previas) {
+            acta("AC-" + previa.numero(), previa.id());
+        }
+
+        for (NotificacionAdministrativa previa : previas) {
+            assertThat(faseDe("AC-" + previa.numero(), corte))
+                    .as(
+                            "la fase del acta de %s, que vence el %s",
+                            previa.numero(), previa.vencimiento().orElseThrow())
+                    .isEqualTo(
+                            previa.vencidaA(corte)
+                                    ? FaseDelProcedimiento.CONSTATADA
+                                    : FaseDelProcedimiento.PREVENTIVA);
+        }
+        assertThat(faseDe("AC-NP-411-B", corte))
+                .as("la que vence el mismo dia del corte todavia se puede subsanar")
+                .isEqualTo(FaseDelProcedimiento.PREVENTIVA);
+
+        List<String> delReporte =
+                transaccion
+                        .execute(
+                                estado ->
+                                        notificaciones.buscarVencidas(
+                                                new CriterioDeNotificacion(
+                                                        null, null, corte, null, FRONTERA, null),
+                                                Paginacion.de(0, 20, "fecha")))
+                        .contenido()
+                        .stream()
+                        .map(NotificacionAdministrativa::numero)
+                        .sorted()
+                        .toList();
+        assertThat(delReporte)
+                .as("el reporte de vencidas lista justo las que sacaron su acta de PREVENTIVA")
+                .isEqualTo(
+                        previas.stream()
+                                .filter(previa -> previa.vencidaA(corte))
+                                .map(NotificacionAdministrativa::numero)
+                                .toList())
+                .containsExactly("NP-411-A");
     }
 
     @Test
@@ -345,6 +419,20 @@ class ProcedimientoSancionadorRepositoryJdbcTest {
     }
 
     // ------------------------------------------------------------------
+
+    private static NotificacionAdministrativa preventiva(String numero, Short plazoDias) {
+        return transaccion.execute(
+                estado ->
+                        notificaciones.insertar(
+                                NotificacionAdministrativa.emitida(
+                                        numero,
+                                        FECHA_ACTA,
+                                        administradoDeA,
+                                        null,
+                                        "AV. JOSE DE LAMA 1180",
+                                        FRONTERA,
+                                        plazoDias)));
+    }
 
     private static FaseDelProcedimiento faseDe(String numeroActa, LocalDate aLaFecha) {
         return filaDe(numeroActa, aLaFecha).fase();

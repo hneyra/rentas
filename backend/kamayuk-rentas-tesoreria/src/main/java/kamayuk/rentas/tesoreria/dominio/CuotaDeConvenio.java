@@ -50,6 +50,33 @@ public record CuotaDeConvenio(
         return capital.mas(interes).mas(gasto);
     }
 
+    /**
+     * Si la cuota ya venció a {@code fecha} (#411).
+     *
+     * <p><b>El día del vencimiento todavía se puede pagar</b>: vence al día siguiente. Es el mismo
+     * criterio que {@code Exigibilidad} escribió para cualquier plazo —«el día en que vence,
+     * tampoco»—. Hasta #411 el listado y la ficha contaban la cuota como vencida ese mismo día, e
+     * invitaban a tratar como incumplido a quien todavía estaba a tiempo.
+     *
+     * <p>Su copia en SQL es {@link #vencidaEnSql}, y no hay otra.
+     */
+    public boolean vencidaA(LocalDate fecha) {
+        Objects.requireNonNull(fecha, "Vencida a que fecha: toda cifra dice la suya (regla 9)");
+        return vencimiento.isBefore(fecha);
+    }
+
+    /**
+     * {@link #vencidaA} escrita en SQL, para una fila de {@code convenio_cuota} con alias {@code
+     * alias} contra el parámetro con nombre {@code parametro} (#411): la misma comparación
+     * estricta, y junto a la Java para que no puedan divergir sin que se vea.
+     *
+     * @param alias el alias de {@code convenio_cuota} en la consulta
+     * @param parametro el nombre, sin los dos puntos, del parámetro con la fecha
+     */
+    public static String vencidaEnSql(String alias, String parametro) {
+        return "(" + alias + ".vencimiento < :" + parametro + ")";
+    }
+
     /** La cuota inicial es la 0: la que se cobra en caja y formaliza el convenio. */
     public boolean esInicial() {
         return numero == 0;

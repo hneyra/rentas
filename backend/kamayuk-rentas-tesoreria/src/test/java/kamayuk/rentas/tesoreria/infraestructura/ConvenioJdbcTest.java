@@ -69,6 +69,7 @@ import kamayuk.rentas.tesoreria.dobles.AnulacionesDeReciboDeMentira;
 import kamayuk.rentas.tesoreria.dominio.Convenio;
 import kamayuk.rentas.tesoreria.dominio.ConvenioEnConsulta;
 import kamayuk.rentas.tesoreria.dominio.CriterioDeConvenios;
+import kamayuk.rentas.tesoreria.dominio.CuotaDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.EstadoDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.MovimientoDeConvenioRepository;
 import kamayuk.rentas.tesoreria.dominio.NumeroDeConvenio;
@@ -1237,9 +1238,59 @@ class ConvenioJdbcTest {
                     .isEqualTo(mesQueViene);
             assertThat(fila.deudaAcogida()).isEqualTo(PREDIAL.mas(ARBITRIOS));
             assertThat(fila.pagadas()).isEqualTo(1);
+            // `mesQueViene` es el vencimiento de la primera cuota, y ese dia todavia se
+            // puede pagar (#411). Esta asercion decia 1 —«un mes despues, la primera
+            // cuota ya vencio»— y fijaba en verde el borde equivocado.
             assertThat(fila.vencidas())
-                    .as("un mes despues, la primera cuota ya vencio sin cobrarse")
+                    .as("el dia en que vence, la primera cuota todavia no esta vencida (#411)")
+                    .isZero();
+            assertThat(unaFila(convenio, mesQueViene.plusDays(1)).vencidas())
+                    .as("al dia siguiente, si: vencio sin cobrarse")
                     .isEqualTo(1);
+        }
+
+        /**
+         * #411: el listado —SQL— y la ficha —Java— cuentan las cuotas vencidas con la misma regla,
+         * {@link CuotaDeConvenio#vencidaA}, y el dia del vencimiento la cuota no cuenta.
+         *
+         * <p>La siembra que distingue es la del dia exacto: la vispera, el dia y el siguiente del
+         * vencimiento de la primera cuota. Con una sola fecha «un mes despues», las dos copias
+         * coincidian entre ellas y con el borde equivocado.
+         */
+        @Test
+        @DisplayName(
+                "el listado, la ficha y el dominio cuentan igual las vencidas, tambien el dia del"
+                        + " vencimiento (#411)")
+        void elListadoLaFichaYElDominioCuentanIgual() {
+            long titular = contribuyenteConDeuda("CONS-411");
+            Convenio convenio = registrarPreconvenio(titular, 6, "20");
+            formalizarLaInicial(convenio);
+            CuotaDeConvenio primera =
+                    convenio.cronograma().stream()
+                            .filter(cuota -> cuota.numero() == 1)
+                            .findFirst()
+                            .orElseThrow();
+            ConsultaDeConvenios.Ficha ficha =
+                    enTransaccion(() -> consulta.ficha(convenio.numero())).orElseThrow();
+
+            LocalDate vence = primera.vencimiento();
+            for (LocalDate fecha : List.of(vence.minusDays(1), vence, vence.plusDays(1))) {
+                int esperadas = primera.vencidaA(fecha) ? 1 : 0;
+                ConsultaDeConvenios.Ficha fichaA =
+                        new ConsultaDeConvenios.Ficha(
+                                ficha.convenio(), ficha.estado(), ficha.movimientos(), fecha);
+
+                assertThat(unaFila(convenio, fecha).vencidas())
+                        .as("el listado (SQL) a %s", fecha)
+                        .isEqualTo(esperadas);
+                assertThat(fichaA.cuotasVencidas())
+                        .as("la ficha (Java) a %s", fecha)
+                        .isEqualTo(esperadas);
+            }
+            assertThat(unaFila(convenio, vence).vencidas())
+                    .as("el mismo dia en que vence, la cuota todavia se puede pagar")
+                    .isZero();
+            assertThat(unaFila(convenio, vence.plusDays(1)).vencidas()).isEqualTo(1);
         }
 
         @Test

@@ -303,8 +303,11 @@ public class ConvenioRepositoryJdbc extends RepositorioJdbc implements ConvenioR
                         // Vencidas y saldo se responden a la fecha que entro en el
                         // criterio, nunca a un now() de la base: dos filas de la misma
                         // pagina tienen que estar calculadas al mismo dia (regla 9).
+                        // Y «vencida» es la del dominio, no una tercera escritura: el dia
+                        // en que vence, la cuota todavia se puede pagar (#411).
                         + " (SELECT count(*) FROM convenio_cuota q"
-                        + "   WHERE q.convenio_id = c.id AND q.vencimiento <= :hoy"
+                        + "   WHERE q.convenio_id = c.id AND "
+                        + CuotaDeConvenio.vencidaEnSql("q", "hoy")
                         + "     AND q.numero >= "
                         + CUOTAS_PAGADAS
                         + ") AS vencidas,"

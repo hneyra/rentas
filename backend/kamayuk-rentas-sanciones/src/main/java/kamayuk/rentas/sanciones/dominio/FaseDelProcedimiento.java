@@ -43,10 +43,13 @@ package kamayuk.rentas.sanciones.dominio;
  *       (V41 §3) — la RIS que la pantalla emite con «Emitir RIS».
  *   <li>Que la notificación preventiva que originó el acta ({@code
  *       papeleta.notificacion_previa_id}, V4) siga <b>abierta</b>: {@code EMITIDA} y con su plazo
- *       sin vencer a la fecha de corte. El vencimiento se calcula igual que en {@code
- *       adm_notificaciones_vencidas} —{@code fecha + plazo_dias}, y sin plazo nada la vence (#47
- *       AC3)—, de modo que las dos pantallas nunca pueden discrepar sobre si una notificación sigue
- *       viva.
+ *       sin vencer a la fecha de corte. «Sin vencer» no se escribe aquí: es {@link
+ *       NotificacionAdministrativa#vencidaEnSql}, negada, que es la misma que lee {@code
+ *       adm_notificaciones_vencidas} y la copia SQL de {@link NotificacionAdministrativa#vencidaA}
+ *       —el último día queda dentro del plazo, y sin plazo nada la vence (#47 AC3)—. Así las dos
+ *       pantallas no pueden discrepar sobre si una notificación sigue viva, ni entre ellas ni con
+ *       el dominio: hasta #411 cumplían lo primero con dos copias que daban por vencido el último
+ *       día, y fallaban lo segundo.
  * </ol>
  *
  * <h2>Una fila puede no tener fase, y entonces lo dice</h2>
@@ -142,12 +145,12 @@ public enum FaseDelProcedimiento {
                     + "               WHERE rg.papeleta_id = p.id"
                     + "                 AND rg.tipo = 'ADMINISTRATIVA') THEN 'SANCIONADA'"
                     // La preventiva sigue abierta: EMITIDA y sin vencer a la fecha de
-                    // corte. El vencimiento se escribe igual que en la consulta de
-                    // notificaciones vencidas, y sin plazo nada la vence (#47 AC3).
+                    // corte. «Vencida» no se escribe aqui: es la del dominio, la misma
+                    // que lee el reporte de vencidas, y el ultimo dia no vence (#411).
                     + " WHEN np.id IS NOT NULL AND np.estado = 'EMITIDA'"
-                    + "      AND (np.plazo_dias IS NULL"
-                    + "           OR (np.fecha + (np.plazo_dias || ' days')::interval)"
-                    + "              > :aLaFecha) THEN 'PREVENTIVA'"
+                    + "      AND NOT "
+                    + NotificacionAdministrativa.vencidaEnSql("np", "aLaFecha")
+                    + " THEN 'PREVENTIVA'"
                     + " ELSE 'CONSTATADA'"
                     + " END";
 }

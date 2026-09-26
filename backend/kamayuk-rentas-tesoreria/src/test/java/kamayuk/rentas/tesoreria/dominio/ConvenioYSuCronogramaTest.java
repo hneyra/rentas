@@ -179,6 +179,31 @@ class ConvenioYSuCronogramaTest {
     }
 
     @Nested
+    @DisplayName("El vencimiento de una cuota (#411)")
+    class DelVencimiento {
+
+        private final CuotaDeConvenio cuota =
+                new CuotaDeConvenio(1, PRIMERA, Dinero.de("100.00"), Dinero.CERO, Dinero.CERO);
+
+        @Test
+        @DisplayName("el dia en que vence todavia se puede pagar: vencida es al dia siguiente")
+        void elDiaEnQueVenceTodaviaNoEstaVencida() {
+            assertThat(cuota.vencidaA(PRIMERA.minusDays(1))).isFalse();
+            assertThat(cuota.vencidaA(PRIMERA))
+                    .as("el criterio de Exigibilidad: el dia en que vence, tampoco")
+                    .isFalse();
+            assertThat(cuota.vencidaA(PRIMERA.plusDays(1))).isTrue();
+        }
+
+        @Test
+        @DisplayName("la copia SQL es la misma comparacion estricta")
+        void laCopiaSqlEsEstricta() {
+            assertThat(CuotaDeConvenio.vencidaEnSql("q", "hoy"))
+                    .isEqualTo("(q.vencimiento < :hoy)");
+        }
+    }
+
+    @Nested
     @DisplayName("El numero")
     class DelNumero {
 

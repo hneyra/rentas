@@ -102,8 +102,9 @@ public class NotificacionAdministrativaRepositoryJdbc extends RepositorioJdbc
                 "estado",
                 (criterio.estado() == null ? EstadoDeNotificacion.EMITIDA : criterio.estado())
                         .name());
-        condiciones.add("n.plazo_dias IS NOT NULL");
-        condiciones.add("(n.fecha + (n.plazo_dias || ' days')::interval) <= :vencidasAl");
+        // La frontera del plazo es la del dominio, y aqui no se reescribe (#411): el ultimo
+        // dia todavia se puede subsanar, y este reporte ofrece multar lo que lista.
+        condiciones.add(NotificacionAdministrativa.vencidaEnSql("n", "vencidasAl"));
         parametros.put("vencidasAl", criterio.vencidasAl());
 
         if (criterio.numero() != null) {
