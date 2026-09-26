@@ -138,6 +138,39 @@ class ElTerritorioDecideLaLicenciaTest {
         }
 
         @Test
+        @DisplayName(
+                "#352 — `catastro` caido contesta 500 CON codigo, y sigue siendo «no se pudo"
+                        + " preguntar»")
+        void unaCaidaConCodigoNoEsNoConsta() {
+            // Por los adaptadores HTTP de verdad: el doble del puerto lanza la excepcion que se le
+            // pida, y lo que #352 midio es justo que el cliente elegia la equivocada.
+            kamayuk.rentas.catastro.infraestructura.CatastroQueNoContesta caido =
+                    kamayuk.rentas.catastro.infraestructura.CatastroQueNoContesta.queContesta(
+                            500,
+                            "{\"status\":500,\"codigo\":\"ERROR_INTERNO\","
+                                    + "\"detail\":\"Incidencia 4f2a\"}");
+            ComprobacionDelTerritorio comprobacion =
+                    new ComprobarElTerritorio(
+                                    new kamayuk.rentas.catastro.infraestructura
+                                            .ZonificacionDelPredioHttp(caido),
+                                    new kamayuk.rentas.catastro.infraestructura
+                                            .RiesgoYItseDelPredioHttp(caido))
+                            .de(PREDIO, HOY, "CZ, RDM", null);
+
+            assertThat(comprobacion.zona())
+                    .as(
+                            "hasta #352 quedaba NO_CONSTA, y la licencia guardaba «zona: no consta"
+                                    + " (ERROR_INTERNO)» con el remedio de dar de alta el predio")
+                    .isEqualTo(RespuestaDelTerritorio.NO_SE_PUDO_PREGUNTAR);
+            assertThat(comprobacion.riesgo())
+                    .isEqualTo(RespuestaDelTerritorio.NO_SE_PUDO_PREGUNTAR);
+            assertThat(comprobacion.itse()).isEqualTo(RespuestaDelTerritorio.NO_SE_PUDO_PREGUNTAR);
+            assertThat(comprobacion.motivo())
+                    .contains("no se pudo preguntar")
+                    .doesNotContain("no consta");
+        }
+
+        @Test
         @DisplayName("#416 — y si SOLO el ITSE no contesta, tampoco es favorable")
         void soloElItseNoContesta() {
             ComprobacionDelTerritorio comprobacion =

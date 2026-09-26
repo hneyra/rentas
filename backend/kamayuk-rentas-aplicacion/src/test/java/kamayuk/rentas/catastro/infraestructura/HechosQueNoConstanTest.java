@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.time.LocalDate;
+import java.util.List;
 import kamayuk.rentas.compartido.Paginacion;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -91,6 +92,60 @@ class HechosQueNoConstanTest {
                         "sin este contraste, «no consta» se tragaria tambien las averias y esta"
                                 + " frontera dejaria de avisar de que catastro no esta")
                 .isInstanceOf(ClienteHttpDeCatastro.CatastroInalcanzable.class);
+    }
+
+    @Test
+    @DisplayName(
+            "#352 — un codigo con un estado de AVERIA (500, 403, 401) es una averia, no «no consta»")
+    void unCodigoConEstadoDeAveriaNoEsUnHecho() {
+        // La siembra que distingue: el error TRAE codigo y su estado es de averia. En este producto
+        // todas las respuestas de error llevan `codigo` —el 500 del manejador y el 401/403 de la
+        // cadena de seguridad—, asi que el contraste de arriba (404 con codigo contra 404 sin el)
+        // no puede fallar con este defecto: una caida de catastro se guardaba en la licencia como
+        // «el predio no consta, es el caso normal».
+        record Caso(int estado, String codigo) {}
+        for (Caso caso :
+                List.of(
+                        new Caso(500, "ERROR_INTERNO"),
+                        new Caso(403, "SIN_PRIVILEGIO"),
+                        new Caso(401, "NO_AUTENTICADO"))) {
+            CatastroQueNoContesta doble =
+                    CatastroQueNoContesta.queContesta(
+                            caso.estado(), problema(caso.codigo(), "Lo que dijo catastro"));
+
+            assertThatThrownBy(
+                            () -> new ZonificacionDelPredioHttp(doble).zonaDe(11L, AL_30_DE_JUNIO))
+                    .as("%d %s", caso.estado(), caso.codigo())
+                    .isInstanceOf(ClienteHttpDeCatastro.CatastroInalcanzable.class)
+                    .isNotInstanceOf(ClienteHttpDeCatastro.NoConstaEnCatastro.class)
+                    .as(
+                            "y nombra el estado y el codigo: es el diagnostico que #166 echaba en falta")
+                    .hasMessageContaining(String.valueOf(caso.estado()))
+                    .hasMessageContaining(caso.codigo());
+        }
+    }
+
+    @Test
+    @DisplayName("#352 — y los dos hechos que catastro publica siguen siendo «no consta»")
+    void losDosHechosSiguenSiendoNoConsta() {
+        // El contraste: una guarda que lo convirtiera TODO en averia tambien pasaria la prueba de
+        // arriba, y borraria la distincion que catastro construyo a proposito.
+        assertThatThrownBy(
+                        () ->
+                                new ZonificacionDelPredioHttp(
+                                                CatastroQueNoContesta.queContesta(
+                                                        404,
+                                                        problema("NO_ENCONTRADO", "Ningun plan")))
+                                        .zonaDe(11L, AL_30_DE_JUNIO))
+                .isInstanceOf(ClienteHttpDeCatastro.NoConstaEnCatastro.class);
+        assertThatThrownBy(
+                        () ->
+                                new RiesgoYItseDelPredioHttp(
+                                                CatastroQueNoContesta.queContesta(
+                                                        422,
+                                                        problema("VALIDACION", "Sin poligono")))
+                                        .riesgoDe(11L, AL_30_DE_JUNIO))
+                .isInstanceOf(ClienteHttpDeCatastro.NoConstaEnCatastro.class);
     }
 
     @Test

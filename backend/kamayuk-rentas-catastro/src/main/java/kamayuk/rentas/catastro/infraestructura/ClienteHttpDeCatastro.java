@@ -394,12 +394,13 @@ public class ClienteHttpDeCatastro {
     }
 
     /**
-     * Una lectura en la que un 4xx <b>con codigo</b> es un hecho del territorio y no una averia.
+     * Una lectura en la que un {@code 404 NO_ENCONTRADO} o un {@code 422 VALIDACION} es un hecho
+     * del territorio y no una averia.
      *
      * <p>La usan las lecturas de `catastro`#4, #5 y #7, que contestan con el catalogo de errores de
-     * ese sistema: ver {@link NoConstaEnCatastro}. Un 4xx <b>sin</b> codigo —el HTML de un proxy,
-     * una ruta que no existe— sigue siendo una averia, y ese contraste es lo que impide que «no
-     * consta» se trague tambien los fallos de verdad.
+     * ese sistema: ver {@link NoConstaEnCatastro}. Todo lo demas —un 4xx sin codigo, el HTML de un
+     * proxy, y tambien un 500, 401 o 403 CON codigo (#352)— sigue siendo una averia, y ese
+     * contraste es lo que impide que «no consta» se trague los fallos de verdad.
      */
     JsonNode pedirHechoDelTerritorio(String ruta, String que) {
         return pedirTraduciendoLosHechos(
@@ -426,36 +427,65 @@ public class ClienteHttpDeCatastro {
             return leer(respuesta.cuerpo(), que);
         }
         HechoContestado hecho =
-                hechoContestado(respuesta)
-                        .orElseThrow(
-                                () ->
-                                        new CatastroInalcanzable(
-                                                que + " (contesto " + respuesta.estado() + ")",
-                                                null));
+                hechoContestado(respuesta).orElseThrow(() -> averiaDe(respuesta, que));
         throw traduccion.apply(hecho);
+    }
+
+    /**
+     * Una respuesta que no es un hecho, nombrada con lo que traiga: su estado y, si el cuerpo es
+     * del catalogo de {@code catastro}, su codigo y su detalle (#352). Un 403 {@code
+     * SIN_PRIVILEGIO} dice que el token perdio la audiencia, y un 500 {@code ERROR_INTERNO} trae la
+     * incidencia: es el diagnostico que #166 echaba en falta, y sin el quien opera ve un numero.
+     */
+    private CatastroInalcanzable averiaDe(RespuestaDeCatastro respuesta, String que) {
+        JsonNode cuerpo = leerSiSePuede(respuesta.cuerpo());
+        String codigo = cuerpo.path("codigo").asString("");
+        if (codigo.isBlank()) {
+            return new CatastroInalcanzable(que + " (contesto " + respuesta.estado() + ")", null);
+        }
+        return new HechoContestado(respuesta.estado(), codigo, cuerpo.path("detail").asString(""))
+                .comoAveria(que);
     }
 
     /**
      * El criterio, en UN solo sitio, de que respuesta distinta de 200 es un hecho del dominio y no
      * una averia (#350).
      *
-     * <p>Hoy lo es la que trae el {@code codigo} del catalogo de errores de {@code catastro}: un
-     * cuerpo sin el —la pagina de un proxy, una ruta que no existe— no es una respuesta de ese
-     * sistema. Hasta #350 este criterio vivia dentro de {@link #pedirHechoDelTerritorio} y el
-     * cuadro de valores unitarios no lo usaba: cualquier cosa distinta de 200 era averia, y el 404
-     * de un ejercicio sin sellar llegaba a la ficha del FUE como 500. Tenerlo aqui es lo que deja
-     * afinarlo una vez para todas las lecturas que lo usan (relacionado con #352: que un codigo con
-     * un estado de averia no cuente como hecho).
+     * <p>Lo es la que trae uno de los dos pares de estado y codigo que {@code catastro} publica
+     * como hecho ({@link #esHechoDelDominio}, #352). Un cuerpo sin codigo —la pagina de un proxy,
+     * una ruta que no existe— no es una respuesta de ese sistema, y un codigo con un estado de
+     * averia —500, 401, 403— es una averia que se explica, no un hecho. Hasta #350 este criterio
+     * vivia dentro de {@link #pedirHechoDelTerritorio} y el cuadro de valores unitarios no lo
+     * usaba: cualquier cosa distinta de 200 era averia, y el 404 de un ejercicio sin sellar llegaba
+     * a la ficha del FUE como 500. Tenerlo aqui es lo que deja afinarlo una vez para todas las
+     * lecturas que lo usan (relacionado con #352: que un codigo con un estado de averia no cuente
+     * como hecho).
      */
     Optional<HechoContestado> hechoContestado(RespuestaDeCatastro respuesta) {
         JsonNode cuerpo = leerSiSePuede(respuesta.cuerpo());
         String codigo = cuerpo.path("codigo").asString("");
-        if (codigo.isBlank()) {
+        if (!esHechoDelDominio(respuesta.estado(), codigo)) {
             return Optional.empty();
         }
         return Optional.of(
                 new HechoContestado(
                         respuesta.estado(), codigo, cuerpo.path("detail").asString("")));
+    }
+
+    /**
+     * Si esa respuesta es uno de los hechos que {@code catastro} publica, y no una averia (#352).
+     *
+     * <p>Son dos, y los dos por su <b>par</b> de estado y codigo: {@code 404 NO_ENCONTRADO} —ningun
+     * plan cubre el predio, el predio no esta en el padron, el ejercicio no tiene cuadro sellado— y
+     * {@code 422 VALIDACION} —el predio esta y no tiene poligono—. Mirar solo si hay {@code codigo}
+     * no basta, y #352 lo midio: en este producto <b>todas</b> las respuestas de error lo llevan,
+     * tambien el 500 {@code ERROR_INTERNO}, el 401 {@code NO_AUTENTICADO} y el 403 {@code
+     * SIN_PRIVILEGIO} de la cadena de seguridad. Con el criterio viejo, una caida de {@code
+     * catastro} se guardaba en la licencia como «el predio no consta, es el caso normal».
+     */
+    static boolean esHechoDelDominio(int estado, String codigo) {
+        return (estado == 404 && "NO_ENCONTRADO".equals(codigo))
+                || (estado == 422 && "VALIDACION".equals(codigo));
     }
 
     /**
