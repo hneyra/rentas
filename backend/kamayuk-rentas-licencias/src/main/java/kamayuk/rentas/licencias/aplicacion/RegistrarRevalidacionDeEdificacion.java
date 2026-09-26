@@ -232,6 +232,11 @@ public class RegistrarRevalidacionDeEdificacion {
                         .REVALIDACION_DE_LICENCIA) {
             throw new RevalidarLicenciaDeEdificacion.NoEsUnaRevalidacion(revalidacion);
         }
+        // Un expediente, un acto (#449): como la emision, se comprueba aqui y lo sostiene un
+        // indice en la base, que es el que cubre la carrera.
+        if (movimientos.revalidacionDe(revalidacion.identificador()).isPresent()) {
+            throw new RevalidarLicenciaDeEdificacion.YaEstabaRevalidada(revalidacion.expediente());
+        }
 
         long originalId =
                 Objects.requireNonNull(
