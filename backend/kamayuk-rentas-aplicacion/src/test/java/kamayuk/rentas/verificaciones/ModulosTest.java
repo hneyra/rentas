@@ -9,12 +9,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
 
 /**
- * Limites entre modulos (ADR-0003, ARQ-01 §4). Bloqueante.
+ * Limites entre modulos (ARQ-01 §4; ADR-0029 reemplaza a ADR-0003). Bloqueante.
+ *
+ * <p><b>Cada proteccion tiene una fuente</b> (#438): la direccion del grafo la fija Gradle —un
+ * {@code import} de {@code valores} a {@code nucleo} no compila, porque {@code valores} no lo
+ * declara—; {@code verify()} vigila los ciclos y el acceso a tipos internos de otro modulo. No
+ * compara contra ninguna lista de dependencias permitidas, porque ningun modulo la declara.
  *
  * <p>Sin esto, "monolito modular" degrada a monolito en pocos meses: nada impide que un contexto
  * llame a las clases internas de otro, y cuando se nota ya hay cincuenta llamadas que desenredar.
  */
-@DisplayName("ADR-0003 — Limites entre modulos")
+@DisplayName("Limites entre modulos: ni ciclos ni tipos internos de otro")
 class ModulosTest {
 
     private static final ApplicationModules MODULOS =
@@ -66,9 +71,15 @@ class ModulosTest {
                         "tesoreria");
     }
 
+    /**
+     * Medido en #438: un {@code import} de {@code valores} a {@code
+     * kamayuk.rentas.cuentacorriente.aplicacion.ReconstruirSaldo} —que Gradle permite, porque
+     * {@code valores} declara {@code cuentacorriente}— pone esto en rojo: «Module 'valores' depends
+     * on non-exposed type ... within module 'cuentacorriente'!».
+     */
     @Test
-    @DisplayName("no hay dependencias no declaradas ni ciclos entre modulos")
-    void noHayDependenciasNoDeclaradasNiCiclos() {
+    @DisplayName("no hay ciclos ni acceso a tipos internos entre modulos")
+    void noHayCiclosNiAccesoATiposInternos() {
         MODULOS.verify();
     }
 }
