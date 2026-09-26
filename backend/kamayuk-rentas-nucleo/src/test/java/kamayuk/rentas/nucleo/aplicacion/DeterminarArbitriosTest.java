@@ -8,12 +8,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.catastro.CaracteristicasDelPredio;
@@ -35,6 +31,7 @@ import kamayuk.rentas.nucleo.dominio.arbitrios.Servicio;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -174,6 +171,102 @@ class DeterminarArbitriosTest {
                 .hasMessageContaining("TASA_LIMPIEZA_PUBLICA");
     }
 
+    @Test
+    @DisplayName(
+            "#443 — la emision de 2027 corrida el 20-12-2026 no ve la inafectacion que acaba ese"
+                    + " 31 de diciembre")
+    void elBeneficioSeMiraALaFechaDeCadaMes() {
+        beneficios.inafectar(
+                PREDIO,
+                Servicio.LIMPIEZA_PUBLICA.codigoTributo(),
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 12, 31));
+        DeterminarArbitrios enDiciembre =
+                conReloj(Clock.fixed(Instant.parse("2026-12-20T00:00:00Z"), ZoneOffset.UTC));
+
+        List<CuotaDeArbitrio> generadas =
+                enDiciembre.determinarPredio(PREDIO, new Ejercicio(2027), OBSERVACION);
+
+        assertThat(generadas.stream().filter(c -> c.servicio() == Servicio.LIMPIEZA_PUBLICA))
+                .as("hasta #443 se evaluaba con el 20-12-2026 y se exoneraban las 12 de 2027")
+                .hasSize(12);
+        assertThat(generadas).hasSize(36);
+    }
+
+    @Test
+    @DisplayName("#443 — un predio con rasgos solo desde el 15 de julio no debe de enero a julio")
+    void soloLosMesesEnQueElPredioExiste() {
+        LocalDate desde = LocalDate.of(2026, 7, 15);
+        DeterminarArbitrios independizado =
+                new DeterminarArbitrios(
+                        cuotas,
+                        beneficios,
+                        (predioId, fecha) -> Optional.of(CONTRIBUYENTE),
+                        (predioId, fecha) ->
+                                fecha.isBefore(desde)
+                                        ? Optional.empty()
+                                        : Optional.of(
+                                                new CaracteristicasDelPredio(
+                                                        "CASA_HABITACION", "S-01", null)),
+                        parametrosDeMentira(),
+                        cargos,
+                        (registro) -> {},
+                        Clock.fixed(Instant.parse("2026-08-01T00:00:00Z"), ZoneOffset.UTC));
+
+        List<CuotaDeArbitrio> generadas =
+                independizado.determinarPredio(PREDIO, EJERCICIO, OBSERVACION);
+
+        assertThat(generadas)
+                .as(
+                        "hasta #443 se generaban las 36 de enero a diciembre: cobro doble con la matriz")
+                .extracting(CuotaDeArbitrio::periodo)
+                .allMatch(periodo -> periodo >= 8);
+        assertThat(generadas).hasSize(15); // agosto a diciembre, tres servicios
+    }
+
+    @Test
+    @DisplayName("#443 — y el titular es el de cada mes: la venta de mayo parte el año en dos")
+    void elTitularEsElDeCadaMes() {
+        long comprador = 201L;
+        LocalDate venta = LocalDate.of(2026, 5, 20);
+        DeterminarArbitrios conVenta =
+                new DeterminarArbitrios(
+                        cuotas,
+                        beneficios,
+                        (predioId, fecha) ->
+                                Optional.of(fecha.isBefore(venta) ? CONTRIBUYENTE : comprador),
+                        (predioId, fecha) ->
+                                Optional.of(
+                                        new CaracteristicasDelPredio(
+                                                "CASA_HABITACION", "S-01", null)),
+                        parametrosDeMentira(),
+                        cargos,
+                        (registro) -> {},
+                        RELOJ);
+
+        List<CuotaDeArbitrio> generadas = conVenta.determinarPredio(PREDIO, EJERCICIO, OBSERVACION);
+
+        assertThat(generadas.stream().filter(c -> c.contribuyenteId() == CONTRIBUYENTE))
+                .extracting(CuotaDeArbitrio::periodo)
+                .containsOnly(1, 2, 3, 4, 5);
+        assertThat(generadas.stream().filter(c -> c.contribuyenteId() == comprador))
+                .extracting(CuotaDeArbitrio::periodo)
+                .containsOnly(6, 7, 8, 9, 10, 11, 12);
+    }
+
+    private DeterminarArbitrios conReloj(Clock reloj) {
+        return new DeterminarArbitrios(
+                cuotas,
+                beneficios,
+                (predioId, fecha) -> Optional.of(CONTRIBUYENTE),
+                (predioId, fecha) ->
+                        Optional.of(new CaracteristicasDelPredio("CASA_HABITACION", "S-01", null)),
+                parametrosDeMentira(),
+                cargos,
+                (registro) -> {},
+                reloj);
+    }
+
     private static LectorDeParametros parametrosDeMentira() {
         return new LectorDeParametros() {
             @Override
@@ -245,11 +338,33 @@ class DeterminarArbitriosTest {
         }
     }
 
+    /**
+     * Respeta la fecha que se le pregunta (#443): hasta #443 devolvia el beneficio a cualquiera.
+     */
     private static final class BeneficiosDeMentira implements BeneficioRepository {
-        private final Map<Long, Set<String>> inafectados = new HashMap<>();
+        private final List<Beneficio> inafectaciones = new ArrayList<>();
 
         void inafectar(long predioId, String tributo) {
-            inafectados.computeIfAbsent(predioId, k -> new HashSet<>()).add(tributo);
+            inafectar(predioId, tributo, LocalDate.of(2026, 1, 1), null);
+        }
+
+        void inafectar(long predioId, String tributo, LocalDate desde, @Nullable LocalDate hasta) {
+            inafectaciones.add(
+                    new Beneficio(
+                            (long) inafectaciones.size() + 1,
+                            CONTRIBUYENTE,
+                            predioId,
+                            null,
+                            "SIN_SERVICIO",
+                            tributo,
+                            Clase.INAFECTACION,
+                            null,
+                            Dinero.CERO,
+                            desde,
+                            hasta,
+                            "Ordenanza de prueba",
+                            "RES-001",
+                            OBSERVACION));
         }
 
         @Override
@@ -275,25 +390,11 @@ class DeterminarArbitriosTest {
 
         @Override
         public List<Beneficio> vigentesDelPredio(long predioId, String tributo, LocalDate fecha) {
-            if (!inafectados.getOrDefault(predioId, Set.of()).contains(tributo)) {
-                return List.of();
-            }
-            return List.of(
-                    new Beneficio(
-                            1L,
-                            CONTRIBUYENTE,
-                            predioId,
-                            null,
-                            "SIN_SERVICIO",
-                            tributo,
-                            Clase.INAFECTACION,
-                            null,
-                            Dinero.CERO,
-                            LocalDate.of(2026, 1, 1),
-                            null,
-                            "Ordenanza de prueba",
-                            "RES-001",
-                            OBSERVACION));
+            return inafectaciones.stream()
+                    .filter(b -> b.predioId() != null && b.predioId() == predioId)
+                    .filter(b -> b.tributo().equals(tributo))
+                    .filter(b -> b.rigeEn(fecha))
+                    .toList();
         }
 
         @Override

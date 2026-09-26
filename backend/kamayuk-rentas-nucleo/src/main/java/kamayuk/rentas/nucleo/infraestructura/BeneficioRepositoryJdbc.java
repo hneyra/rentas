@@ -68,7 +68,8 @@ public class BeneficioRepositoryJdbc extends RepositorioJdbc implements Benefici
             parametros.put("codigo", criterio.codigoContribuyente());
         }
         if (criterio.tipo() != null) {
-            condiciones.add("b.tipo = :tipo");
+            // upper(): las filas anteriores a #443 guardaron el tipo con la grafia tecleada.
+            condiciones.add("upper(b.tipo) = :tipo");
             parametros.put("tipo", criterio.tipo());
         }
         if (criterio.vigentesA() != null) {
@@ -95,7 +96,7 @@ public class BeneficioRepositoryJdbc extends RepositorioJdbc implements Benefici
                         "SELECT "
                                 + COLUMNAS
                                 + DESDE
-                                + " WHERE b.contribuyente_id = :contribuyenteId AND b.tipo = :tipo")
+                                + " WHERE b.contribuyente_id = :contribuyenteId AND upper(b.tipo) = :tipo")
                 .param("contribuyenteId", contribuyenteId)
                 .param("tipo", tipo)
                 .query(BeneficioRepositoryJdbc::mapear)

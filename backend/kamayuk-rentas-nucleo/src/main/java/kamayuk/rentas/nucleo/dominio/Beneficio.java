@@ -14,8 +14,9 @@ import org.jspecify.annotations.Nullable;
  * una amnistía es D-02; este tipo solo guarda que el beneficio existe, para quien y con que
  * sustento. Se puede construir sin ninguna cifra normativa.
  *
- * <p><b>Nunca se borra.</b> Un cese dentro deja la fila con {@code vigenciaHasta}, no la quita (V7:
- * {@code beneficio} tiene {@code UPDATE}, no {@code DELETE}).
+ * <p><b>Nunca se borra.</b> Un cese dentro deja la fila con {@code vigenciaHasta}, no la quita (los
+ * {@code GRANT} de {@code beneficio} en {@code V1__baseline.sql}: {@code UPDATE}, no {@code
+ * DELETE}).
  *
  * <p>{@code porcentaje} es {@link Alicuota} y no {@link kamayuk.rentas.dominio.Porcentaje}: la
  * columna usa el dominio {@code alicuota} de PostgreSQL, que admite el 0 —«una alícuota puede ser
@@ -65,7 +66,9 @@ public record Beneficio(
                             + " positivo");
         }
         Objects.requireNonNull(tipo, "El beneficio necesita su tipo");
-        tipo = tipo.strip();
+        // La grafia la fija el objeto de valor, como la del tributo (#443): «Pensionista» y
+        // «PENSIONISTA» son el mismo tipo, y una consulta que compara con `=` no lo sabe.
+        tipo = tipo.strip().toUpperCase(java.util.Locale.ROOT);
         if (tipo.isEmpty() || tipo.length() > TIPO_MAXIMO) {
             throw new IllegalArgumentException(
                     "El tipo de beneficio va de 1 a "
@@ -163,11 +166,27 @@ public record Beneficio(
     }
 
     /**
+     * Si este beneficio y el otro recaen sobre lo mismo: mismo tipo, mismo tributo, mismo predio y
+     * mismo vehiculo (#443).
+     *
+     * <p>Es el ambito en que dos vigencias pueden chocar. Hasta #443 se comparaba solo por
+     * contribuyente y tipo, y el mismo {@code SIN_SERVICIO} de limpieza en <b>otro</b> predio del
+     * mismo contribuyente —o sobre parques en el mismo predio— salia como solape. Si algun
+     * beneficio tiene que ser unico <b>por persona</b> —la deduccion de pensionista exige un solo
+     * predio (art. 19 del TUO LTM)—, eso es otra regla con su nombre, no un efecto de esta.
+     */
+    public boolean mismoAmbitoQue(Beneficio otro) {
+        return tipo.equals(otro.tipo)
+                && tributo.equals(otro.tributo)
+                && Objects.equals(predioId, otro.predioId)
+                && Objects.equals(vehiculoId, otro.vehiculoId);
+    }
+
+    /**
      * Si el rango de vigencia de este beneficio se cruza con el del otro.
      *
-     * <p>Es una funcion pura sobre dos intervalos, para poder probarla sin base de datos. Quien
-     * decide con que otros beneficios comparar —mismo contribuyente, mismo tipo— es {@code
-     * RegistrarBeneficio}, que trae los candidatos del repositorio.
+     * <p>Es una funcion pura sobre dos intervalos, para poder probarla sin base de datos. Con que
+     * otros beneficios se compara lo dice {@link #mismoAmbitoQue}.
      */
     public boolean solapaCon(Beneficio otro) {
         boolean empiezaAntesDeQueElOtroTermine =

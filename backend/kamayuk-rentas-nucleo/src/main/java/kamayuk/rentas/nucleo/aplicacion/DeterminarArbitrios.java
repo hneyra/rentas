@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -20,6 +21,7 @@ import kamayuk.rentas.nucleo.dominio.BeneficioRepository;
 import kamayuk.rentas.nucleo.dominio.Clase;
 import kamayuk.rentas.nucleo.dominio.arbitrios.CuotaDeArbitrio;
 import kamayuk.rentas.nucleo.dominio.arbitrios.CuotaDeArbitrioRepository;
+import kamayuk.rentas.nucleo.dominio.arbitrios.PeriodoDeArbitrio;
 import kamayuk.rentas.nucleo.dominio.arbitrios.Servicio;
 import kamayuk.rentas.nucleo.dominio.arbitrios.TitularPrincipalRepository;
 import kamayuk.rentas.parametros.ConjuntoVigente;
@@ -36,17 +38,20 @@ import org.springframework.transaction.annotation.Transactional;
  * sector y uso, tal cual (ADR-0007). El único cálculo estructural es «cuántas cuotas faltan» y «a
  * cuál servicio excluye qué beneficio» — nunca cuánto vale la tasa (regla 5, D-02b).
  *
+ * <p><b>Cada mes se decide a su fecha</b> (#443): el titular, el uso y el sector del predio y los
+ * beneficios que lo exoneran se leen a {@link PeriodoDeArbitrio#fechaDeAtribucion}, y no a la fecha
+ * de la corrida. Solo se generan los meses en que el predio tiene rasgos y titular: el predio
+ * independizado en julio no debe de enero a junio, y la inafectacion que acaba el 31 de diciembre
+ * no exonera el ejercicio siguiente aunque la emision se corra el 20 de diciembre.
+ *
  * <p><b>Reejecutar no duplica cargos</b> (AC de #31): antes de cada cuota se consulta {@link
- * CuotaDeArbitrioRepository#existe}, y el {@code UNIQUE} de {@code determinacion_arbitrio} (V23) es
- * la garantía real, no solo la de esta comprobación. Las cuotas ya generadas no se recalculan: un
- * cambio de uso o sector a mitad de ejercicio solo afecta las cuotas que todavía no existían cuando
- * se detecta.
+ * CuotaDeArbitrioRepository#existe}, y la restriccion {@code det_arbitrio_uq} ({@code
+ * V1__baseline.sql}) es la garantía real, no solo la de esta comprobación. Las cuotas ya generadas
+ * no se recalculan.
  */
 @Service
 public class DeterminarArbitrios {
 
-    private static final int PRIMER_PERIODO = 1;
-    private static final int ULTIMO_PERIODO = 12;
     private static final String TABLA_AUDITADA = "determinacion_arbitrio";
 
     private final CuotaDeArbitrioRepository cuotas;
@@ -86,57 +91,67 @@ public class DeterminarArbitrios {
     @Transactional
     public List<CuotaDeArbitrio> determinarPredio(
             long predioId, Ejercicio ejercicio, Observacion observacion) {
-        LocalDate fecha = LocalDate.now(reloj);
-
-        CaracteristicasDelPredio caracteristicasDelPredio =
-                caracteristicas
-                        .de(predioId, fecha)
-                        .filter(c -> c.uso() != null && c.sectorCodigo() != null)
-                        .orElseThrow(() -> new PredioSinCaracteristicas(predioId));
-
-        long contribuyenteId =
-                titulares
-                        .principalDe(predioId, fecha)
-                        .orElseThrow(() -> new PredioSinTitular(predioId));
+        LocalDate hoy = LocalDate.now(reloj);
 
         // Una resolucion, no dos (#361): los parametros y el id del mismo conjunto.
         ConjuntoVigente conjunto = parametros.vigenteConSuConjunto(ejercicio);
         ParametrosSellados sellados = conjunto.parametros();
         long conjuntoId = conjunto.id();
 
-        String claveDeTasa =
-                caracteristicasDelPredio.sectorCodigo() + ":" + caracteristicasDelPredio.uso();
-
         List<CuotaDeArbitrio> generadas = new ArrayList<>();
-        for (Servicio servicio : Servicio.values()) {
-            if (excluidoPorBeneficio(predioId, servicio, fecha)) {
+        boolean algunMesConRasgos = false;
+        boolean algunMesConTitular = false;
+        for (int periodo = PeriodoDeArbitrio.PRIMERO;
+                periodo <= PeriodoDeArbitrio.ULTIMO;
+                periodo++) {
+            LocalDate atribucion = PeriodoDeArbitrio.fechaDeAtribucion(ejercicio, periodo);
+            Optional<CaracteristicasDelPredio> rasgos =
+                    caracteristicas
+                            .de(predioId, atribucion)
+                            .filter(c -> c.uso() != null && c.sectorCodigo() != null);
+            if (rasgos.isEmpty()) {
                 continue;
             }
-            Dinero monto =
-                    new Dinero(
-                            sellados.exigirNumero(
-                                            LlavesDelConjunto.tasaDeArbitrio(servicio), claveDeTasa)
-                                    .valor());
-            String parametroAplicado =
-                    LlavesDelConjunto.tasaDeArbitrio(servicio) + ":" + claveDeTasa;
+            algunMesConRasgos = true;
+            Optional<Long> titular = titulares.principalDe(predioId, atribucion);
+            if (titular.isEmpty()) {
+                continue;
+            }
+            algunMesConTitular = true;
 
-            for (int periodo = PRIMER_PERIODO; periodo <= ULTIMO_PERIODO; periodo++) {
-                if (cuotas.existe(predioId, servicio, ejercicio, periodo)) {
+            String claveDeTasa = rasgos.get().sectorCodigo() + ":" + rasgos.get().uso();
+            for (Servicio servicio : Servicio.values()) {
+                if (excluidoPorBeneficio(predioId, servicio, atribucion)
+                        || cuotas.existe(predioId, servicio, ejercicio, periodo)) {
                     continue;
                 }
+                Dinero monto =
+                        new Dinero(
+                                sellados.exigirNumero(
+                                                LlavesDelConjunto.tasaDeArbitrio(servicio),
+                                                claveDeTasa)
+                                        .valor());
                 generadas.add(
                         determinarCuota(
                                 ejercicio,
                                 servicio,
                                 periodo,
-                                contribuyenteId,
+                                titular.get(),
                                 predioId,
                                 conjuntoId,
                                 monto,
-                                parametroAplicado,
-                                fecha,
+                                LlavesDelConjunto.tasaDeArbitrio(servicio) + ":" + claveDeTasa,
+                                hoy,
                                 observacion));
             }
+        }
+        // Nada se escribio si ningun mes tenia rasgos y titular: fallar aqui no deja cuotas a
+        // medias.
+        if (!algunMesConRasgos) {
+            throw new PredioSinCaracteristicas(predioId);
+        }
+        if (!algunMesConTitular) {
+            throw new PredioSinTitular(predioId);
         }
         return generadas;
     }
@@ -202,7 +217,7 @@ public class DeterminarArbitrios {
         return "DETERMINACION-ARBITRIO-" + ejercicio + "-" + servicio.name();
     }
 
-    /** El predio no tiene ficha vigente, o no tiene sector asignado: no hay con qué buscar tasa. */
+    /** El predio no tiene uso o sector en ningun mes del ejercicio: no hay con qué buscar tasa. */
     public static final class PredioSinCaracteristicas extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
@@ -215,7 +230,7 @@ public class DeterminarArbitrios {
         }
     }
 
-    /** El predio no tiene ningún titular vigente a quién cobrarle. */
+    /** El predio no tiene titular en ningun mes en que tenga rasgos: no hay a quién cobrarle. */
     public static final class PredioSinTitular extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
