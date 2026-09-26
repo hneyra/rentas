@@ -7,7 +7,6 @@ import kamayuk.rentas.sanciones.dominio.ItemDeCorrida;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DataRetrievalFailureException;
 import org.springframework.dao.NonTransientDataAccessException;
 import org.springframework.stereotype.Service;
@@ -120,20 +119,26 @@ public class GenerarCorridaDeValores {
     /**
      * Si el fallo sale de los datos de la papeleta, y por tanto ningún reintento lo arregla (#384).
      *
-     * <p>Son dos familias de {@link NonTransientDataAccessException}: una lectura que no devuelve
-     * lo que el código espera —{@link DataRetrievalFailureException}, como la {@code
-     * IncorrectResultSizeDataAccessException} de dos resoluciones donde se esperaba una— y una
-     * restricción de la base que esta papeleta viola —{@link DataIntegrityViolationException}—.
+     * <p>Es una sola familia de {@link NonTransientDataAccessException}: una lectura que no
+     * devuelve lo que el código espera —{@link DataRetrievalFailureException}, como la {@code
+     * IncorrectResultSizeDataAccessException} de dos resoluciones donde se esperaba una—.
      *
      * <p><b>No lo es toda excepción no transitoria</b>, y eso es a propósito. Una consulta mal
      * escrita o un permiso que falta también son no transitorios, pero no son de esta papeleta:
      * revientan en todos los candidatos, los arregla un despliegue, y cerrarlos como {@code
      * NO_PROCEDE} los daría por resueltos y apagaría la alarma de {@link Informe#sinAvance()}, con
      * la que el proceso batch sale distinto de cero. Siguen contando como fallidos.
+     *
+     * <p><b>Tampoco lo es una restricción violada</b> ({@code DataIntegrityViolationException}),
+     * por la misma razón: un {@code NOT NULL} que el código no rellena o un valor fuera de rango
+     * (SQLState de clase 22 o 23) sale de un defecto del programa tan a menudo como de los datos, y
+     * entonces revienta en todos los candidatos. El único caso de datos que se conoce —la carrera
+     * en que otra corrida ya le dio valor a la papeleta, que {@code papeleta_valor_unico_uq}
+     * rechaza— no llega aquí como {@code DuplicateKeyException}: el repositorio lo traduce a {@link
+     * CorridaDeValoresRepository.PapeletaYaConValor}.
      */
     private static boolean esDeSusDatos(DataAccessException fallo) {
-        return fallo instanceof DataRetrievalFailureException
-                || fallo instanceof DataIntegrityViolationException;
+        return fallo instanceof DataRetrievalFailureException;
     }
 
     /**

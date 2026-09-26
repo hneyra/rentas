@@ -146,6 +146,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.http.ResponseEntity;
@@ -2225,13 +2226,15 @@ class ValoresMasivosYReportesJdbcTest {
 
         @Test
         @DisplayName(
-                "el de datos sale NO_PROCEDE con su mensaje; el pasajero y el del programa, no")
+                "el de datos sale NO_PROCEDE con su mensaje; el pasajero, el del programa y la"
+                        + " restriccion violada, no")
         void elDeDatosNoProcedeYElPasajeroSigue() {
             Papeleta deDatos = papeletaExigible("err384a");
             Papeleta pasajero = papeletaExigible("err384b");
             Papeleta delPrograma = papeletaExigible("err384c");
             Papeleta sana = papeletaExigible("err384d");
-            CorridaDeValores corrida = corridaDe(deDatos, pasajero, delPrograma, sana);
+            Papeleta restriccion = papeletaExigible("err384e");
+            CorridaDeValores corrida = corridaDe(deDatos, pasajero, delPrograma, sana, restriccion);
 
             GenerarCorridaDeValores conFallos =
                     new GenerarCorridaDeValores(
@@ -2251,7 +2254,15 @@ class ValoresMasivosYReportesJdbcTest {
                                                             "SELECT columna_que_no_existe",
                                                             new SQLException(
                                                                     "column does not exist",
-                                                                    "42703"))))));
+                                                                    "42703")),
+                                                    restriccion.identificador(),
+                                                    new DataIntegrityViolationException(
+                                                            "null value in column \"valor_id\""
+                                                                    + " violates not-null"
+                                                                    + " constraint",
+                                                            new SQLException(
+                                                                    "not-null violation",
+                                                                    "23502"))))));
             GenerarCorridaDeValores.Informe informe = conFallos.generar(corrida.identificador());
 
             ItemDeCorrida itemDeDatos = itemDe(corrida, deDatos);
@@ -2268,6 +2279,12 @@ class ValoresMasivosYReportesJdbcTest {
                     .as(
                             "una consulta mal escrita la arregla un despliegue, no los datos de esta papeleta")
                     .isEqualTo(EstadoDeItemDeCorrida.PENDIENTE);
+            assertThat(itemDe(corrida, restriccion).estado())
+                    .as(
+                            "un NOT NULL violado sale tan a menudo de un defecto del codigo como de"
+                                    + " los datos, y entonces revienta en todos: no se da por"
+                                    + " resuelto")
+                    .isEqualTo(EstadoDeItemDeCorrida.PENDIENTE);
             assertThat(itemDe(corrida, sana).estado()).isEqualTo(EstadoDeItemDeCorrida.GENERADO);
             assertThat(informe)
                     .as("generados, sin deuda, no proceden, fallidos")
@@ -2276,7 +2293,7 @@ class ValoresMasivosYReportesJdbcTest {
                             GenerarCorridaDeValores.Informe::sinDeuda,
                             GenerarCorridaDeValores.Informe::noProceden,
                             GenerarCorridaDeValores.Informe::fallidos)
-                    .containsExactly(1, 0, 1, 2);
+                    .containsExactly(1, 0, 1, 3);
         }
     }
 
