@@ -686,7 +686,12 @@ class TransferirARentasTest {
                         lineas);
         movimientos.insertar(
                 MovimientoDeLiquidacion.apertura(guardada.identificador(), HOY, "emitida", PORQUE));
-        if (estado != EstadoDeLiquidacion.ABIERTA) {
+        if (estado == EstadoDeLiquidacion.NOTIFICADA) {
+            // Notificar lleva el numero del cargo (#368).
+            movimientos.insertar(
+                    MovimientoDeLiquidacion.notificada(
+                            guardada.identificador(), HOY, "entregada", "N-2026-0001", PORQUE));
+        } else if (estado != EstadoDeLiquidacion.ABIERTA) {
             movimientos.insertar(
                     MovimientoDeLiquidacion.cambioDeEstado(
                             guardada.identificador(), estado, HOY, "cerrada", PORQUE));
