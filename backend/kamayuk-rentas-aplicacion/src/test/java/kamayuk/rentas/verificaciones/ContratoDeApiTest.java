@@ -352,6 +352,8 @@ class ContratoDeApiTest {
                     "GET /transito/internamientos",
                     "POST /transito/internamientos",
                     "POST /transito/internamientos/{placa}/liberacion",
+                    // #454 — el abandono del vehiculo: el estado EN_ABANDONO no tenia productor.
+                    "POST /transito/internamientos/{placa}/abandono",
                     "POST /transito/resoluciones/ordinaria",
                     "POST /transito/resoluciones/sancionadora",
                     "POST /transito/resoluciones/{numero}/notificacion",

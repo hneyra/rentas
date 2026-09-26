@@ -152,6 +152,7 @@ class ElEstadoYLaClaseLleganPorElCableTest {
                                 consulta,
                                 null,
                                 null,
+                                null,
                                 java.time.Clock.fixed(
                                         DIA.atStartOfDay(java.time.ZoneOffset.UTC).toInstant(),
                                         java.time.ZoneOffset.UTC)));

@@ -28,7 +28,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Libera un vehículo del depósito municipal, o declara su abandono (#50, RF-064).
+ * Libera un vehículo del depósito municipal (#50, RF-064). El abandono lo declara {@link
+ * DeclararAbandonoDeVehiculo} (#454): este javadoc lo prometía, y la clase nunca lo hizo.
  *
  * <h2>La custodia pagada se comprueba contra la caja, no contra una casilla</h2>
  *
