@@ -751,6 +751,11 @@ export interface LicenciaDeFuncionamiento {
   readonly ordenanzaDeLaZona: string;
   readonly zonaOrigen: string;
   readonly comprobacionDelTerritorio: string;
+  /**
+   * Por que se emitio aunque el territorio no lo respaldara, con las palabras de quien lo asumio
+   * (#418). `null` si el territorio lo respaldaba, si no se pregunto o si la licencia es anterior.
+   */
+  readonly autorizacionDelTerritorio: string | null;
   readonly aforo: number;
   readonly fechaDeEmision: string;
   readonly fechaDeVencimiento: string;

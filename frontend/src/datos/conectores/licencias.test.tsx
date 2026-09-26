@@ -78,6 +78,7 @@ function licencia(
     ordenanzaDeLaZona: '',
     zonaOrigen: '',
     comprobacionDelTerritorio: '',
+    autorizacionDelTerritorio: null,
     aforo: 0,
     fechaDeEmision: '02/01/2026',
     fechaDeVencimiento: '31/12/2026',
