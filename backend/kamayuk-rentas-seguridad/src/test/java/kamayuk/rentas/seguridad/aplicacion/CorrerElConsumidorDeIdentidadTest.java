@@ -277,6 +277,11 @@ class CorrerElConsumidorDeIdentidadTest {
                 java.time.Duration umbral) {
             // Lo mide PasadaDelConsumidorDeIdentidadTest; aqui no es el sujeto.
         }
+
+        @Override
+        public void laCopiaSeQuedaComoEstaba(String causa, long cuentas) {
+            // Lo mide ImplantarMunicipalidadTest; aqui no es el sujeto.
+        }
     }
 
     private static final class AplicadorQueCuenta extends AplicarUnEventoDeIdentidad {

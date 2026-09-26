@@ -145,6 +145,25 @@ class ElAvisoAlResponsableTest {
     }
 
     @Test
+    @DisplayName(
+            "#453: la copia que se queda como estaba al implantar va por el mismo canal, con la"
+                    + " causa y las cuentas")
+    void laCopiaQueSeQuedaComoEstabaVaPorElMismoCanal() {
+        alertaCon(canal.raiz())
+                .laCopiaSeQuedaComoEstaba(
+                        "`identidad` contesto 503 al leer el buzon, y contesto «reiniciando»", 40);
+
+        assertThat(canal.esperaElAviso())
+                .contains("NO SE PUSO AL DIA AL IMPLANTAR")
+                .contains("contesto 503")
+                .as("lo que sigue autorizando: las cuentas que la copia ya tenia")
+                .contains("con 40 cuenta(s)")
+                .contains("SIN_LEER_AL_IMPLANTAR")
+                .endsWith("}");
+        assertThat(canal.recibidos()).as("y no llego un segundo aviso").isEmpty();
+    }
+
+    @Test
     @DisplayName("sin nombre o sin canal el consumidor no arranca, y el mensaje dice las dos")
     void sinResponsableNoArranca() {
         assertThatThrownBy(

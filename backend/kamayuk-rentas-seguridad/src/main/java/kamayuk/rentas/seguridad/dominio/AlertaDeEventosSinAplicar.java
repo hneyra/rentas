@@ -13,12 +13,13 @@ import kamayuk.rentas.plataforma.EstadoDeLaCola;
  * contestando con lo que la copia dice. Por eso se avisa a una persona con nombre, y no solo al
  * registro.
  *
- * <p><b>Son tres avisos y no uno, porque son tres hechos distintos</b>: uno que no se podra aplicar
- * nunca —se aparta a la cola de muertos, y hay que mirarlo—; uno que se podria aplicar en cuanto
- * llegue su dependencia, y que se aparto porque dejo de estar en camino; y una cola cuya cabeza
- * entera esta esperando con mas eventos detras, que no se leen (#377). El segundo no es un fallo
- * mientras la dependencia este en camino; lo es cuando deja de estarlo, y eso solo se ve por el
- * tiempo que lleva esperando.
+ * <p><b>Son cuatro avisos y no uno, porque son cuatro hechos distintos</b>: uno que no se podra
+ * aplicar nunca —se aparta a la cola de muertos, y hay que mirarlo—; uno que se podria aplicar en
+ * cuanto llegue su dependencia, y que se aparto porque dejo de estar en camino; una cola cuya
+ * cabeza entera esta esperando con mas eventos detras, que no se leen (#377); y una implantacion
+ * que no pudo leer el buzon y deja la copia como estaba (#453). El segundo no es un fallo mientras
+ * la dependencia este en camino; lo es cuando deja de estarlo, y eso solo se ve por el tiempo que
+ * lleva esperando.
  */
 public interface AlertaDeEventosSinAplicar {
 
@@ -58,4 +59,19 @@ public interface AlertaDeEventosSinAplicar {
      */
     void laColaEstaBloqueada(
             EstadoDeLaCola.Bloqueada bloqueada, List<EventoPospuesto> enLaCabeza, Duration umbral);
+
+    /**
+     * La implantacion no pudo leer el buzon y la copia local SE QUEDA COMO ESTABA, con cuentas
+     * (#453).
+     *
+     * <p>No es un fallo del {@code Job} —la municipalidad ya tiene quien entre, y el {@code
+     * Deployment} sigue autorizando con esa copia—, pero tampoco es nada: lo que {@code identidad}
+     * haya cambiado desde la ultima pasada, una baja incluida, no rige aqui hasta que el {@code
+     * CronJob} del consumidor la ponga al dia. Y si la causa es una credencial o una afiliacion, no
+     * se cura sola. Por eso va a una persona y no solo al registro del {@code Job}.
+     *
+     * @param causa lo que el transporte dijo, con el estado dentro si lo hubo
+     * @param cuentas las cuentas que la copia local tiene, que son las que siguen autorizando
+     */
+    void laCopiaSeQuedaComoEstaba(String causa, long cuentas);
 }

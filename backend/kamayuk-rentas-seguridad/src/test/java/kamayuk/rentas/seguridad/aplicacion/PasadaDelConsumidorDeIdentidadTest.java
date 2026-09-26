@@ -328,6 +328,11 @@ class PasadaDelConsumidorDeIdentidadTest {
                 Duration umbral) {
             bloqueadas.add(bloqueada);
         }
+
+        @Override
+        public void laCopiaSeQuedaComoEstaba(String causa, long cuentas) {
+            // Lo mide ImplantarMunicipalidadTest; aqui no es el sujeto.
+        }
     }
 
     private record AvisoDePospuestos(

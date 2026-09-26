@@ -69,6 +69,15 @@ import org.springframework.stereotype.Component;
  * minutos y al que nadie mira. Lo que no puede pasar es lo contrario: terminar en verde sin que
  * nadie pueda entrar.
  *
+ * <p><b>Y el resultado decide tambien cuando el buzon no contesta</b> (#453). {@code
+ * IdentidadNoContesta} es un 503 de un {@code identidad} que se reinicia, un 403 de una afiliacion,
+ * un token que el emisor no entrega: todo transitorio o de despliegue, y nada de ello dice si la
+ * copia esta vacia. En la primera implantacion lo esta, y se falla como siempre. En un
+ * <b>redespliegue</b> —un {@code Job} nuevo por cada {@code sha}— la copia ya tiene sus cuentas y
+ * el {@code Deployment} autoriza con ellas: fallar ahi dejaba el despliegue de `rentas` atascado
+ * por la disponibilidad de otro sistema y mandaba al operador a buscar una copia vacia que no
+ * existia. Asi que la causa solo elige el mensaje; lo que decide es si hay cuentas.
+ *
  * <h2>Lo que NO hace</h2>
  *
  * <ul>
@@ -214,6 +223,11 @@ public class ImplantarMunicipalidad implements ApplicationRunner {
      * transitorio; y «el buzon contesto y no trajo ni una cuenta» se arregla implantando {@code
      * identidad}, que es otra cosa y en otro repositorio. Colapsarlas en un solo mensaje mandaria a
      * dos de cada tres casos a mirar donde no es.
+     *
+     * <p>La segunda solo es negativa si la copia se queda VACIA (#453): con cuentas —un
+     * redespliegue, o una pasada que cayo a mitad despues de aplicar parte— la copia se queda como
+     * estaba, se avisa y el {@code Job} termina. La falta de buzon configurado no entra en eso: es
+     * configuracion, y no se cura sola.
      */
     private void traerLaAutorizacion() {
         if (pasada == null) {
@@ -231,6 +245,13 @@ public class ImplantarMunicipalidad implements ApplicationRunner {
         try {
             aplicados = pasada.hastaAgotar();
         } catch (FuenteDeEventosDeIdentidad.IdentidadNoContesta noContesta) {
+            // Se cuenta ANTES de decidir (#453): lanzar aqui sin mirar afirmaba «sin una sola
+            // cuenta» de una copia que en un redespliegue tiene todas las suyas.
+            long cuentasQueHabia = copiaLocal.usuariosEnLaCopia();
+            if (cuentasQueHabia > 0) {
+                seQuedaComoEstaba(pasada, noContesta, cuentasQueHabia);
+                return;
+            }
             throw new SinLaAutorizacionDeIdentidad(
                     "No se pudo leer el buzon de `identidad` al implantar la municipalidad "
                             + datos.ubigeo()
@@ -262,6 +283,33 @@ public class ImplantarMunicipalidad implements ApplicationRunner {
                 aplicados,
                 cuentas);
         avisarSiFaltaElAdministradorDeclarado();
+    }
+
+    /**
+     * El buzon no contesto y la copia TIENE cuentas: se queda como estaba, se dice con la causa, y
+     * el {@code Job} termina bien (#453).
+     *
+     * <p>Es el mismo criterio que {@link #avisarSiFaltaElAdministradorDeclarado()}: fallar dejaria
+     * todo despliegue de `rentas` en rojo por la disponibilidad de otro sistema, y no impide que
+     * nadie entre —ahi hay cuentas—. Y en el {@code Job} de implantacion nadie mas lo reintenta —el
+     * runner del consumidor se aparta alli—: lo que la pone al dia es el {@code CronJob}. El aviso
+     * sale ademas al responsable de la copia, porque una linea de {@code WARN} en el registro de un
+     * {@code Job} que termino bien no la lee nadie.
+     */
+    private void seQuedaComoEstaba(
+            PasadaDelConsumidorDeIdentidad pasada,
+            FuenteDeEventosDeIdentidad.IdentidadNoContesta noContesta,
+            long cuentas) {
+        log.warn(
+                "No se pudo leer el buzon de `identidad` al implantar la municipalidad {}: {}. Su"
+                        + " copia local tiene {} cuenta(s) y se queda como estaba —el Deployment"
+                        + " sigue autorizando con ella—, asi que la implantacion termina; el"
+                        + " CronJob del consumidor la pone al dia en cuanto `identidad` conteste",
+                datos.ubigeo(),
+                noContesta.getMessage(),
+                cuentas,
+                noContesta);
+        pasada.avisarQueLaCopiaSeQuedaComoEstaba(noContesta, cuentas);
     }
 
     /**

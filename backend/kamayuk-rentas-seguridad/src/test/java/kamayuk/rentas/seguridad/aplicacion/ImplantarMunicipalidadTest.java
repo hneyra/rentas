@@ -245,6 +245,20 @@ class ImplantarMunicipalidadTest {
                 .single();
     }
 
+    /** Lo que la implantacion escribio en su registro mientras corria. */
+    private static List<ILoggingEvent> anotado(Runnable implantar) {
+        Logger registro = (Logger) LoggerFactory.getLogger(ImplantarMunicipalidad.class);
+        ListAppender<ILoggingEvent> anotadas = new ListAppender<>();
+        anotadas.start();
+        registro.addAppender(anotadas);
+        try {
+            implantar.run();
+        } finally {
+            registro.detachAppender(anotadas);
+        }
+        return List.copyOf(anotadas.list);
+    }
+
     // ------------------------------------------------------------------
 
     @Nested
@@ -381,6 +395,74 @@ class ImplantarMunicipalidadTest {
                         .isEqualTo(CatalogoDeOpciones.leer().size());
             }
         }
+
+        /**
+         * #453: un redespliegue con {@code identidad} caido o negando NO tumba una municipalidad
+         * que ya tiene cuentas.
+         *
+         * <p>La siembra que distingue es la PAREJA con {@link ElOrdenEquivocado#unBuzonQueNiega()}:
+         * el mismo buzon que niega, una vez sobre una copia en cero —que tiene que seguir fallando—
+         * y otra sobre una copia con cinco cuentas —que tiene que terminar bien—. Con una sola de
+         * las dos, «decidir por el resultado» y «no fallar nunca» (o «fallar siempre») dan el mismo
+         * color. Y son dos negativas y no una porque {@code IdentidadNoContesta} las cubre todas:
+         * el 503 de un {@code identidad} reiniciandose y el 403 de una afiliacion mal puesta, que
+         * ya paso (#66).
+         */
+        @Test
+        @DisplayName(
+                "#453 — relanzar con el buzon en 503 o en 403 NO tumba una municipalidad que ya"
+                        + " tiene cuentas: la copia se queda como estaba, y se avisa con la causa")
+        void relanzarConElBuzonCaidoNoTumbaLaImplantacion() throws IOException {
+            AlertaQueAnota alerta = new AlertaQueAnota();
+            try (BuzonDeMentira buzon =
+                    BuzonDeMentira.arranca(CorrienteDeIdentidad.deUnaImplantacion())) {
+                implantacion("270105", false, hay(pasadaContra(buzon, alerta))).run(null);
+            }
+            for (int estado : new int[] {503, 403}) {
+                List<ILoggingEvent> anotadas;
+                try (BuzonDeMentira caido = BuzonDeMentira.queNiega(estado)) {
+                    anotadas =
+                            anotado(
+                                    () ->
+                                            implantacion(
+                                                            "270105",
+                                                            false,
+                                                            hay(pasadaContra(caido, alerta)))
+                                                    .run(null));
+                }
+                assertThat(
+                                anotadas.stream()
+                                        .filter(e -> e.getLevel() == Level.WARN)
+                                        .map(ILoggingEvent::getFormattedMessage)
+                                        .toList())
+                        .as(
+                                "[el Deployment sigue sirviendo con sus cinco cuentas: lo que se dice"
+                                        + " es la CAUSA —el %d— y que la copia se queda como estaba, no"
+                                        + " que se quede «sin una sola cuenta» ni que haya que implantar"
+                                        + " `identidad` primero]",
+                                estado)
+                        .singleElement()
+                        .asString()
+                        .contains("270105")
+                        .contains("contesto " + estado)
+                        .contains("5 cuenta(s)")
+                        .doesNotContain("sin una sola cuenta")
+                        .doesNotContain("PRIMERO");
+            }
+            assertThat(alerta.copiasQueSeQuedanComoEstaban)
+                    .as(
+                            "y el aviso sale ADEMAS al responsable, una vez por relanzamiento y con"
+                                    + " su causa: un WARN en un Job que termino bien no lo lee nadie")
+                    .satisfiesExactly(
+                            aviso -> assertThat(aviso).startsWith("5 cuenta(s)").contains("503"),
+                            aviso -> assertThat(aviso).startsWith("5 cuenta(s)").contains("403"));
+            assertThat(alerta.pospuestos).isEmpty();
+            assertThat(alerta.apartados).isEmpty();
+            TenantContext.fijar(new MunicipalidadId(idDe("270105")));
+            assertThat(contar("SELECT count(*) FROM usuario"))
+                    .as("la copia se queda con las cinco cuentas que ya tenia")
+                    .isEqualTo(5);
+        }
     }
 
     @Nested
@@ -435,6 +517,11 @@ class ImplantarMunicipalidadTest {
             }
             TenantContext.fijar(new MunicipalidadId(idDe("270202")));
             assertThat(contar("SELECT count(*) FROM usuario")).isZero();
+            assertThat(alerta.copiasQueSeQuedanComoEstaban)
+                    .as(
+                            "[#453: con la copia en CERO no hay nada «como estaba» que dejar: se"
+                                    + " falla, y el aviso de que se queda como estaba no sale]")
+                    .isEmpty();
         }
 
         @Test
@@ -619,19 +706,6 @@ class ImplantarMunicipalidadTest {
                     .contains("270404")
                     .contains("es_demostracion = false")
                     .contains("pidio es_demostracion = true");
-        }
-
-        private static List<ILoggingEvent> anotado(Runnable implantar) {
-            Logger registro = (Logger) LoggerFactory.getLogger(ImplantarMunicipalidad.class);
-            ListAppender<ILoggingEvent> anotadas = new ListAppender<>();
-            anotadas.start();
-            registro.addAppender(anotadas);
-            try {
-                implantar.run();
-            } finally {
-                registro.detachAppender(anotadas);
-            }
-            return List.copyOf(anotadas.list);
         }
 
         /** La linea que existe para decir el regimen, y tiene que haber UNA por implantacion. */
@@ -1090,6 +1164,7 @@ class ImplantarMunicipalidadTest {
     private static final class AlertaQueAnota implements AlertaDeEventosSinAplicar {
         private final List<String> apartados = new ArrayList<>();
         private final List<String> pospuestos = new ArrayList<>();
+        private final List<String> copiasQueSeQuedanComoEstaban = new ArrayList<>();
 
         @Override
         public void hayUnEventoSinAplicar(
@@ -1109,6 +1184,11 @@ class ImplantarMunicipalidadTest {
                 List<EventoPospuesto> enLaCabeza,
                 java.time.Duration umbral) {
             pospuestos.add("COLA BLOQUEADA: " + bloqueada);
+        }
+
+        @Override
+        public void laCopiaSeQuedaComoEstaba(String causa, long cuentas) {
+            copiasQueSeQuedanComoEstaban.add(cuentas + " cuenta(s): " + causa);
         }
     }
 }
