@@ -28,6 +28,18 @@ public interface LiquidacionRepository {
 
     Optional<Liquidacion> porNumero(String numero);
 
+    /**
+     * Serializa, hasta el final de la transaccion, los actos que deciden sobre el estado de esta
+     * liquidacion (#484).
+     *
+     * <p>Anular lee que no hay RDF y escribe ANULADA; transferir lee LIQUIDADA y escribe la RDF.
+     * Sin candado las dos leen el estado anterior y las dos escriben, y queda una RDF vigente sobre
+     * una liquidacion anulada: el estado que #338 declaro imposible. Se toma <b>antes</b> de leer
+     * el estado. Es un candado consultivo y no un {@code FOR UPDATE}: la tabla no admite {@code
+     * UPDATE} (V39 §3), y bloquear la fila exigiria el privilegio que se le retiro.
+     */
+    void bloquear(long liquidacionId);
+
     Optional<Liquidacion> findById(long id);
 
     /** Las líneas de una liquidación, ordenadas por ejercicio y unidad. */

@@ -37,6 +37,10 @@ public final class LiquidacionesEnMemoria implements LiquidacionRepository {
     /**
      * El embudo (#196) se mide contra PostgreSQL: el DISTINCT y la ultima version son del motor.
      */
+    /** En memoria no hay concurrencia que serializar: el candado es de la base (#484). */
+    @Override
+    public void bloquear(long liquidacionId) {}
+
     @Override
     public int unidadesConDiferencia(
             long programaId,

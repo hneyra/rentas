@@ -186,6 +186,10 @@ public class TransferirARentas {
                                 () -> new LiquidacionInexistente(peticion.numeroDeLiquidacion()));
         long liquidacionId = liquidacion.identificador();
 
+        // El candado de la liquidacion ANTES de leer su estado (#484), el mismo que toma la
+        // anulacion: una de las dos espera a que la otra confirme y ve lo que hizo. Va antes del
+        // de la unidad, siempre en ese orden, y la anulacion solo toma este.
+        liquidaciones.bloquear(liquidacionId);
         exigirSustento(liquidacion, peticion);
 
         ActaFiscalizacion acta =
