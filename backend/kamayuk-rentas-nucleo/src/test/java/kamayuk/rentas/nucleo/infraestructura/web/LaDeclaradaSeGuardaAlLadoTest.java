@@ -364,8 +364,7 @@ class LaDeclaradaSeGuardaAlLadoTest {
                         valuaciones,
                         (contribuyenteId, fecha) -> List.of(),
                         comoLoMontaSpring(
-                                new RegistrarDeterminacionPredial(
-                                        repositorio, lector, registro -> {})),
+                                new RegistrarDeterminacionPredial(repositorio, registro -> {})),
                         RELOJ);
         RegistrarCorridaDeEmision rastro =
                 comoLoMontaSpring(
