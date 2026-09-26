@@ -200,10 +200,12 @@ public class PapeletaRepositoryJdbc extends RepositorioJdbc implements PapeletaR
             parametros.put("ingresadoPor", criterio.ingresadoPor());
         }
         if (criterio.soloPendientes()) {
-            // La lista sale del enumerado y no se escribe aqui (#259): hasta entonces
+            // El predicado sale del dominio y no se escribe aqui (#259): hasta entonces
             // estaba tres veces —esta, la de PadronDePapeletasRepositoryJdbc y la de
-            // PapeletaDelPadron.estaPendiente(), que es la que la API publica—.
-            condiciones.add("p.estado NOT IN " + EstadoDePapeleta.NO_SE_DEBE);
+            // PapeletaDelPadron.estaPendiente(), que es la que la API publica—. Y desde
+            // #385 no es solo el estado: la multa que una resolucion deja sin efecto
+            // sigue IMPUESTA y el estado de cuenta de transito la listaba.
+            condiciones.add(EstadoDePapeleta.SE_DEBE);
         }
 
         String donde = " WHERE " + String.join(" AND ", condiciones);
@@ -298,6 +300,18 @@ public class PapeletaRepositoryJdbc extends RepositorioJdbc implements PapeletaR
                             + " en esta municipalidad");
         }
         return anulada;
+    }
+
+    @Override
+    public boolean dejadaSinEfecto(long papeletaId) {
+        return jdbc().sql(
+                        "SELECT "
+                                + EstadoDePapeleta.DEJADA_SIN_EFECTO
+                                + " FROM papeleta p WHERE p.id = :id")
+                .param("id", papeletaId)
+                .query(Boolean.class)
+                .optional()
+                .orElse(false);
     }
 
     private static Papeleta conId(Papeleta papeleta, long id, String usuarioRegistro) {

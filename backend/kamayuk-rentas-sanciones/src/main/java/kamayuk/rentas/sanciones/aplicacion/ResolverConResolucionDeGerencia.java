@@ -81,6 +81,13 @@ import org.springframework.transaction.annotation.Transactional;
  * tiene y del libro: escribirla en la columna dejaría dos verdades, y la de la columna es la que
  * nadie vuelve a mirar.
  *
+ * <p><b>Y desde #385 alguien la deriva.</b> Hasta entonces esta frase era cierta sólo a medias: la
+ * columna no se tocaba, pero ningún lector miraba el efecto de las resoluciones, así que la multa
+ * seguía {@code SANCIONADA} en la fase, {@code pendiente} en el padrón y en el estado de cuenta, y
+ * negaba la constancia de tránsito. Ahora lo que la deriva es un predicado, {@link
+ * EstadoDePapeleta#DEJADA_SIN_EFECTO}, que leen la fase, los padrones, el resumen y la guarda de
+ * más abajo: una sola fuente, derivada de {@link EfectoSobreLaMulta#extingueLaDeuda()}.
+ *
  * <h2>Y no si un valor vivo la formaliza (#495)</h2>
  *
  * <p>Antes de dictar nada, la resolución que deja la multa sin efecto pregunta a {@code valores}
@@ -150,7 +157,8 @@ public class ResolverConResolucionDeGerencia {
      * @param formato en qué formato sale el papel
      * @param observacion por qué se dicta (regla 10, RNF-052)
      * @throws RegistrarDescargo.PapeletaInexistente si no hay ninguna papeleta con ese número
-     * @throws RegistrarDescargo.PapeletaSinNadaQueImpugnar si la papeleta está anulada o prescrita
+     * @throws RegistrarDescargo.PapeletaSinNadaQueImpugnar si la papeleta está anulada o prescrita,
+     *     o una resolución anterior ya dejó su multa sin efecto (#385)
      * @throws DescargoInexistente si se pide resolver un recurso que no existe
      * @throws DescargoDeOtraPapeleta si el recurso es de otra papeleta
      * @throws OrdinariaSinDictar si se pide la sancionadora y no hay ordinaria
@@ -174,10 +182,9 @@ public class ResolverConResolucionDeGerencia {
                                 () ->
                                         new RegistrarDescargo.PapeletaInexistente(
                                                 peticion.familia(), peticion.numeroDePapeleta()));
-        if (papeleta.estado() == EstadoDePapeleta.ANULADA
-                || papeleta.estado() == EstadoDePapeleta.PRESCRITA) {
-            throw new RegistrarDescargo.PapeletaSinNadaQueImpugnar(papeleta);
-        }
+        // La misma guarda que el descargo, y no una copia (#385): tambien rechaza la papeleta
+        // cuya multa ya dejo sin efecto otra resolucion, que el estado no dice.
+        RegistrarDescargo.exigirQueQuedeAlgoQueImpugnar(papeleta, papeletas);
 
         Descargo recurso = recursoDe(papeleta, peticion);
         // #402: la fecha de la resolucion es la fecha valor de la baja, y hasta aqui una del 5 de

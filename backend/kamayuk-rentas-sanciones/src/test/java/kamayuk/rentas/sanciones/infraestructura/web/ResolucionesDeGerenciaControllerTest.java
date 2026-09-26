@@ -595,6 +595,13 @@ class ResolucionesDeGerenciaControllerTest {
         }
 
         @Override
+        public boolean dejadaSinEfecto(long papeletaId) {
+            // Ninguna resolucion de este doble deja nada sin efecto en la base: el
+            // predicado de #385 se mide contra PostgreSQL en SancionesJdbcTest.
+            return false;
+        }
+
+        @Override
         public Papeleta anular(long papeletaId) {
             throw new UnsupportedOperationException("esta prueba no anula papeletas");
         }

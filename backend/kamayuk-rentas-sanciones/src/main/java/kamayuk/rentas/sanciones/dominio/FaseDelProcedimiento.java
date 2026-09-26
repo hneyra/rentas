@@ -40,7 +40,11 @@ package kamayuk.rentas.sanciones.dominio;
  *   <li>{@code papeleta.estado}, para la cola del procedimiento. Que el cobro y el pase a coactiva
  *       se digan en el vocabulario de la deuda no es un accidente: <b>son</b> de la deuda.
  *   <li>Que exista una {@code resolucion_gerencia} de tipo {@code ADMINISTRATIVA} sobre la papeleta
- *       (V41 §3) — la RIS que la pantalla emite con «Emitir RIS».
+ *       (V41 §3) — la RIS que la pantalla emite con «Emitir RIS», <b>y también</b> la que resuelve
+ *       un descargo, porque la ruta de la administrativa siempre dicta ese tipo. Hasta #385 aquí se
+ *       decía sólo lo primero, y por eso la multa cuyo descargo se declaró fundado seguía {@code
+ *       SANCIONADA}: la que una resolución dejó sin efecto la recoge antes la primera rama, con
+ *       {@link EstadoDePapeleta#DEJADA_SIN_EFECTO}.
  *   <li>Que la notificación preventiva que originó el acta ({@code
  *       papeleta.notificacion_previa_id}, V4) siga <b>abierta</b>: {@code EMITIDA} y con su plazo
  *       sin vencer a la fecha de corte. «Sin vencer» no se escribe aquí: es {@link
@@ -54,10 +58,11 @@ package kamayuk.rentas.sanciones.dominio;
  *
  * <h2>Una fila puede no tener fase, y entonces lo dice</h2>
  *
- * <p>Una papeleta {@code ANULADA} o {@code PRESCRITA} es un procedimiento que terminó sin que
- * ninguna de las cinco palabras del manual lo nombre. La expresión devuelve {@code NULL} y la
- * pantalla dibuja «—». Elegir «la más parecida» —{@code CONSTATADA}, que es la que saldría sola—
- * pondría en la grilla una cifra plausible y equivocada, que es peor que un hueco visible.
+ * <p>Una papeleta {@code ANULADA} o {@code PRESCRITA}, o una cuya multa dejó sin efecto una
+ * resolución de gerencia (#385), es un procedimiento que terminó sin que ninguna de las cinco
+ * palabras del manual lo nombre. La expresión devuelve {@code NULL} y la pantalla dibuja «—».
+ * Elegir «la más parecida» —{@code CONSTATADA}, que es la que saldría sola— pondría en la grilla
+ * una cifra plausible y equivocada, que es peor que un hueco visible.
  *
  * <h2>Dos de las cinco fases sólo las produce un PADRÓN MIGRADO (#259)</h2>
  *
@@ -137,8 +142,12 @@ public enum FaseDelProcedimiento {
     public static final String EXPRESION =
             "CASE"
                     // Ni ANULADA ni PRESCRITA tienen palabra en el vocabulario del
-                    // procedimiento. Se dice que no la hay; no se elige la mas parecida.
-                    + " WHEN p.estado IN ('ANULADA', 'PRESCRITA') THEN NULL"
+                    // procedimiento, ni la multa que una resolucion dejo sin efecto (#385): su
+                    // estado se queda en IMPUESTA y lo que termino se lee de la resolucion. Se
+                    // dice que no la hay; no se elige la mas parecida.
+                    + " WHEN p.estado IN ('ANULADA', 'PRESCRITA') OR "
+                    + EstadoDePapeleta.DEJADA_SIN_EFECTO
+                    + " THEN NULL"
                     + " WHEN p.estado = 'COACTIVA' THEN 'COACTIVA'"
                     + " WHEN p.estado = 'PAGADA' THEN 'PAGADA'"
                     + " WHEN EXISTS (SELECT 1 FROM resolucion_gerencia rg"

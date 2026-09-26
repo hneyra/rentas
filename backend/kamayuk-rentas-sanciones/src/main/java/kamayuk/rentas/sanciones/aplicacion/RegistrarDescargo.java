@@ -49,6 +49,13 @@ import org.springframework.transaction.annotation.Transactional;
  * src/main} era {@code SET numero}—, así que estaba escrita, probada con dobles, e inerte. Lo que
  * la vuelve real es {@link AnularPapeleta}; {@code PRESCRITA} sigue siendo un valor que sólo un
  * padrón migrado trae, y {@code EstadoDePapeleta} lleva la medida de por qué.
+ *
+ * <p><b>Y desde #385 tampoco contra una cuya multa dejó sin efecto una resolución de gerencia.</b>
+ * Su estado sigue {@code IMPUESTA} —la resolución no lo toca—, así que esto no lo podía ver mirando
+ * la columna: registraba otro descargo contra una multa que ya no existe y dejaba dictar otra RIS
+ * sobre ella. Lo pregunta al repositorio con {@code EstadoDePapeleta.DEJADA_SIN_EFECTO}, el mismo
+ * predicado con que la fase y los padrones la derivan, y la guarda es una sola para los dos casos
+ * de uso: {@link #exigirQueQuedeAlgoQueImpugnar}.
  */
 @Service
 public class RegistrarDescargo {
@@ -82,7 +89,8 @@ public class RegistrarDescargo {
      * @param peticion lo que la pantalla manda
      * @param observacion por qué se registra (regla 10, RNF-052)
      * @throws PapeletaInexistente si no hay ninguna papeleta con ese número en esa familia
-     * @throws PapeletaSinNadaQueImpugnar si la papeleta está anulada o prescrita
+     * @throws PapeletaSinNadaQueImpugnar si la papeleta está anulada o prescrita, o una resolución
+     *     dejó su multa sin efecto (#385)
      * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si se presentó antes de la infracción o
      *     después de hoy (#402)
      */
@@ -95,10 +103,7 @@ public class RegistrarDescargo {
                         .porNumero(familia, numeroDePapeleta)
                         .orElseThrow(() -> new PapeletaInexistente(familia, numeroDePapeleta));
 
-        if (papeleta.estado() == EstadoDePapeleta.ANULADA
-                || papeleta.estado() == EstadoDePapeleta.PRESCRITA) {
-            throw new PapeletaSinNadaQueImpugnar(papeleta);
-        }
+        exigirQueQuedeAlgoQueImpugnar(papeleta, papeletas);
 
         // #402: `Descargo` solo exige que `enPlazo` cuadre con `presentadoHasta`, asi que un
         // escrito del 20 de febrero contra una infraccion del 4 de marzo entraba «en plazo».
@@ -141,6 +146,28 @@ public class RegistrarDescargo {
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * La guarda de los dos casos de uso que impugnan o resuelven una papeleta: este y {@link
+     * ResolverConResolucionDeGerencia}.
+     *
+     * <p>Una sola, para que no haya dos sitios donde olvidar la mitad (#385). Mira el estado
+     * —{@code ANULADA} y {@code PRESCRITA}, que sí se escriben o se migran en la columna— y
+     * pregunta a la base si una resolución dejó la multa sin efecto, que es lo que la columna no
+     * dice.
+     *
+     * @throws PapeletaSinNadaQueImpugnar si no queda multa que impugnar
+     */
+    static void exigirQueQuedeAlgoQueImpugnar(Papeleta papeleta, PapeletaRepository papeletas) {
+        if (papeleta.estado() == EstadoDePapeleta.ANULADA
+                || papeleta.estado() == EstadoDePapeleta.PRESCRITA) {
+            throw new PapeletaSinNadaQueImpugnar(papeleta);
+        }
+        if (papeletas.dejadaSinEfecto(papeleta.identificador())) {
+            throw new PapeletaSinNadaQueImpugnar(
+                    papeleta, "una resolucion de gerencia dejo su multa sin efecto");
+        }
+    }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoría. */
     private static String descripcion(Papeleta papeleta, Descargo descargo) {
@@ -202,17 +229,28 @@ public class RegistrarDescargo {
         }
     }
 
-    /** La papeleta ya está anulada o prescrita: no queda nada que impugnar. */
+    /**
+     * La papeleta ya está anulada o prescrita, o su multa quedó sin efecto por una resolución de
+     * gerencia (#385): no queda nada que impugnar.
+     */
     public static final class PapeletaSinNadaQueImpugnar extends RuntimeException {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
 
         PapeletaSinNadaQueImpugnar(Papeleta papeleta) {
+            this(papeleta, "esta " + papeleta.estado());
+        }
+
+        /**
+         * Con el motivo dicho, porque el estado no siempre lo dice: la dejada sin efecto sigue
+         * {@code IMPUESTA}, y «esta IMPUESTA: no tiene objeto» sería un mensaje que se contradice.
+         */
+        PapeletaSinNadaQueImpugnar(Papeleta papeleta, String porque) {
             super(
                     "La papeleta "
                             + papeleta.numero()
-                            + " esta "
-                            + papeleta.estado()
+                            + " "
+                            + porque
                             + ": un recurso contra una multa que ya no existe no tiene objeto");
         }
     }

@@ -169,6 +169,51 @@ public enum EstadoDePapeleta {
                     .map(estado -> "'" + estado.name() + "'")
                     .collect(Collectors.joining(", ", "(", ")"));
 
+    /**
+     * Que una resolución de gerencia haya dejado la multa sin efecto (#385), para un {@code WHERE}
+     * o un {@code CASE} sobre el alias {@code p} de {@code papeleta}.
+     *
+     * <p><b>Es la otra mitad de «ya no se debe», y no cabe en {@link #seDebe()}.</b> {@code
+     * ResolverConResolucionDeGerencia} decide —y con motivo— que el estado de la papeleta <b>no se
+     * toca</b> cuando la resolución la deja sin efecto: extingue la obligación en el libro y la
+     * situación de la papeleta «se deriva de las resoluciones que tiene». Hasta #385 esa frase no
+     * la hacía verdad nadie: la fase decía {@code SANCIONADA}, el padrón la publicaba {@code
+     * pendiente}, el estado de cuenta la listaba y la constancia de tránsito se negaba por ella,
+     * todo porque {@code p.estado} seguía en {@code IMPUESTA}. Esto es lo que la deriva.
+     *
+     * <p><b>La lista de efectos se deriva de {@link EfectoSobreLaMulta#extingueLaDeuda()}</b>, con
+     * el mismo patrón que {@link #NO_SE_DEBE} sobre {@link #seDebe()} (#259): el día que {@code
+     * SE_REDUCE} también extinga, basta con cambiar un {@code boolean}. Mira el <b>efecto</b>, y no
+     * el tipo de la resolución ni que resuelva un descargo: la {@code ADMINISTRATIVA} que declara
+     * infundado un descargo también resuelve un descargo, y esa multa sigue viva.
+     *
+     * <p>Mira <b>cualquier</b> resolución con ese efecto, no «la última». Hoy no hay ningún acto
+     * que revoque la que dejó la multa sin efecto; si aparece, el predicado cambia aquí, en un
+     * sitio.
+     */
+    public static final String DEJADA_SIN_EFECTO =
+            "EXISTS (SELECT 1 FROM resolucion_gerencia rg"
+                    + " WHERE rg.papeleta_id = p.id AND rg.efecto IN "
+                    + Arrays.stream(EfectoSobreLaMulta.values())
+                            .filter(EfectoSobreLaMulta::extingueLaDeuda)
+                            .map(efecto -> "'" + efecto.name() + "'")
+                            .collect(Collectors.joining(", ", "(", ")"))
+                    + ")";
+
+    /**
+     * Que la papeleta del alias {@code p} <b>siga debiéndose</b> (#385): ni en un estado que ya no
+     * se debe ({@link #NO_SE_DEBE}) ni dejada sin efecto por una resolución ({@link
+     * #DEJADA_SIN_EFECTO}).
+     *
+     * <p>Es <b>la única</b> definición de «pendiente» que leen los padrones, el filtro de
+     * pendientes, los {@code FILTER} del resumen y la columna {@code se_debe} que {@code
+     * PapeletaDelPadron.estaPendiente()} devuelve. Por eso no hay una versión en Java: {@link
+     * #seDebe()} sólo sabe del estado, y volver a calcular en Java lo que la consulta ya calculó es
+     * justo la divergencia que cerró #259.
+     */
+    public static final String SE_DEBE =
+            "(p.estado NOT IN " + NO_SE_DEBE + " AND NOT " + DEJADA_SIN_EFECTO + ")";
+
     private final boolean seDebe;
 
     EstadoDePapeleta(boolean seDebe) {
@@ -181,6 +226,10 @@ public enum EstadoDePapeleta {
      * <p>Es la única verdad sobre eso, y de ella sale también {@link #NO_SE_DEBE}. {@code PAGADA}
      * se cobró, {@code ANULADA} no vale y {@code PRESCRITA} ya no se puede exigir; las otras cuatro
      * son puntos del camino de una deuda viva, y {@code COACTIVA} la más viva de todas.
+     *
+     * <p><b>Habla del estado, no de la papeleta</b> (#385): una {@code IMPUESTA} que una resolución
+     * dejó sin efecto ya no se debe, y eso no lo sabe el estado. Lo que se publica como pendiente
+     * es {@link #SE_DEBE}, que es esto <b>y</b> lo que dicen las resoluciones.
      */
     public boolean seDebe() {
         return seDebe;
