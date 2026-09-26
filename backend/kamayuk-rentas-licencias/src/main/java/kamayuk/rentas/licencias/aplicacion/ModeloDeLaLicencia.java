@@ -79,6 +79,12 @@ final class ModeloDeLaLicencia {
                                 : licencia.vigenciaHasta().toString()));
         cabecera.add(Campo.de("Expediente", vacioSiFalta(licencia.expediente())));
         cabecera.add(Campo.de("Recibo del derecho de tramite", numeroDeRecibo));
+        // Solo cuando el acto se sostiene en una autorizacion expresa (#418): es su fundamento,
+        // y el papel que se impugna tiene que decirlo. Los papeles sin ella no cambian.
+        String autorizacion = licencia.territorio().autorizacion();
+        if (autorizacion != null) {
+            cabecera.add(Campo.de("Emitida por excepcion", autorizacion));
+        }
 
         return new ModeloDeDocumento(
                 TITULO,

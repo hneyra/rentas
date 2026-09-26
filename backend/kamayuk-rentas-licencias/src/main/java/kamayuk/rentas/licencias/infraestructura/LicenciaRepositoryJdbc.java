@@ -70,7 +70,7 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
                     + " vigencia_hasta, recibo_id, documento_id, expediente, fecha_expediente,"
                     + " usuario_registro, fecha_registro, observacion,"
                     + " zona_del_territorio, ordenanza_de_la_zona, zona_origen,"
-                    + " comprobacion_territorio";
+                    + " comprobacion_territorio, autorizacion_territorio";
 
     /** Las mismas columnas con el alias {@code l}, que la consulta del padron necesita. */
     private static final String COLUMNAS_CALIFICADAS = "l." + COLUMNAS.replace(", ", ", l.");
@@ -144,7 +144,8 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
                                             + "  documento_id, expediente, fecha_expediente,"
                                             + "  usuario_registro, fecha_registro, observacion,"
                                             + "  zona_del_territorio, ordenanza_de_la_zona,"
-                                            + "  zona_origen, comprobacion_territorio)"
+                                            + "  zona_origen, comprobacion_territorio,"
+                                            + "  autorizacion_territorio)"
                                             + " VALUES ("
                                             + MUNICIPALIDAD_ACTUAL
                                             + ", :numero, :contribuyente, :predio, :ficha,"
@@ -153,7 +154,8 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
                                             + "  :recibo, :documento, :expediente,"
                                             + "  :fechaExpediente, :usuario, :registrado,"
                                             + "  :observacion, :zonaTerritorio, :ordenanzaZona,"
-                                            + "  :zonaOrigen, :comprobacionTerritorio)"
+                                            + "  :zonaOrigen, :comprobacionTerritorio,"
+                                            + "  :autorizacionTerritorio)"
                                             + " RETURNING id")
                             .param("numero", licencia.numero())
                             .param("contribuyente", licencia.contribuyenteId())
@@ -178,6 +180,7 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
                             .param("ordenanzaZona", licencia.territorio().ordenanzaDeLaZona())
                             .param("zonaOrigen", licencia.territorio().origen().name())
                             .param("comprobacionTerritorio", licencia.territorio().comprobacion())
+                            .param("autorizacionTerritorio", licencia.territorio().autorizacion())
                             .query(Long.class)
                             .single();
         } catch (DuplicateKeyException yaEstaba) {
@@ -566,7 +569,8 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
                         fila.getString("zona_del_territorio"),
                         fila.getString("ordenanza_de_la_zona"),
                         OrigenDeLaZona.valueOf(fila.getString("zona_origen")),
-                        fila.getString("comprobacion_territorio")));
+                        fila.getString("comprobacion_territorio"),
+                        fila.getString("autorizacion_territorio")));
     }
 
     /**

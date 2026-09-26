@@ -1,6 +1,7 @@
 package kamayuk.rentas.licencias.dominio;
 
 import java.util.Objects;
+import kamayuk.rentas.dominio.Observacion;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -32,12 +33,15 @@ import org.jspecify.annotations.Nullable;
  *     puede notificar
  * @param origen cual de las dos zonas sostiene el acto
  * @param comprobacion que contestaron las tres consultas, y cual no contesto
+ * @param autorizacion por que se emitio aunque el territorio no lo respaldara, con las palabras de
+ *     quien lo asumio (#418); {@code null} si el territorio lo respaldaba o no se pregunto
  */
 public record TerritorioDeLaLicencia(
         @Nullable String zonaDelTerritorio,
         @Nullable String ordenanzaDeLaZona,
         OrigenDeLaZona origen,
-        @Nullable String comprobacion) {
+        @Nullable String comprobacion,
+        @Nullable String autorizacion) {
 
     /** {@code licencia_funcionamiento.zona_del_territorio varchar(20)} (V14). */
     public static final int ZONA_MAXIMA = 20;
@@ -45,8 +49,17 @@ public record TerritorioDeLaLicencia(
     /** {@code licencia_funcionamiento.comprobacion_territorio varchar(400)} (V14). */
     public static final int COMPROBACION_MAXIMA = 400;
 
+    /** {@code licencia_funcionamiento.autorizacion_territorio varchar(500)} (V36). */
+    public static final int AUTORIZACION_MAXIMA = 500;
+
     public TerritorioDeLaLicencia {
         Objects.requireNonNull(origen, "Hay que decir que zona sostiene el acto");
+        if (autorizacion != null && autorizacion.length() > AUTORIZACION_MAXIMA) {
+            throw new IllegalArgumentException(
+                    "La autorizacion va hasta "
+                            + AUTORIZACION_MAXIMA
+                            + " caracteres: recortarla cambiaria lo que alguien firmo");
+        }
         // La misma guarda que `licencia_zona_del_territorio_ck` en la base, y aqui tambien: un
         // acto que dice sostenerse en el territorio sin traer el codigo con que se comprobo
         // afirma una comprobacion que no deja ver contra que se hizo.
@@ -71,11 +84,23 @@ public record TerritorioDeLaLicencia(
      * la migracion tampoco las rellena hacia atras.
      */
     public static TerritorioDeLaLicencia sinComprobar(@Nullable String porQue) {
-        return new TerritorioDeLaLicencia(null, null, OrigenDeLaZona.NO_COMPROBADA, porQue);
+        return new TerritorioDeLaLicencia(null, null, OrigenDeLaZona.NO_COMPROBADA, porQue, null);
     }
 
-    /** Compone lo que se guarda a partir de lo que el territorio contesto. */
-    public static TerritorioDeLaLicencia de(ComprobacionDelTerritorio comprobacion) {
+    /**
+     * Compone lo que se guarda a partir de lo que el territorio contesto y de quien lo asumio.
+     *
+     * <p>La autorizacion se guarda <b>solo si fue ella la que sostuvo el acto</b> ({@link
+     * ComprobacionDelTerritorio#exigeAutorizacion()}). Hasta #418 se validaba como observacion y se
+     * tiraba: {@code zona_origen = DECLARADA} afirmaba que «una persona lo autorizo por escrito» y
+     * ese escrito no estaba en ninguna tabla. Y al reves, una autorizacion tecleada sobre un predio
+     * en regla no se guarda: la licencia diria «emitida por excepcion» sin haberlo sido.
+     *
+     * @param comprobacion lo que contestaron las tres consultas
+     * @param autorizacion la autorizacion expresa de la solicitud, si la trae
+     */
+    public static TerritorioDeLaLicencia de(
+            ComprobacionDelTerritorio comprobacion, @Nullable Observacion autorizacion) {
         Objects.requireNonNull(comprobacion, "Sin comprobacion no hay nada que guardar");
         OrigenDeLaZona origen =
                 comprobacion.zona() == RespuestaDelTerritorio.RESPONDIO
@@ -87,6 +112,14 @@ public record TerritorioDeLaLicencia(
                 comprobacion.zonaDelTerritorio(),
                 comprobacion.ordenanzaDeLaZona(),
                 origen,
-                comprobacion.motivo());
+                comprobacion.motivo(),
+                comprobacion.exigeAutorizacion() && autorizacion != null
+                        ? autorizacion.texto()
+                        : null);
+    }
+
+    /** Si el acto se sostiene en una autorizacion expresa y no en el territorio (#418). */
+    public boolean porExcepcion() {
+        return autorizacion != null;
     }
 }
