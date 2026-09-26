@@ -374,6 +374,27 @@ class GenerarMuestraTest {
     }
 
     @Test
+    @DisplayName("#346 — una muestra VACIA tambien es un sorteo: no se vuelve a sortear")
+    void unaMuestraVaciaNoSeVuelveASortear() {
+        // Los dos omisos que la deteccion entrega ya se los llevo otro programa abierto: el sorteo
+        // no admite a nadie y no deja ni una fila en la muestra. Hasta #346 «ya se sorteo» se
+        // media por esas filas, y el mismo programa se podia sortear otra vez meses despues.
+        long otro = programas.sembrar(programa(CondicionFiscalizada.OMISO));
+        muestras.sembrar(otro, OMISO_UNO);
+        muestras.sembrar(otro, OMISO_DOS);
+        long programaId = programas.sembrar(programa(CondicionFiscalizada.OMISO));
+
+        ResultadoDelSorteo primero = servicio().generar(programaId, OBSERVACION);
+        assertThat(primero.sorteados()).isZero();
+        assertThat(primero.excluidosPorOtroPrograma()).isEqualTo(2);
+
+        assertThatThrownBy(() -> servicio().generar(programaId, OBSERVACION))
+                .as("un sorteo en el que no entro nadie sigue siendo el sorteo del programa")
+                .isInstanceOf(GenerarMuestra.MuestraYaSorteada.class);
+        assertThat(muestras.prediosDe(programaId)).isEmpty();
+    }
+
+    @Test
     @DisplayName("un programa que no existe no sortea nada")
     void unProgramaQueNoExisteNoSortea() {
         assertThatThrownBy(() -> servicio().generar(404L, OBSERVACION))
@@ -557,10 +578,27 @@ class GenerarMuestraTest {
             return filas.size();
         }
 
+        /** Los programas con su fila de sorteo (V41), como la clave de {@code programa_sorteo}. */
+        private final Set<Long> sorteos = new HashSet<>();
+
         @Override
-        public boolean tieneMuestra(long programaId) {
-            return guardadas.stream().anyMatch(m -> m.programaId() == programaId);
+        public boolean yaSorteo(long programaId) {
+            return sorteos.contains(programaId)
+                    || guardadas.stream().anyMatch(m -> m.programaId() == programaId);
         }
+
+        @Override
+        public boolean registrarSorteo(
+                long programaId,
+                ResultadoDelSorteo resultado,
+                Observacion observacion,
+                Instant fechaRegistro) {
+            return sorteos.add(programaId);
+        }
+
+        /** Un solo hilo: el candado lo mide {@code SorteoUnicoFronteraTest} contra PostgreSQL. */
+        @Override
+        public void bloquearLosSorteos() {}
 
         @Override
         public Pagina<MuestraDelPrograma> delPrograma(

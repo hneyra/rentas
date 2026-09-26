@@ -20,8 +20,36 @@ public interface MuestraDelProgramaRepository {
      */
     int insertar(List<MuestraDelPrograma> filas, Observacion observacion, Instant fechaRegistro);
 
-    /** Si el programa ya sorteó su muestra. Sortearla otra vez no la reemplaza: responde 409. */
-    boolean tieneMuestra(long programaId);
+    /**
+     * Si el programa ya sorteó su muestra (#346). Sortearla otra vez no la reemplaza: responde 409.
+     *
+     * <p>Lo dice la fila del sorteo, no las de la muestra: un sorteo en el que no entró nadie no
+     * deja ninguna fila en la muestra y sigue siendo un sorteo. Los programas sorteados antes de
+     * que el sorteo tuviera fila propia ({@code V41}) cuentan por sus filas.
+     */
+    boolean yaSorteo(long programaId);
+
+    /**
+     * Registra el sorteo del programa con su reparto (#346).
+     *
+     * @return {@code false} si ese programa ya tenía su sorteo: dos sorteos simultáneos del mismo
+     *     programa chocan en la clave de {@code programa_sorteo}, y el segundo no escribe nada
+     */
+    boolean registrarSorteo(
+            long programaId,
+            ResultadoDelSorteo resultado,
+            Observacion observacion,
+            Instant fechaRegistro);
+
+    /**
+     * Serializa los sorteos de la municipalidad hasta el fin de la transacción (#346).
+     *
+     * <p>La exclusión entre programas —un predio, un programa abierto (ADR-0023)— exige que el
+     * segundo sorteo vea las filas que el primero escribió, y en {@code READ COMMITTED} sólo lo
+     * garantiza esperar a que el primero confirme. Se toma <b>antes</b> de la primera lectura en
+     * que el sorteo se apoya. Sortear es una acción rara: esperar no cuesta nada.
+     */
+    void bloquearLosSorteos();
 
     /**
      * La grilla de la muestra de un programa, opcionalmente acotada a un predio — que es como

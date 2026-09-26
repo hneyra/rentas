@@ -1495,6 +1495,17 @@ public final class DatosDePrueba {
                 predioId,
                 titular,
                 VIGENCIA);
+        // Y el sorteo que la dejo (#346, V41): una fila por programa, con su reparto cuadrado.
+        ejecutar(
+                app,
+                "INSERT INTO programa_sorteo (municipalidad_id, programa_id, fecha_sorteo,"
+                        + " detectados, sorteados, sorteados_sin_titular,"
+                        + " excluidos_por_otro_programa, excluidos_por_acta, observacion,"
+                        + " usuario_registro, fecha_registro)"
+                        + " VALUES (?, ?, ?, 1, 1, 0, 0, 0, 'sorteo de prueba', 'prueba', now())",
+                muni,
+                programaId,
+                VIGENCIA);
         long actaId =
                 insertar(
                         app,

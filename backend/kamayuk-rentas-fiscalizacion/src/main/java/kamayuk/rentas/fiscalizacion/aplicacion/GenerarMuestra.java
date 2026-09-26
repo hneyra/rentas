@@ -171,7 +171,12 @@ public class GenerarMuestra {
                             throw new ProgramaSinParametros(falta);
                         });
 
-        if (muestras.tieneMuestra(programaId)) {
+        // El candado, antes de la primera lectura en que el sorteo se apoya (#346): el segundo
+        // sorteo de la municipalidad espera a que el primero confirme, y entonces ve su fila de
+        // sorteo —el mismo programa sale 409— y sus predios —la exclusion entre programas los
+        // aparta—. Sin el, dos sorteos simultaneos se llevaban los mismos predios.
+        muestras.bloquearLosSorteos();
+        if (muestras.yaSorteo(programaId)) {
             throw new MuestraYaSorteada(programaId);
         }
 
@@ -214,10 +219,6 @@ public class GenerarMuestra {
             pagina++;
         } while ((long) pagina * TAMANO_DE_PAGINA < total);
 
-        if (!sorteadas.isEmpty()) {
-            muestras.insertar(sorteadas, observacion, reloj.instant());
-        }
-
         ResultadoDelSorteo resultado =
                 new ResultadoDelSorteo(
                         fechaSorteo,
@@ -226,6 +227,17 @@ public class GenerarMuestra {
                         (int) sorteadas.stream().filter(MuestraDelPrograma::sinTitular).count(),
                         porOtroPrograma,
                         porActaDelEjercicio);
+
+        // El sorteo se registra SIEMPRE, tambien cuando no entro nadie (#346): «ya se sorteo» lo
+        // dice esta fila, no las de la muestra. Y va antes que las filas: si dos peticiones
+        // llegaran hasta aqui, la segunda choca en la clave del sorteo y sale 409, no contra
+        // `programa_muestra_uq` con un 500.
+        if (!muestras.registrarSorteo(programaId, resultado, observacion, reloj.instant())) {
+            throw new MuestraYaSorteada(programaId);
+        }
+        if (!sorteadas.isEmpty()) {
+            muestras.insertar(sorteadas, observacion, reloj.instant());
+        }
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(

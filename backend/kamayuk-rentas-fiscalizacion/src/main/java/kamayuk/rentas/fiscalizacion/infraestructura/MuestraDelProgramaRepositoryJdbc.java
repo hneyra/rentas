@@ -17,9 +17,11 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
 import kamayuk.rentas.fiscalizacion.dominio.MuestraDelPrograma;
 import kamayuk.rentas.fiscalizacion.dominio.MuestraDelProgramaRepository;
+import kamayuk.rentas.fiscalizacion.dominio.ResultadoDelSorteo;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -100,14 +102,71 @@ public class MuestraDelProgramaRepositoryJdbc extends RepositorioJdbc
         return escritas;
     }
 
+    /**
+     * La fila del sorteo, o —para los programas sorteados antes de {@code V41}, que no la tienen—
+     * alguna fila de su muestra (#346).
+     */
     @Override
-    public boolean tieneMuestra(long programaId) {
-        Long cuantas =
-                jdbc().sql("SELECT count(*)" + DESDE + " WHERE programa_id = :programaId")
+    public boolean yaSorteo(long programaId) {
+        return Boolean.TRUE.equals(
+                jdbc().sql(
+                                "SELECT EXISTS (SELECT 1 FROM programa_sorteo"
+                                        + "               WHERE programa_id = :programaId)"
+                                        + "     OR EXISTS (SELECT 1"
+                                        + DESDE
+                                        + "               WHERE programa_id = :programaId)")
                         .param("programaId", programaId)
-                        .query(Long.class)
-                        .single();
-        return cuantas != null && cuantas > 0;
+                        .query(Boolean.class)
+                        .single());
+    }
+
+    @Override
+    public boolean registrarSorteo(
+            long programaId,
+            ResultadoDelSorteo resultado,
+            Observacion observacion,
+            Instant fechaRegistro) {
+        Map<String, Object> campos = new HashMap<>();
+        campos.put("programaId", programaId);
+        campos.put("fechaSorteo", resultado.fechaSorteo());
+        campos.put("detectados", resultado.detectados());
+        campos.put("sorteados", resultado.sorteados());
+        campos.put("sinTitular", resultado.sorteadosSinTitular());
+        campos.put("porOtroPrograma", resultado.excluidosPorOtroPrograma());
+        campos.put("porActa", resultado.excluidosPorActaDelEjercicio());
+        campos.put("observacion", observacion.texto());
+        campos.put("usuario", OrigenContext.actual().usuario());
+        campos.put("fechaRegistro", java.sql.Timestamp.from(fechaRegistro));
+        try {
+            jdbc().sql(
+                            "INSERT INTO programa_sorteo"
+                                    + " (municipalidad_id, programa_id, fecha_sorteo, detectados,"
+                                    + "  sorteados, sorteados_sin_titular,"
+                                    + "  excluidos_por_otro_programa, excluidos_por_acta,"
+                                    + "  observacion, usuario_registro, fecha_registro)"
+                                    + " VALUES ("
+                                    + MUNICIPALIDAD_ACTUAL
+                                    + ", :programaId, :fechaSorteo, :detectados, :sorteados,"
+                                    + "  :sinTitular, :porOtroPrograma, :porActa, :observacion,"
+                                    + "  :usuario, :fechaRegistro)")
+                    .params(campos)
+                    .update();
+            return true;
+        } catch (DuplicateKeyException yaSorteado) {
+            // `programa_sorteo_pk` (V41). La comprobacion de `yaSorteo` ahorra el recorrido; esta
+            // es la que impide el segundo sorteo cuando dos peticiones pasan las dos por el `if`.
+            return false;
+        }
+    }
+
+    /**
+     * El candado de los sorteos de ESTA municipalidad: la municipalidad sale del contexto que fijo
+     * {@code SET LOCAL} (regla 2), y el identificador es cero porque el agregado es el conjunto de
+     * programas abiertos entero, no uno de ellos.
+     */
+    @Override
+    public void bloquearLosSorteos() {
+        bloquearElAgregado("programa_sorteo", 0);
     }
 
     @Override
