@@ -3338,7 +3338,10 @@ const OPERACIONES_ADICIONALES = {
         ' un predio que otro programa abierto ya se llevó ni uno ya fiscalizado en el ejercicio,' +
         ' así que la muestra depende del orden: el primer programa que se genere se lleva los' +
         ' predios. Responde 409 si el programa ya la sorteó — una muestra es un acto y no se' +
-        ' regenera, porque hay actas levantadas sobre ella. La respuesta dice sobre qué padrón se' +
+        ' regenera, porque hay actas levantadas sobre ella. Responde 422 si el programa es' +
+        ' VEHICULAR, nombrando el tipo: la detección es el cruce del padrón de predios, y un' +
+        ' programa vehicular no tiene padrón que sortear —hasta #343 se llevaba los predios' +
+        ' omisos sin poder levantarles ni una acta—. La respuesta dice sobre qué padrón se' +
         ' sorteó y no sólo cuántos entraron: detectados, predios, sinTitular —cuántos de los' +
         ' sorteados no tienen titular vigente— y los excluidos POR MOTIVO, de modo que detectados' +
         ' = predios + excluidosPorOtroPrograma + excluidosPorActaDelEjercicio. Un número suelto no' +

@@ -201,6 +201,24 @@ public record ProgramaFiscalizacion(
     }
 
     /**
+     * Si el padrón que su muestra sortea es el de <b>predios</b> (#343): {@code tipo == PREDIAL}.
+     *
+     * <p>Hasta #343 esta regla no vivía en ningún sitio. El sorteo recorre la detección de omisos,
+     * que es el cruce del padrón de predios contra las declaraciones juradas, y no miraba el tipo:
+     * un programa {@code VEHICULAR} con criterio {@code OMISO} se llevaba los predios omisos del
+     * distrito, ningún acta predial podía levantarse sobre ellos ({@code ProgramaDeOtroTipo}) y la
+     * exclusión de #481 los apartaba de la muestra de todo programa predial mientras siguiera
+     * abierto. No existe detección de vehículos, así que un programa vehicular no tiene padrón que
+     * sortear; el día que exista será otro padrón y otra operación.
+     *
+     * <p>No está en {@link #parametrosDeLaMuestra()} a propósito: ese método nombra un parámetro
+     * que <b>falta</b>, y el tipo no falta — el mensaje mentiría.
+     */
+    public boolean sorteaPredios() {
+        return tipo == TipoDePrograma.PREDIAL;
+    }
+
+    /**
      * El nombre del parámetro que le falta para poder sortear su muestra, o vacío si los tiene.
      *
      * <p>{@code sectorCodigo} no está: su nulo significa «todo el distrito», que es una respuesta y

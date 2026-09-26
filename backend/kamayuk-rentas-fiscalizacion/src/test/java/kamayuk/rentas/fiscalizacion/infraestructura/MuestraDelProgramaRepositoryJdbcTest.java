@@ -317,6 +317,52 @@ class MuestraDelProgramaRepositoryJdbcTest {
         }
 
         @Test
+        @DisplayName(
+                "#343 — la muestra de un programa VEHICULAR ABIERTO no retiene predios: solo"
+                        + " excluye la de otro PREDIAL")
+        void unProgramaVehicularNoRetienePredios() {
+            // La siembra MEZCLA tipos, que es lo que hace visible el filtro: el 42 esta en la
+            // muestra de un programa VEHICULAR ABIERTO —la que dejo cualquier sorteo anterior a
+            // #343, y que no se borra (regla 4)— y el 43 en la de otro PREDIAL ABIERTO. Con solo
+            // programas PREDIAL, como hasta este issue, «filtra por tipo» y «no filtra» dan lo
+            // mismo; y con solo el VEHICULAR, «filtra por tipo» y «no excluye nada» tambien.
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            long titular = crearContribuyente(municipalidadA, "M-0343", "70100343");
+            long el42 = crearPredio(municipalidadA, "M-0343a");
+            long el43 = crearPredio(municipalidadA, "M-0343b");
+            long vehicular = crearPrograma(municipalidadA, "PF-VEH-343", "VEHICULAR");
+            long otroPredial = crearPrograma(municipalidadA, "PF-PRED-343a", "PREDIAL");
+            long predial = crearPrograma(municipalidadA, "PF-PRED-343b", "PREDIAL");
+
+            transaccion.execute(
+                    estado ->
+                            repositorio.insertar(
+                                    List.of(fila(vehicular, el42, titular, "M-0343a")),
+                                    OBSERVACION,
+                                    REGISTRO));
+            transaccion.execute(
+                    estado ->
+                            repositorio.insertar(
+                                    List.of(fila(otroPredial, el43, titular, "M-0343b")),
+                                    OBSERVACION,
+                                    REGISTRO));
+
+            Set<Long> excluidos =
+                    transaccion.execute(
+                            estado ->
+                                    repositorio.prediosEnProgramasAbiertos(
+                                            predial, Set.of(el42, el43)));
+
+            assertThat(excluidos)
+                    .as(
+                            "el 42 lo tiene un programa que no puede levantarle acta predial"
+                                    + " (ProgramaDeOtroTipo): retenerlo lo saca de todo sorteo"
+                                    + " predial mientras ese programa siga ABIERTO. El 43 si lo"
+                                    + " retiene otro PREDIAL, y eso no cambia")
+                    .containsExactly(el43);
+        }
+
+        @Test
         @DisplayName("y su propia muestra no se excluye a si misma")
         void laPropiaMuestraNoSeExcluye() {
             TenantContext.fijar(new MunicipalidadId(municipalidadA));
@@ -471,14 +517,23 @@ class MuestraDelProgramaRepositoryJdbcTest {
     }
 
     private static long crearPrograma(long municipalidadId, String codigo) {
+        return crearPrograma(municipalidadId, codigo, "PREDIAL");
+    }
+
+    /**
+     * El programa con su tipo escrito a mano (#343): hasta este issue todos nacian {@code PREDIAL}
+     * y con esa siembra el filtro por tipo de la exclusion era invisible.
+     */
+    private static long crearPrograma(long municipalidadId, String codigo, String tipo) {
         return ejecutarComoApp(
                 municipalidadId,
                 "INSERT INTO programa_fiscalizacion (municipalidad_id, codigo, descripcion, tipo,"
                         + " fecha_inicio, ejercicio, sector_codigo, criterio, fiscalizador)"
-                        + " VALUES (?, ?, 'Programa de prueba', 'PREDIAL', ?, 2026, '01', 'OMISO',"
+                        + " VALUES (?, ?, 'Programa de prueba', ?, ?, 2026, '01', 'OMISO',"
                         + "         'R. MENDOZA CRUZ') RETURNING id",
                 municipalidadId,
                 codigo,
+                tipo,
                 LocalDate.of(2026, 1, 1));
     }
 

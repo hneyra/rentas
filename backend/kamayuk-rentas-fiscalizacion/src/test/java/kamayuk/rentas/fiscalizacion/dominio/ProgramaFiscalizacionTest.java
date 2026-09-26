@@ -54,6 +54,43 @@ class ProgramaFiscalizacionTest {
     }
 
     @Test
+    @DisplayName("#343 — solo un programa PREDIAL sortea predios, y el VEHICULAR no le falta nada")
+    void soloElPredialSorteaPredios() {
+        ProgramaFiscalizacion vehicular =
+                ProgramaFiscalizacion.nuevo(
+                        "PF-VEH-01",
+                        "Vehiculos omisos",
+                        TipoDePrograma.VEHICULAR,
+                        LocalDate.of(2026, 3, 1),
+                        null,
+                        new kamayuk.rentas.dominio.Ejercicio(2026),
+                        null,
+                        CondicionFiscalizada.OMISO,
+                        "R. MENDOZA CRUZ");
+        ProgramaFiscalizacion predial =
+                ProgramaFiscalizacion.nuevo(
+                        "PF-PRED-01",
+                        "Predios omisos",
+                        TipoDePrograma.PREDIAL,
+                        LocalDate.of(2026, 3, 1),
+                        null,
+                        new kamayuk.rentas.dominio.Ejercicio(2026),
+                        null,
+                        CondicionFiscalizada.OMISO,
+                        "R. MENDOZA CRUZ");
+
+        assertThat(predial.sorteaPredios()).isTrue();
+        assertThat(vehicular.sorteaPredios())
+                .as("la deteccion es el cruce del padron de PREDIOS: no existe una de vehiculos")
+                .isFalse();
+        assertThat(vehicular.parametrosDeLaMuestra())
+                .as(
+                        "y no es que le falte un parametro: por eso la regla no vive en"
+                                + " parametrosDeLaMuestra(), cuyo mensaje mentiria")
+                .isEmpty();
+    }
+
+    @Test
     @DisplayName("#341 — cerrado() devuelve la copia CERRADA y no toca nada mas")
     void cerrarSoloMueveElEstado() {
         ProgramaFiscalizacion abierto =

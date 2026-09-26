@@ -110,6 +110,10 @@ public class MuestraController {
      * hay actas levantadas sobre ella, y volver a sortear cambiaría la foto bajo sus pies. Para
      * otra muestra, otro programa.
      *
+     * <p>Y <b>422</b> si el programa es {@code VEHICULAR} (#343), nombrando el tipo: la detección
+     * es de predios, y hasta este issue un programa vehicular se llevaba el padrón omiso del
+     * distrito sin poder levantarle ni una acta.
+     *
      * <p><b>Y la respuesta dice sobre qué padrón se sorteó</b> (#586). Hasta este issue devolvía
      * {@code {"programaId":N,"predios":M}} y nada más, así que una muestra de 100 sobre un padrón
      * donde 4 977 predios no podían entrar era indistinguible de una muestra de 100 sobre un padrón
@@ -129,6 +133,8 @@ public class MuestraController {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(repetida));
         } catch (GenerarMuestra.ProgramaSinParametros incompleto) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(incompleto));
+        } catch (GenerarMuestra.ProgramaSinPadronQueSortear sinPadron) {
+            throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(sinPadron));
         } catch (IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
         }

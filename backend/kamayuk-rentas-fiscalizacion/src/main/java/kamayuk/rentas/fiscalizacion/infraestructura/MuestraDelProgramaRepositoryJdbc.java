@@ -155,6 +155,14 @@ public class MuestraDelProgramaRepositoryJdbc extends RepositorioJdbc
      * que se cierra deja de excluir el mismo día, y una copia diría lo de antes. Que un programa se
      * cierre es cierto desde #341 —{@code CerrarProgramaFiscalizacion}—; hasta entonces ninguno
      * salía de {@code ABIERTO} y esta consulta retenía a todo predio sorteado una vez.
+     *
+     * <p><b>Y sólo retiene la muestra de un programa {@code PREDIAL}</b> (#343), el único que
+     * sortea predios ({@code ProgramaFiscalizacion.sorteaPredios()}). Hasta este issue un programa
+     * {@code VEHICULAR} podía sortear el padrón de predios, y esa muestra —sobre la que no se puede
+     * levantar ni una acta predial— los apartaba de todo programa predial. Desde #343 ya no se
+     * sortea una así, pero las que existan en cualquier ambiente no se borran ({@code
+     * programa_muestra} sólo admite {@code INSERT}, regla 4): este filtro es lo que las deja
+     * inofensivas sin migrar nada.
      */
     @Override
     public Set<Long> prediosEnProgramasAbiertos(long programaPropio, Set<Long> predios) {
@@ -174,7 +182,8 @@ public class MuestraDelProgramaRepositoryJdbc extends RepositorioJdbc
                                         + "  AND p.id = m.programa_id"
                                         + " WHERE m.predio_id IN (:predios)"
                                         + "   AND m.programa_id <> :programaPropio"
-                                        + "   AND p.estado IN ('ABIERTO', 'EN_PROCESO')")
+                                        + "   AND p.estado IN ('ABIERTO', 'EN_PROCESO')"
+                                        + "   AND p.tipo = 'PREDIAL'")
                         .params(campos)
                         .query(Long.class)
                         .list());
