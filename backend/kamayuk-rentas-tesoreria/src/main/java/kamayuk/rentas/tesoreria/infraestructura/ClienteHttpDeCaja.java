@@ -429,10 +429,10 @@ public class ClienteHttpDeCaja {
      * Manda un cuerpo JSON, y devuelve lo que la caja conteste.
      *
      * <p>Es la UNICA escritura de este cliente. Admite {@code 200} y {@code 201} por igual: la caja
-     * usa el codigo para decir si la orden era nueva o ya estaba, y las dos son exito. Cualquier
-     * otra cosa sale como {@link CajaInalcanzable} — incluido un 4xx, y a proposito: una orden que
-     * la caja rechaza es un defecto de este sistema al componerla, y devolver un identificador
-     * inventado dejaria al contribuyente delante de una ventanilla que no encuentra su deuda.
+     * usa el codigo para decir si la orden era nueva o ya estaba, y las dos son exito. Un 4xx sale
+     * como {@link CajaRechaza} (#434): una orden que la caja rechaza es un defecto de este sistema
+     * al componerla, se dice con su motivo y no se reintenta. Lo demas —5xx, fallo de E/S— sale
+     * como {@link CajaInalcanzable}. Nunca se devuelve un identificador inventado.
      *
      * <p><b>No pasa por la guarda de #450, y no es un olvido.</b> {@code OrdenesDeCobroHttp} la
      * llama dentro de la transaccion que registra la orden, y eso SI retiene una conexion mientras
@@ -444,6 +444,12 @@ public class ClienteHttpDeCaja {
     JsonNode publicar(String ruta, String cuerpo, String que) {
         RespuestaDeCaja respuesta = enviarCuerpo(ruta, cuerpo, que);
         int estado = respuesta.estado();
+        if (estado >= 400 && estado < 500) {
+            // Un 4xx es la caja CONTESTANDO que no (#434): no se reintenta, y se dice su motivo.
+            // Hasta #434 salia como `CajaInalcanzable`, y un 422 por un salto de linea que el
+            // cuerpo no escapaba llegaba al cliente como «la caja no contesta» (503).
+            throw new CajaRechaza(que, estado, detalleDe(respuesta.cuerpo()));
+        }
         if (estado != 200 && estado != 201) {
             throw new CajaInalcanzable(que + " (contesto " + estado + ")", null);
         }
@@ -451,6 +457,40 @@ public class ClienteHttpDeCaja {
             return json.readTree(respuesta.cuerpo());
         } catch (JacksonException ilegible) {
             throw new CajaInalcanzable(que, ilegible);
+        }
+    }
+
+    /** El {@code detail} del problema que la caja contesto, si el cuerpo es JSON y lo trae. */
+    private String detalleDe(@Nullable String cuerpo) {
+        if (cuerpo == null || cuerpo.isBlank()) {
+            return "";
+        }
+        try {
+            return json.readTree(cuerpo).path("detail").asString("");
+        } catch (JacksonException noEsJson) {
+            return "";
+        }
+    }
+
+    /** La caja contesto con un 4xx: rechazo lo que se le mando (#434). Reintentar no sirve. */
+    public static final class CajaRechaza extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        private final int estado;
+
+        public CajaRechaza(String que, int estado, String detalle) {
+            super(
+                    "La caja rechazo "
+                            + que
+                            + " (contesto "
+                            + estado
+                            + (detalle.isBlank() ? "" : ": " + detalle)
+                            + ")");
+            this.estado = estado;
+        }
+
+        public int estado() {
+            return estado;
         }
     }
 

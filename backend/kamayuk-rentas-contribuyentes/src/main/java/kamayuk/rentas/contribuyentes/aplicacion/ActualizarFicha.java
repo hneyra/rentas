@@ -1,9 +1,12 @@
 package kamayuk.rentas.contribuyentes.aplicacion;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
+import kamayuk.rentas.auditoria.JsonDeAuditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.contribuyentes.dominio.Contacto;
@@ -75,8 +78,8 @@ public class ActualizarFicha {
                             previo.id(),
                             Operacion.MODIFICACION,
                             observacion,
-                            descripcion(previo),
-                            descripcion(cerrado));
+                            JsonDeAuditoria.objeto(descripcion(previo)),
+                            JsonDeAuditoria.objeto(descripcion(cerrado)));
                 });
 
         Domicilio guardado = repositorio.guardar(nuevo);
@@ -86,7 +89,7 @@ public class ActualizarFicha {
                 Operacion.ALTA,
                 observacion,
                 null,
-                descripcion(guardado));
+                JsonDeAuditoria.objeto(descripcion(guardado)));
 
         return guardado;
     }
@@ -187,7 +190,7 @@ public class ActualizarFicha {
                 Operacion.ALTA,
                 observacion,
                 null,
-                descripcion(guardado));
+                JsonDeAuditoria.objeto(descripcion(guardado)));
         return guardado;
     }
 
@@ -204,8 +207,8 @@ public class ActualizarFicha {
                 cerrado.id(),
                 Operacion.BAJA,
                 observacion,
-                descripcion(responsable),
-                descripcion(cerrado));
+                JsonDeAuditoria.objeto(descripcion(responsable)),
+                JsonDeAuditoria.objeto(descripcion(cerrado)));
         return cerrado;
     }
 
@@ -227,31 +230,23 @@ public class ActualizarFicha {
                         .con(antes, despues));
     }
 
-    private static String descripcion(Domicilio domicilio) {
-        return "{\"tipo\":\""
-                + domicilio.tipo()
-                + "\",\"direccion\":\""
-                + domicilio.direccion().replace("\"", "\\\"")
-                + "\",\"vigenciaDesde\":\""
-                + domicilio.vigenciaDesde()
-                + "\",\"vigenciaHasta\":"
-                + (domicilio.vigenciaHasta() == null
-                        ? "null"
-                        : "\"" + domicilio.vigenciaHasta() + "\"")
-                + "}";
+    private static Map<String, Object> descripcion(Domicilio domicilio) {
+        // Campos con nombre, no JSON a mano (#434): la direccion es texto libre, y hasta #434 solo
+        // se le escapaba la comilla —un tabulador o una barra final daban 500—.
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("tipo", domicilio.tipo());
+        campos.put("direccion", domicilio.direccion());
+        campos.put("vigenciaDesde", domicilio.vigenciaDesde());
+        campos.put("vigenciaHasta", domicilio.vigenciaHasta());
+        return campos;
     }
 
-    private static String descripcion(ResponsableSolidario responsable) {
-        return "{\"vinculo\":\""
-                + responsable.vinculo()
-                + "\",\"responsableId\":"
-                + responsable.responsableId()
-                + ",\"vigenciaDesde\":\""
-                + responsable.vigenciaDesde()
-                + "\",\"vigenciaHasta\":"
-                + (responsable.vigenciaHasta() == null
-                        ? "null"
-                        : "\"" + responsable.vigenciaHasta() + "\"")
-                + "}";
+    private static Map<String, Object> descripcion(ResponsableSolidario responsable) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("vinculo", responsable.vinculo());
+        campos.put("responsableId", responsable.responsableId());
+        campos.put("vigenciaDesde", responsable.vigenciaDesde());
+        campos.put("vigenciaHasta", responsable.vigenciaHasta());
+        return campos;
     }
 }

@@ -2,6 +2,8 @@ package kamayuk.rentas.licencias.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -128,18 +130,16 @@ public class PresentarFue {
     // ------------------------------------------------------------------
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(FueDeEdificacion fue) {
-        return "{\"expediente\":\""
-                + fue.expediente()
-                + "\",\"tramite\":\""
-                + fue.tipoTramite()
-                + "\",\"obra\":\""
-                + fue.tipoObra()
-                + "\",\"modalidad\":\""
-                + fue.modalidad()
-                + "\",\"origen\":"
-                + (fue.licenciaOrigenId() == null ? "null" : fue.licenciaOrigenId())
-                + "}";
+    private static Map<String, Object> descripcion(FueDeEdificacion fue) {
+        // Campos con nombre, no JSON a mano (#434): los escribe `JsonDeAuditoria`, que escapa el
+        // texto libre entero. Una comilla en el texto daba 500, y una clave inyectada se quedaba.
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("expediente", fue.expediente());
+        campos.put("tramite", fue.tipoTramite());
+        campos.put("obra", fue.tipoObra());
+        campos.put("modalidad", fue.modalidad());
+        campos.put("origen", fue.licenciaOrigenId());
+        return campos;
     }
 
     private static String textoDe(@Nullable String numero) {
