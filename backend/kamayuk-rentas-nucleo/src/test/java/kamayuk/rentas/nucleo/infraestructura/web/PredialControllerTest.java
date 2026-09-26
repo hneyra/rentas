@@ -101,6 +101,10 @@ class PredialControllerTest {
     /** Las fichas que leen la determinacion y el alcance de la corrida; por omision, ninguna. */
     private final FichasDePrueba fichas = new FichasDePrueba();
 
+    /** Las valuaciones que `catastro` sello; vacias salvo en la prueba que siembra una (#375). */
+    private final kamayuk.rentas.nucleo.dobles.ValuacionesSelladasEnMemoria selladas =
+            new kamayuk.rentas.nucleo.dobles.ValuacionesSelladasEnMemoria();
+
     /**
      * En que estado esta la valuacion del ejercicio cuando se monta el controlador (P5C).
      *
@@ -457,6 +461,66 @@ class PredialControllerTest {
         assertThat(((CorridasEnMemoria) corridas).guardadas)
                 .as("ni rastro de una corrida que no se corrio")
                 .isEmpty();
+    }
+
+    /**
+     * <b>Un contribuyente con un dato que no cuadra no para la emision del padron</b> (#375).
+     *
+     * <p>P esta EN MEDIO a proposito: con P solo, o al final, «la corrida sigue» y «la corrida se
+     * corta» dan lo mismo. P declaro 100 000 con 60 000 exonerados, y `catastro` sello despues su
+     * predio en 50 000: el exonerado declarado supera al sellado. Hasta #375 la
+     * `IllegalArgumentException` de `PredioEnLaBase` salia de la corrida como 422, con A ya
+     * asentado, C sin determinar y ni una fila de rastro.
+     */
+    @Test
+    @DisplayName(
+            "#375 — el exonerado mayor que la valuacion sellada se OBSERVA, y la corrida sigue")
+    void elExoneradoMayorQueLaSelladaSeObserva() throws Exception {
+        predios.con(501L, 11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        predios.con(502L, 12L, "10002", "CALLE LIMA 200", Porcentaje.total());
+        predios.con(503L, 13L, "10003", "JR. TACNA 300", Porcentaje.total());
+        for (long[] fila : new long[][] {{7L, 501L, 11L}, {8L, 502L, 12L}, {9L, 503L, 13L}}) {
+            boolean esP = fila[1] == 502L;
+            determinaciones.sembrar(
+                    EJERCICIO,
+                    fila[0],
+                    fila[1],
+                    EstadoDeDeterminacion.BORRADOR,
+                    ModalidadDelPredial.TRIMESTRAL,
+                    DetalleDeterminacionPredio.nuevo(
+                            fila[2],
+                            Dinero.de("100000.00"),
+                            esP ? Dinero.de("60000.00") : Dinero.CERO,
+                            Porcentaje.total(),
+                            esP ? Dinero.de("40000.00") : Dinero.de("100000.00")));
+        }
+        selladas.conCifra(EJERCICIO, 12L, "50000.00", 77L);
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/predial/calculo-masivo")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,"
+                                                        + "\"ejercicio\":\"2026\","
+                                                        + "\"observacion\":\"Emision anual\"}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+        assertThat(determinaciones.determinados)
+                .as("A y C se determinan: el dato de P no se lleva por delante al siguiente")
+                .containsExactly(501L, 503L);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"codContribuyente\":\"C-002\"")
+                .contains("10002")
+                .contains("60000.00")
+                .contains("50000.00");
+        assertThat(((CorridasEnMemoria) corridas).guardadas)
+                .as("y la corrida deja su rastro, con P observado")
+                .singleElement()
+                .satisfies(corrida -> assertThat(corrida.observados()).hasSize(1));
     }
 
     /**
@@ -1987,7 +2051,7 @@ class PredialControllerTest {
                         fichas,
                         new DirectorioDePrueba(),
                         cuadro,
-                        new kamayuk.rentas.nucleo.dobles.ValuacionesSelladasEnMemoria(),
+                        selladas,
                         (contribuyenteId, fecha) ->
                                 beneficios.getOrDefault(contribuyenteId, List.of()).stream()
                                         .filter(beneficio -> beneficio.rigeEn(fecha))
@@ -2362,6 +2426,10 @@ class PredialControllerTest {
         private static final ResumenDeContribuyente DOS =
                 new ResumenDeContribuyente(502L, "C-002", "SULLON VILCHEZ, JOSE RAUL", "29614026");
 
+        /** El tercero hace falta para medir que la corrida SIGUE tras el del medio (#375). */
+        private static final ResumenDeContribuyente TRES =
+                new ResumenDeContribuyente(503L, "C-003", "TERCERA, CONTRIBUYENTE", "40000003");
+
         @Override
         public List<ResumenDeContribuyente> buscar(String texto, int maximo) {
             throw new UnsupportedOperationException("La determinacion no busca por texto");
@@ -2371,6 +2439,9 @@ class PredialControllerTest {
         public Optional<ResumenDeContribuyente> porCodigo(String codigo) {
             if ("C-001".equals(codigo)) {
                 return Optional.of(UNO);
+            }
+            if ("C-003".equals(codigo)) {
+                return Optional.of(TRES);
             }
             return "C-002".equals(codigo) ? Optional.of(DOS) : Optional.empty();
         }
@@ -2383,6 +2454,9 @@ class PredialControllerTest {
             }
             if (ids.contains(DOS.id())) {
                 encontrados.put(DOS.id(), DOS);
+            }
+            if (ids.contains(TRES.id())) {
+                encontrados.put(TRES.id(), TRES);
             }
             return encontrados;
         }
