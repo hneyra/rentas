@@ -2,6 +2,7 @@ package kamayuk.rentas.licencias.infraestructura.web;
 
 import java.time.LocalDate;
 import java.util.List;
+import kamayuk.rentas.licencias.aplicacion.AnularLicenciaDeEdificacion;
 import kamayuk.rentas.licencias.aplicacion.EmitirLicenciaDeEdificacion;
 import kamayuk.rentas.licencias.aplicacion.RevalidarLicenciaDeEdificacion;
 import kamayuk.rentas.licencias.dominio.VigenciaDeLaLicencia;
@@ -63,6 +64,18 @@ public record ActoDeEdificacionResource(
                 revalidacion.movimiento().fecha(),
                 ActoDeLicenciaResource.DocumentoResource.de(revalidacion.resolucion()),
                 vigencias.stream().map(ActoDeEdificacionResource::vigenciaDe).toList(),
+                null);
+    }
+
+    /** La anulacion: sin vigencias nuevas, porque deja sin efecto las que habia (#455). */
+    public static ActoDeEdificacionResource de(AnularLicenciaDeEdificacion.Anulacion anulacion) {
+        return new ActoDeEdificacionResource(
+                anulacion.fue().expediente(),
+                anulacion.numeroDeLicencia(),
+                "ANULACION",
+                anulacion.movimiento().fecha(),
+                ActoDeLicenciaResource.DocumentoResource.de(anulacion.resolucion()),
+                List.of(),
                 null);
     }
 

@@ -86,15 +86,17 @@ public class ConsultaDeFue {
      *
      * <p>Lo que la grilla no trae y este si: el area a construir y el valor de obra de cada fila.
      * Las filas se leen <b>en una transaccion</b> y el cuadro de valores unitarios se pide <b>fuera
-     * de ella</b> y una sola vez para toda la pagina —{@link ValorizacionDelFue#valorizarVarias}—,
-     * con la misma fecha de corte: si cada fila lo resolviera por su cuenta y entre dos lecturas se
-     * sellara una version nueva, media hoja saldria con un cuadro y media con otro.
+     * de ella</b>, una vez por ejercicio distinto de la pagina —{@link
+     * ValorizacionDelFue#valorizarVarias}—. Cada obra con el cuadro <b>de su acto</b>, como su
+     * ficha y su papel (#455): hasta #455 se valorizaba con el de la fecha de corte, y la misma
+     * licencia daba en el reporte otra cifra que en su ficha. Leer cada cuadro una sola vez sigue
+     * impidiendo que media hoja salga con una version y media con otra.
      *
      * <p>Una fila que no se pueda valorizar sale con su {@link ValorizacionDelFue.Resultado} <b>sin
      * cifra y con el motivo</b>, nombrando la llave que falta cuando la hay: ni cero ni error. Un
      * cero es indistinguible de una obra que no vale nada cuando llega al papel (#48).
      *
-     * @param aLaFecha la fecha de corte del reporte; deriva el estado y resuelve el cuadro
+     * @param aLaFecha la fecha de corte del reporte; deriva el estado, y NO decide el cuadro
      */
     public Pagina<FilaDelReporte> reporte(
             CriterioDeFue criterio,
@@ -112,8 +114,15 @@ public class ConsultaDeFue {
             return Pagina.vacia(paginacion);
         }
 
-        Map<Long, ValorizacionDelFue.Resultado> valorizadas =
-                valorizadasParaLeer(datos.estructuras(), aLaFecha);
+        Map<Long, ValorizacionDelFue.ObraAValorizar> obras = new LinkedHashMap<>();
+        for (FueEnConsulta fila : datos.filas().contenido()) {
+            long id = fila.fue().identificador();
+            obras.put(
+                    id,
+                    new ValorizacionDelFue.ObraAValorizar(
+                            datos.estructuras().getOrDefault(id, List.of()), fila.fechaDelActo()));
+        }
+        Map<Long, ValorizacionDelFue.Resultado> valorizadas = valorizadasParaLeer(obras);
 
         return datos.filas()
                 .mapear(
@@ -190,17 +199,16 @@ public class ConsultaDeFue {
         }
     }
 
-    /** Lo mismo para una pagina entera del reporte: una sola lectura del cuadro, o ninguna. */
+    /** Lo mismo para una pagina entera del reporte: una lectura del cuadro por ejercicio. */
     private Map<Long, ValorizacionDelFue.Resultado> valorizadasParaLeer(
-            Map<Long, List<EstructuraDelProyecto>> porExpediente, LocalDate aLaFecha) {
+            Map<Long, ValorizacionDelFue.ObraAValorizar> obras) {
         try {
-            return valorizaciones.valorizarVarias(porExpediente, aLaFecha);
+            return valorizaciones.valorizarVarias(obras);
         } catch (TerritorioInalcanzable caido) {
-            ValorizacionDelFue.Resultado sinCatastro = sinPoderPreguntar(aLaFecha, caido);
             Map<Long, ValorizacionDelFue.Resultado> todas = new LinkedHashMap<>();
-            for (Long fueId : porExpediente.keySet()) {
-                todas.put(fueId, sinCatastro);
-            }
+            obras.forEach(
+                    (fueId, obra) ->
+                            todas.put(fueId, sinPoderPreguntar(obra.fechaDelActo(), caido)));
             return Map.copyOf(todas);
         }
     }
@@ -227,6 +235,8 @@ public class ConsultaDeFue {
      * @param numeroDeLicencia el numero otorgado; nulo mientras el expediente este en tramite
      * @param terreno el terreno vigente; nulo si la seccion no se completo
      * @param solicitante el resumen del padron; nulo si el contribuyente ya no esta
+     * @param fechaDelActo el dia con el que se valoriza la obra: el de la emision si la hubo, y el
+     *     de la declaracion mientras no (#455). Una sola fuente, la de la ficha y la del papel
      */
     public record FueEnConsulta(
             FueDeEdificacion fue,
@@ -234,7 +244,8 @@ public class ConsultaDeFue {
             LocalDate aLaFecha,
             @Nullable String numeroDeLicencia,
             @Nullable TerrenoDelFue terreno,
-            @Nullable ResumenDeContribuyente solicitante) {
+            @Nullable ResumenDeContribuyente solicitante,
+            LocalDate fechaDelActo) {
 
         public String nombreDelSolicitante() {
             ResumenDeContribuyente resumen = solicitante;

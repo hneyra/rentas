@@ -126,6 +126,33 @@ public record MovimientoDeEdificacion(
                 observacion);
     }
 
+    /**
+     * El movimiento que deja la licencia sin efecto (#455). Sin recibo —ninguna norma condiciona
+     * dejar sin efecto un acto a un pago— y con su motivo, que el constructor exige.
+     */
+    public static MovimientoDeEdificacion anulacion(
+            long fueId,
+            LocalDate fecha,
+            String motivo,
+            long documentoId,
+            String documentoNumero,
+            Instant registradoEn,
+            Observacion observacion) {
+        return new MovimientoDeEdificacion(
+                null,
+                fueId,
+                TipoDeMovimientoDeEdificacion.ANULACION,
+                fecha,
+                null,
+                motivo,
+                null,
+                documentoId,
+                documentoNumero,
+                registradoEn,
+                null,
+                observacion);
+    }
+
     public boolean esNuevo() {
         return id == null;
     }

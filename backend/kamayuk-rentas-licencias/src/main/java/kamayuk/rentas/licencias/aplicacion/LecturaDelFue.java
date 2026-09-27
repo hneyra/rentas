@@ -274,7 +274,8 @@ public class LecturaDelFue {
                 aLaFecha,
                 numero,
                 terreno,
-                solicitante);
+                solicitante,
+                fechaDelActo(fue, historial));
     }
 
     private CriterioDeFue conTitularesResueltos(

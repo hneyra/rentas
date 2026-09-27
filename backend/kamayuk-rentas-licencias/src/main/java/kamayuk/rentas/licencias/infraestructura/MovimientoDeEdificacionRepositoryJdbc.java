@@ -98,6 +98,12 @@ public class MovimientoDeEdificacionRepositoryJdbc extends RepositorioJdbc
                                 + " un segundo tramo lo concederia otro expediente",
                         yaEstaba);
             }
+            if (choqueDe(yaEstaba, "edificacion_movimiento_anulacion_uq")) {
+                throw new YaEstabaAnulada(
+                        "La licencia ya esta anulada: una segunda resolucion de anulacion sobre la"
+                                + " misma licencia se contradice con la primera",
+                        yaEstaba);
+            }
             if (choqueDe(yaEstaba, "edificacion_numero_licencia_uq")) {
                 throw new NumeroDeLicenciaDuplicado(
                         "Ese numero de licencia de edificacion ya existe en esta municipalidad: dos"

@@ -21,6 +21,7 @@ public interface MovimientoDeEdificacionRepository {
      * @throws YaEstabaEmitida si el expediente ya tenia su emision; lo decide {@code
      *     edificacion_movimiento_emision_uq}, no un {@code SELECT}
      * @throws NumeroDeLicenciaDuplicado si ese numero ya existe
+     * @throws YaEstabaAnulada si la licencia ya tenia su anulacion (#455)
      */
     MovimientoDeEdificacion registrar(MovimientoDeEdificacion movimiento);
 
@@ -55,6 +56,18 @@ public interface MovimientoDeEdificacionRepository {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
         public YaEstabaRevalidada(String mensaje, Throwable causa) {
+            super(mensaje, causa);
+        }
+    }
+
+    /**
+     * La licencia ya estaba anulada: lo dice {@code edificacion_movimiento_anulacion_uq} (#455).
+     */
+    final class YaEstabaAnulada extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public YaEstabaAnulada(String mensaje, Throwable causa) {
             super(mensaje, causa);
         }
     }

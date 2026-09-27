@@ -121,6 +121,7 @@
   "POST /licencias/certificados/{numero}/impresion": ["404"],
   "POST /licencias/ciiu": [],
   "POST /licencias/edificacion": ["404"],
+  "POST /licencias/edificacion/{expediente}/anulacion": ["404"],
   "POST /licencias/edificacion/{expediente}/licencia": ["404"],
   "POST /licencias/edificacion/{expediente}/revalidacion": ["404"],
   "POST /licencias/edificacion/{expediente}/secciones": ["404"],

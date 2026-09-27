@@ -369,6 +369,8 @@ class ContratoDeApiTest {
                     "POST /licencias/edificacion/{expediente}/secciones",
                     "POST /licencias/edificacion/{expediente}/licencia",
                     "POST /licencias/edificacion/{expediente}/revalidacion",
+                    // #455 — la anulacion, que el enumerado y el filtro de estado ya anunciaban.
+                    "POST /licencias/edificacion/{expediente}/anulacion",
                     "GET /licencias/edificacion/reportes/general",
                     // #51 — RF-114: anuncios y propaganda, con la deuda por la tasa generada al
                     // registrar. Los tres POST de acto son tramites, no ediciones: `anuncio` no

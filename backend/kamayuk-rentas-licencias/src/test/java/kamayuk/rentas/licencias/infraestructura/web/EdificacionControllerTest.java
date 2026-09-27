@@ -22,6 +22,7 @@ import kamayuk.rentas.documentos.RenderizadorRtf;
 import kamayuk.rentas.documentos.RenderizadorXls;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.PuntoDeRedondeo;
+import kamayuk.rentas.licencias.aplicacion.AnularLicenciaDeEdificacion;
 import kamayuk.rentas.licencias.aplicacion.CompletarSeccionDelFue;
 import kamayuk.rentas.licencias.aplicacion.ConsultaDeFue;
 import kamayuk.rentas.licencias.aplicacion.DerechosDeTramiteParametrizados;
@@ -194,6 +195,13 @@ class EdificacionControllerTest {
                                                 reloj),
                                         caja,
                                         derechos),
+                                new AnularLicenciaDeEdificacion(
+                                        expedientes,
+                                        movimientos,
+                                        padron,
+                                        documentos,
+                                        (RegistroDeAuditoria registro) -> {},
+                                        reloj),
                                 reloj))
                 .setControllerAdvice(
                         new ManejadorDeErrores(),
@@ -1056,9 +1064,15 @@ class EdificacionControllerTest {
         }
 
         @Test
-        @DisplayName("el reporte general con corte el 4 de enero de 2027, sin cuadro 2027: 200")
+        @DisplayName(
+                "el reporte con corte el 4 de enero de 2027: 200, y el motivo es el del ACTO, 2025")
         void elReporteDelCuatroDeEnero() throws Exception {
             presentarEl(sinSellar, DEL_2025, "2025-11-20");
+            envio(
+                    sinSellar,
+                    "/rentas/api/v1/licencias/edificacion/" + DEL_2025 + "/secciones",
+                    VALORIZACION,
+                    201);
 
             String reporte =
                     obtener(
@@ -1069,10 +1083,12 @@ class EdificacionControllerTest {
                     .as("el 1 de enero de cada anio es una fecha cierta en que el reporte caeria")
                     .contains("\"expediente\":\"" + DEL_2025 + "\"")
                     .contains("\"valorDeObraS\":null")
-                    .as("el reporte valoriza al corte, y el corte cae en 2027")
-                    .contains(
-                            "\"valorDeObraNoDisponible\":\"No hay ningun conjunto de parametros"
-                                    + " sellado para el ejercicio 2027:");
+                    .as(
+                            "hasta #455 el reporte valorizaba al corte —2027— y la ficha al acto"
+                                    + " —2025—: dos motivos, y con los dos cuadros sellados, dos"
+                                    + " cifras para el mismo expediente")
+                    .contains(MOTIVO_SIN_SELLAR_2025)
+                    .doesNotContain("ejercicio 2027");
         }
 
         @Test
@@ -1118,6 +1134,13 @@ class EdificacionControllerTest {
         @DisplayName("con catastro caido, el reporte general contesta 200 con el mismo motivo")
         void elReporteConCatastroCaido() throws Exception {
             presentarEl(sinSellar, DEL_2025, "2025-11-20");
+            // Con estructuras: sin ellas no se le pregunta nada a `catastro` desde #455 —las
+            // estructuras van primero, en la ficha y en el reporte—, y no habria caida que ver.
+            envio(
+                    sinSellar,
+                    "/rentas/api/v1/licencias/edificacion/" + DEL_2025 + "/secciones",
+                    VALORIZACION,
+                    201);
 
             String reporte =
                     obtener(caido, "/rentas/api/v1/licencias/edificacion/reportes/general");
@@ -1225,6 +1248,63 @@ class EdificacionControllerTest {
     }
 
     /** El expediente con las cinco secciones completadas y listo para emitir. */
+    @Nested
+    @DisplayName("#455 — POST /licencias/edificacion/{expediente}/anulacion")
+    class Anulacion {
+
+        private static final String RUTA =
+                "/rentas/api/v1/licencias/edificacion/" + EXPEDIENTE + "/anulacion";
+
+        private static final String CUERPO =
+                """
+                {"fecha":"2026-03-16","motivo":"El administrado desiste de la obra",
+                 "observacion":"Se anula a pedido del administrado"}
+                """;
+
+        @Test
+        @DisplayName(
+                "una licencia otorgada se anula: 201 con su resolucion, y el acto es ANULACION")
+        void seAnula() throws Exception {
+            expedienteCompleto();
+            emitir(mvc, 201);
+
+            String cuerpo = envio(mvc, RUTA, CUERPO, 201);
+
+            assertThat(cuerpo)
+                    .contains("\"acto\":\"ANULACION\"")
+                    .contains("\"nroLicencia\":\"LE-2026-000001\"");
+            assertThat(obtener("/rentas/api/v1/licencias/edificacion?nroExpediente=" + EXPEDIENTE))
+                    .as("el estado se deriva del movimiento: la ficha dice ANULADA")
+                    .contains("ANULADA");
+        }
+
+        @Test
+        @DisplayName("la segunda anulacion es 409: se contradice con la primera")
+        void laSegundaEs409() throws Exception {
+            expedienteCompleto();
+            emitir(mvc, 201);
+            envio(mvc, RUTA, CUERPO, 201);
+
+            envio(mvc, RUTA, CUERPO, 409);
+        }
+
+        @Test
+        @DisplayName(
+                "sin licencia otorgada es 409, sin motivo 422 y un expediente que no existe 404")
+        void losRechazos() throws Exception {
+            expedienteCompleto();
+            envio(mvc, RUTA, CUERPO, 409);
+            envio(
+                    mvc,
+                    RUTA,
+                    """
+                    {"fecha":"2026-03-16","observacion":"Se anula sin decir por que"}
+                    """,
+                    422);
+            envio(mvc, "/rentas/api/v1/licencias/edificacion/EXP-NO-EXISTE/anulacion", CUERPO, 404);
+        }
+    }
+
     private void expedienteCompleto() throws Exception {
         expedienteCompleto(EXPEDIENTE);
     }

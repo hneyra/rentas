@@ -13,6 +13,7 @@ import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Medida;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.licencias.aplicacion.AnularLicenciaDeEdificacion;
 import kamayuk.rentas.licencias.aplicacion.CompletarSeccionDelFue;
 import kamayuk.rentas.licencias.aplicacion.ComprobacionDelDerecho;
 import kamayuk.rentas.licencias.aplicacion.ConsultaDeFue;
@@ -105,6 +106,7 @@ public class EdificacionController {
     private final CompletarSeccionDelFue completar;
     private final EmitirLicenciaDeEdificacion emitir;
     private final RevalidarLicenciaDeEdificacion revalidar;
+    private final AnularLicenciaDeEdificacion anular;
     private final Clock reloj;
 
     public EdificacionController(
@@ -113,12 +115,14 @@ public class EdificacionController {
             CompletarSeccionDelFue completar,
             EmitirLicenciaDeEdificacion emitir,
             RevalidarLicenciaDeEdificacion revalidar,
+            AnularLicenciaDeEdificacion anular,
             Clock reloj) {
         this.consulta = consulta;
         this.presentar = presentar;
         this.completar = completar;
         this.emitir = emitir;
         this.revalidar = revalidar;
+        this.anular = anular;
         this.reloj = reloj;
     }
 
@@ -177,9 +181,10 @@ public class EdificacionController {
     /**
      * El reporte general de licencias de edificacion (RF-115).
      *
-     * <p>Es la unica salida con importes del modulo, y por eso cada fila lleva su fecha: el valor
-     * de obra sale del cuadro de valores unitarios que rigio la fecha de corte, y sin ella la misma
-     * hoja impresa el anio que viene podria decir otra cosa (regla 9, RNF-075).
+     * <p>Es la unica salida con importes del modulo, y por eso cada fila lleva su fecha (regla 9,
+     * RNF-075). El valor de obra sale del cuadro de valores unitarios que rigio <b>el acto</b> de
+     * cada expediente —la emision, o la declaracion mientras no la hay—, el mismo que su ficha y su
+     * papel (#455); la fecha de corte decide el estado de la fila, no el cuadro.
      */
     @GetMapping("/reportes/general")
     @RequiereAcceso(acceso = ACCESO_REPORTE, privilegio = Privilegio.IMPRESION)
@@ -370,6 +375,44 @@ public class EdificacionController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ActoDeEdificacionResource.de(emitida));
+    }
+
+    /**
+     * Anula la licencia del expediente, con su resolucion y su motivo (#455).
+     *
+     * <p>Hasta #455 el reporte general admitia {@code ?estado=ANULADA} y ninguna ruta escribia una
+     * anulacion: el filtro salia siempre vacio en una instalacion nueva.
+     */
+    @PostMapping("/{expediente}/anulacion")
+    @RequiereAcceso(acceso = ACCESO_FUE, privilegio = Privilegio.REGISTRO)
+    public ResponseEntity<ActoDeEdificacionResource> anular(
+            @PathVariable String expediente, @RequestBody PeticionDeAnulacion peticion) {
+
+        Observacion observacion = observacionDe(peticion.observacion());
+        FormatoDeDocumento formato = formatoDe(peticion.formato());
+        LocalDate fecha = fechaOhoy(peticion.fecha(), "fecha");
+
+        AnularLicenciaDeEdificacion.Anulacion anulacion;
+        try {
+            anulacion =
+                    anular.anular(
+                            expediente,
+                            fecha,
+                            exigido(peticion.motivo(), "motivo"),
+                            formato,
+                            observacion);
+        } catch (EmitirLicenciaDeEdificacion.ExpedienteInexistente noEsta) {
+            throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
+        } catch (AnularLicenciaDeEdificacion.SinLicenciaQueAnular
+                | AnularLicenciaDeEdificacion.YaEstabaAnulada
+                | MovimientoDeEdificacionRepository.YaEstabaAnulada enConflicto) {
+            // 409: la peticion esta bien formada; lo que no la admite es el estado del expediente.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enConflicto));
+        } catch (AnularLicenciaDeEdificacion.SinMotivo | IllegalArgumentException invalida) {
+            throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalida));
+        }
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ActoDeEdificacionResource.de(anulacion));
     }
 
     /** Revalida la licencia que este expediente de revalidacion nombra (AC 4). */

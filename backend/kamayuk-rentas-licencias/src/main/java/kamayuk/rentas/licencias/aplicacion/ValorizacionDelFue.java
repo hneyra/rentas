@@ -2,6 +2,7 @@ package kamayuk.rentas.licencias.aplicacion;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,35 +70,75 @@ public class ValorizacionDelFue {
     /**
      * Valoriza esas estructuras con el cuadro que rige esa fecha.
      *
-     * <p>No lanza por falta de datos normativos: eso vuelve dentro del {@link Resultado}.
+     * <p>No lanza por falta de datos normativos: eso vuelve dentro del {@link Resultado}. Es el
+     * caso de un elemento de {@link #valorizarVarias}, y no una copia suya (#455): hasta #455 eran
+     * dos metodos con la misma traduccion del cuadro escrita dos veces, y ya daban motivos
+     * distintos para el mismo expediente.
      *
      * @param estructuras las lineas declaradas en la seccion de valorizacion
      * @param fechaDelActo el dia con el que se resuelve el conjunto sellado (regla 6)
      */
     public Resultado valorizar(List<EstructuraDelProyecto> estructuras, LocalDate fechaDelActo) {
-        Objects.requireNonNull(estructuras, "La lista de estructuras es vacia, no nula");
-        Objects.requireNonNull(fechaDelActo, "La fecha entra como argumento (regla 6)");
+        return valorizarUna(new ObraAValorizar(estructuras, fechaDelActo), new HashMap<>());
+    }
 
-        Ejercicio ejercicio = Ejercicio.de(fechaDelActo);
-        if (estructuras.isEmpty()) {
-            return Resultado.noDisponible(
-                    ejercicio,
-                    "El proyecto todavia no declara ninguna partida en ningun piso: la seccion de"
-                            + " valorizacion esta sin completar",
-                    null);
+    /**
+     * Valoriza varias obras, cada una con el cuadro <b>de su acto</b>, leyendo cada cuadro una sola
+     * vez (#455).
+     *
+     * <p>Lo pide el reporte general, que pinta el valor de obra de cada fila. Hasta #455 las
+     * valorizaba todas con el cuadro de la fecha de CORTE del reporte, y la misma licencia salia
+     * con otra cifra que su ficha y su papel, que usan la del acto. Leer el cuadro una vez por
+     * ejercicio distinto da la coherencia que aquella fecha unica buscaba —que media hoja no salga
+     * con un cuadro y media con otro de la misma version— sin cambiar de acto.
+     *
+     * @param obras las estructuras y la fecha del acto de cada expediente, por su identificador
+     */
+    public Map<Long, Resultado> valorizarVarias(Map<Long, ObraAValorizar> obras) {
+        Objects.requireNonNull(obras, "El mapa de obras es vacio, no nulo");
+
+        Map<Ejercicio, Cuadro> cuadros = new HashMap<>();
+        Map<Long, Resultado> resultados = new LinkedHashMap<>();
+        for (Map.Entry<Long, ObraAValorizar> entrada : obras.entrySet()) {
+            resultados.put(entrada.getKey(), valorizarUna(entrada.getValue(), cuadros));
         }
+        return Map.copyOf(resultados);
+    }
 
+    /**
+     * Una obra, con un solo orden para los motivos: primero las estructuras —que no necesitan el
+     * cuadro, y por eso sin ellas no se pide—, despues el cuadro del ejercicio de su acto.
+     */
+    private Resultado valorizarUna(ObraAValorizar obra, Map<Ejercicio, Cuadro> cuadros) {
+        Ejercicio ejercicio = Ejercicio.de(obra.fechaDelActo());
+        if (obra.estructuras().isEmpty()) {
+            return Resultado.sinEstructuras(ejercicio);
+        }
+        return switch (cuadros.computeIfAbsent(ejercicio, this::cuadroDe)) {
+            case Cuadro.Ausente ausente -> ausente.porQue();
+            case Cuadro.Disponible cuadro -> {
+                try {
+                    yield Resultado.calculada(
+                            ejercicio,
+                            ValorizacionDeObra.valorizar(
+                                    obra.estructuras(), cuadro.tabla(), cuadro.politica()));
+                } catch (TablaDeValoresUnitarios.ValorUnitarioSinParametrizar falta) {
+                    yield Resultado.noDisponible(ejercicio, mensajeDe(falta), falta.celda());
+                }
+            }
+        };
+    }
+
+    /**
+     * El cuadro y la politica de redondeo de un ejercicio, o el {@link Resultado} que dice por que
+     * no hay con que valorizar en el. Es la unica traduccion del cuadro de este modulo.
+     */
+    private Cuadro cuadroDe(Ejercicio ejercicio) {
         List<ValorUnitarioPublicado> celdas;
         try {
             celdas = cuadro.valoresUnitariosVigentesEn(ejercicio);
         } catch (LectorDeParametros.EjercicioSinSellar sinSellar) {
-            return Resultado.noDisponible(
-                    ejercicio,
-                    "No hay ningun conjunto de parametros sellado para el ejercicio "
-                            + ejercicio
-                            + ", asi que no hay cuadro de valores unitarios con que valorizar la"
-                            + " obra. Las cifras del cuadro las espera #197 (D-02a)",
-                    null);
+            return new Cuadro.Ausente(Resultado.sinSellar(ejercicio));
         }
 
         List<TablaDeValoresUnitarios.Celda> traducidas = new ArrayList<>(celdas.size());
@@ -110,7 +151,6 @@ public class ValorizacionDelFue {
                             celda.anioConstruccionHasta(),
                             celda.valorM2()));
         }
-
         // El anio de construccion de una obra que se autoriza es el del acto: el cuadro es una
         // matriz de categoria por anio de construccion (NEG-05 §RT-002), y elegir la fila por el
         // ejercicio del conjunto en vez de por el anio de la obra es el defecto que ese documento
@@ -118,118 +158,15 @@ public class ValorizacionDelFue {
         TablaDeValoresUnitarios tabla =
                 TablaDeValoresUnitarios.de(traducidas, ejercicio, ejercicio.valor());
         if (tabla.tamano() == 0) {
-            return Resultado.noDisponible(
-                    ejercicio,
-                    "El conjunto sellado del ejercicio "
-                            + ejercicio
-                            + " no trae ninguna celda del cuadro de valores unitarios que rija una"
-                            + " edificacion de "
-                            + ejercicio.valor()
-                            + ". Las cifras las espera #197 (D-02a)",
-                    null);
+            return new Cuadro.Ausente(Resultado.sinCeldas(ejercicio));
         }
 
         Redondeo redondeo = redondeoEn(ejercicio);
         PoliticaDeRedondeo politica = redondeo.politica();
         if (politica == null) {
-            return redondeo.sinCifra(ejercicio);
+            return new Cuadro.Ausente(redondeo.sinCifra(ejercicio));
         }
-
-        try {
-            return Resultado.calculada(
-                    ejercicio, ValorizacionDeObra.valorizar(estructuras, tabla, politica));
-        } catch (TablaDeValoresUnitarios.ValorUnitarioSinParametrizar falta) {
-            return Resultado.noDisponible(ejercicio, mensajeDe(falta), falta.celda());
-        }
-    }
-
-    /**
-     * Valoriza varias listas de estructuras con <b>una sola</b> lectura del cuadro.
-     *
-     * <p>Lo pide el reporte general, que pinta el valor de obra de cada fila. Llamar al metodo de
-     * una en una resolveria el conjunto sellado una vez por fila; peor todavia, si entre dos
-     * lecturas se sellara una version nueva, media pagina saldria con un cuadro y media con otro.
-     *
-     * @param porExpediente las estructuras de cada expediente, por su identificador
-     * @param fechaDelActo el dia con el que se resuelve el conjunto sellado (regla 6)
-     */
-    public Map<Long, Resultado> valorizarVarias(
-            Map<Long, List<EstructuraDelProyecto>> porExpediente, LocalDate fechaDelActo) {
-
-        Objects.requireNonNull(porExpediente, "El mapa de estructuras es vacio, no nulo");
-        Objects.requireNonNull(fechaDelActo, "La fecha entra como argumento (regla 6)");
-
-        Ejercicio ejercicio = Ejercicio.de(fechaDelActo);
-        List<ValorUnitarioPublicado> celdas;
-        try {
-            celdas = cuadro.valoresUnitariosVigentesEn(ejercicio);
-        } catch (LectorDeParametros.EjercicioSinSellar sinSellar) {
-            Map<Long, Resultado> sinCuadro = new LinkedHashMap<>();
-            for (Long fueId : porExpediente.keySet()) {
-                sinCuadro.put(
-                        fueId,
-                        Resultado.noDisponible(
-                                ejercicio,
-                                "No hay ningun conjunto de parametros sellado para el ejercicio "
-                                        + ejercicio
-                                        + ": las cifras del cuadro de valores unitarios las espera"
-                                        + " #197 (D-02a)",
-                                null));
-            }
-            return Map.copyOf(sinCuadro);
-        }
-
-        List<TablaDeValoresUnitarios.Celda> traducidas = new ArrayList<>(celdas.size());
-        for (ValorUnitarioPublicado celda : celdas) {
-            traducidas.add(
-                    new TablaDeValoresUnitarios.Celda(
-                            celda.partida(),
-                            celda.categoria(),
-                            celda.anioConstruccionDesde(),
-                            celda.anioConstruccionHasta(),
-                            celda.valorM2()));
-        }
-        TablaDeValoresUnitarios tabla =
-                TablaDeValoresUnitarios.de(traducidas, ejercicio, ejercicio.valor());
-        // Una sola lectura de la politica para toda la pagina, por lo mismo que el cuadro.
-        Redondeo redondeo = redondeoEn(ejercicio);
-        PoliticaDeRedondeo politica = redondeo.politica();
-
-        Map<Long, Resultado> resultados = new LinkedHashMap<>();
-        for (Map.Entry<Long, List<EstructuraDelProyecto>> entrada : porExpediente.entrySet()) {
-            List<EstructuraDelProyecto> estructuras = entrada.getValue();
-            if (estructuras.isEmpty() || tabla.tamano() == 0) {
-                resultados.put(
-                        entrada.getKey(),
-                        Resultado.noDisponible(
-                                ejercicio,
-                                estructuras.isEmpty()
-                                        ? "El expediente todavia no declara ninguna partida en"
-                                                + " ningun piso"
-                                        : "El conjunto sellado del ejercicio "
-                                                + ejercicio
-                                                + " no trae ninguna celda del cuadro de valores"
-                                                + " unitarios. Las cifras las espera #197 (D-02a)",
-                                null));
-                continue;
-            }
-            if (politica == null) {
-                resultados.put(entrada.getKey(), redondeo.sinCifra(ejercicio));
-                continue;
-            }
-            try {
-                resultados.put(
-                        entrada.getKey(),
-                        Resultado.calculada(
-                                ejercicio,
-                                ValorizacionDeObra.valorizar(estructuras, tabla, politica)));
-            } catch (TablaDeValoresUnitarios.ValorUnitarioSinParametrizar falta) {
-                resultados.put(
-                        entrada.getKey(),
-                        Resultado.noDisponible(ejercicio, mensajeDe(falta), falta.celda()));
-            }
-        }
-        return Map.copyOf(resultados);
+        return new Cuadro.Disponible(tabla, politica);
     }
 
     private static String mensajeDe(RuntimeException excepcion) {
@@ -289,6 +226,29 @@ public class ValorizacionDelFue {
         }
     }
 
+    /** El cuadro de un ejercicio con su politica, o el resultado que dice por que no lo hay. */
+    private sealed interface Cuadro {
+
+        record Disponible(TablaDeValoresUnitarios tabla, PoliticaDeRedondeo politica)
+                implements Cuadro {}
+
+        record Ausente(Resultado porQue) implements Cuadro {}
+    }
+
+    /**
+     * Lo que se valoriza de un expediente: sus estructuras y la fecha de su acto, que es la que
+     * decide el cuadro (#455). La fecha del acto la resuelve {@code LecturaDelFue}: la de la
+     * emision si la hubo, y la de la declaracion mientras no.
+     */
+    public record ObraAValorizar(List<EstructuraDelProyecto> estructuras, LocalDate fechaDelActo) {
+
+        public ObraAValorizar {
+            Objects.requireNonNull(estructuras, "La lista de estructuras es vacia, no nula");
+            Objects.requireNonNull(fechaDelActo, "La fecha entra como argumento (regla 6)");
+            estructuras = List.copyOf(estructuras);
+        }
+    }
+
     // ------------------------------------------------------------------
 
     /**
@@ -314,6 +274,39 @@ public class ValorizacionDelFue {
         static Resultado noDisponible(
                 Ejercicio ejercicio, String motivo, @Nullable String llaveQueFalta) {
             return new Resultado(ejercicio, null, motivo, llaveQueFalta);
+        }
+
+        /** El expediente todavia no declara ninguna estructura: no hace falta mirar el cuadro. */
+        static Resultado sinEstructuras(Ejercicio ejercicio) {
+            return noDisponible(
+                    ejercicio,
+                    "El proyecto todavia no declara ninguna partida en ningun piso: la seccion de"
+                            + " valorizacion esta sin completar",
+                    null);
+        }
+
+        /** El ejercicio del acto no tiene ningun conjunto sellado. */
+        static Resultado sinSellar(Ejercicio ejercicio) {
+            return noDisponible(
+                    ejercicio,
+                    "No hay ningun conjunto de parametros sellado para el ejercicio "
+                            + ejercicio
+                            + ", asi que no hay cuadro de valores unitarios con que valorizar la"
+                            + " obra. Las cifras del cuadro las espera #197 (D-02a)",
+                    null);
+        }
+
+        /** El conjunto esta sellado y no trae ninguna celda que rija una obra de ese anio. */
+        static Resultado sinCeldas(Ejercicio ejercicio) {
+            return noDisponible(
+                    ejercicio,
+                    "El conjunto sellado del ejercicio "
+                            + ejercicio
+                            + " no trae ninguna celda del cuadro de valores unitarios que rija una"
+                            + " edificacion de "
+                            + ejercicio.valor()
+                            + ". Las cifras las espera #197 (D-02a)",
+                    null);
         }
 
         public boolean estaDisponible() {

@@ -3769,6 +3769,27 @@
     ],
     "completo": "booleano"
   },
+  "POST /licencias/edificacion/{expediente}/anulacion": {
+    "nroExpediente": "texto",
+    "nroLicencia": "texto",
+    "acto": "texto",
+    "fecha": "fecha",
+    "resolucion": {
+      "numero": "texto",
+      "formato": "texto",
+      "resumen": "texto",
+      "bytes": "entero",
+      "reimpresiones": "entero"
+    },
+    "vigencias": [
+      {
+        "tramo": "entero",
+        "desde": "fecha",
+        "hasta": "fecha"
+      }
+    ],
+    "valorDeObraNoDisponible": "texto"
+  },
   "POST /licencias/edificacion/{expediente}/licencia": {
     "nroExpediente": "texto",
     "nroLicencia": "texto",
