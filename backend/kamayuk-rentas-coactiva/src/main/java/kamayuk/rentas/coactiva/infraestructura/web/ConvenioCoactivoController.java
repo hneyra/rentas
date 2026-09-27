@@ -14,7 +14,6 @@ import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
-import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.tesoreria.ConvenioCoactivo;
 import kamayuk.rentas.tesoreria.FraccionamientoCoactivo;
 import kamayuk.rentas.web.Api;
@@ -142,15 +141,6 @@ public class ConvenioCoactivoController {
             // fase de origen CONVENIO y la guarda de fase la rechazaba con 422; desde que la
             // rechaza `cuentacorriente`, sin este `catch` saldria 500 con su incidencia.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(yaAcogida));
-        } catch (FraccionamientoCoactivo.CondicionesSinPublicar falta) {
-            // `CondicionesSinPublicar` no es un fallo del servidor: es que nadie ha publicado
-            // todavia el interes, el maximo de cuotas o la politica de redondeo del ejercicio
-            // (D-02a, D-03c). Ver la cabecera de la clase (#562).
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(falta);
         } catch (FraccionamientoCoactivo.ClaveEnConflicto conflicto) {
             // 409 como por /tesoreria/fraccionamientos: la clave ya registro el convenio de otra
             // peticion, o dos envios con la misma chocaron (#433). Sin este `catch`, 500.

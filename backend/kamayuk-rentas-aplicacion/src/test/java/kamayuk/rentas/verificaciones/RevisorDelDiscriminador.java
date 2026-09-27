@@ -83,9 +83,14 @@ public final class RevisorDelDiscriminador {
      */
     public static final String EL_PROBLEMA = "ProblemaDeNegocio";
 
+    /**
+     * Quien entra en la familia: desde #435, quien extiende {@code CifraSinPublicar}. La base misma
+     * cuenta, porque un {@code catch (CifraSinPublicar falta)} es la familia entera.
+     */
+    public static final String LA_BASE = "CifraSinPublicar";
+
     private static final Pattern DECLARACION =
-            Pattern.compile(
-                    "class\\s+(\\w+)\\s+extends\\s+RuntimeException\\s+implements\\s+ParametroSinPublicar\\b");
+            Pattern.compile("class\\s+(\\w+)\\s+extends\\s+(?:[\\w.]+\\.)?" + LA_BASE + "\\b");
 
     private static final Pattern CATCH = Pattern.compile("\\bcatch\\s*\\(");
 
@@ -126,6 +131,7 @@ public final class RevisorDelDiscriminador {
     public static Set<String> familiaSegunLasFuentes(Map<String, String> fuentes) {
         Set<String> familia = new LinkedHashSet<>();
         familia.add(LA_DEL_DOMINIO_PURO);
+        familia.add(LA_BASE);
         for (String contenido : fuentes.values()) {
             Matcher declara = DECLARACION.matcher(contenido);
             while (declara.find()) {
@@ -167,12 +173,11 @@ public final class RevisorDelDiscriminador {
             hallazgos.add(
                     new RevisorDeCodigoFuente.Hallazgo(
                             archivo,
-                            "#691, #723 — una respuesta de «falta publicar» sin su"
-                                    + " discriminador: traducela con "
+                            "#691, #723, #435 — una respuesta de «falta publicar» sin su"
+                                    + " discriminador: dejala pasar —la traduce"
+                                    + " ManejadorDeLoQueFaltaPublicar— o traducela con "
                                     + EL_TRADUCTOR
-                                    + ".problema(...) si es un 422, o con "
-                                    + EL_TRADUCTOR
-                                    + ".noEncontrado(...) si es un 404",
+                                    + ".problema(...)",
                             clase
                                     + "."
                                     + metodoQueContiene(contenido, captura.start())

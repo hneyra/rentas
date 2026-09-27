@@ -19,8 +19,6 @@ import kamayuk.rentas.coactiva.dominio.LiquidacionDeCostasRepository;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.Observacion;
-import kamayuk.rentas.parametros.FaltaPublicar;
-import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.FiltroDeLaConsulta;
@@ -149,15 +147,6 @@ public class CostasController {
             // 409: la peticion esta bien formada; lo que no admite la operacion es el estado
             // actual del expediente o de sus actos.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enConflicto));
-        } catch (ArancelDeCostasParametrizado.ArancelSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar falta) {
-            // `EjercicioSinSellar` no es un fallo del servidor: es que nadie ha sellado todavia el
-            // conjunto del ejercicio de la liquidacion (D-02a). Ver la cabecera de la clase (#562).
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(falta);
         } catch (LiquidarCostas.SinActosQueLiquidar
                 | LiquidarCostas.ActoAjeno
                 | IllegalArgumentException invalido) {

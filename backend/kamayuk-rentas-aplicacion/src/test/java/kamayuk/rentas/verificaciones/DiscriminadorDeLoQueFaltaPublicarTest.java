@@ -129,7 +129,7 @@ class DiscriminadorDeLoQueFaltaPublicarTest {
                         RevisorDelDiscriminador.familiaSegunLasFuentes(fuentesDeProduccion()));
 
         assertThat(hallazgos)
-                .as("los cuatro que traducen sin el miembro; los tres en regla no")
+                .as("los cuatro que traducen sin el miembro; los que estan en regla no")
                 .hasSize(4);
         assertThat(hallazgos.stream().map(Hallazgo::fragmento).toList())
                 .as("y el hallazgo nombra la clase y el metodo, no «el catch de la linea 40»")
@@ -248,7 +248,7 @@ class DiscriminadorDeLoQueFaltaPublicarTest {
                         try {
                             return leerCuadro();
                         } catch (LectorDeParametros.EjercicioSinSellar sinSellar) {
-                            throw FaltaPublicar.noEncontrado(sinSellar);
+                            throw FaltaPublicar.problema(sinSellar);
                         }
                     }
                 }

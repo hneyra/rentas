@@ -158,45 +158,12 @@ public final class ParametrosSellados {
     }
 
     /** Falta un parametro que la regla necesita. Nunca se sustituye por un valor por omision. */
-    public static final class ParametroAusente extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class ParametroAusente extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
 
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final String llave;
-
         ParametroAusente(Ejercicio ejercicio, String llave, String mensaje) {
-            super(mensaje);
-            this.ejercicio = ejercicio;
-            this.llave = llave;
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        /**
-         * La llave que falta, {@code tipo:clave}, legible por programa y no solo por quien lee el
-         * mensaje.
-         *
-         * <p>Es lo que permite que el corpus de casos <b>recoja</b> los parametros que una regla
-         * pide de verdad, corriendola con un conjunto vacio, en vez de que alguien los escriba a
-         * mano en una lista que se desincroniza.
-         *
-         * <p>Aqui <b>siempre</b> la hay —se pidio una fila concreta y no estaba—, pero el tipo es
-         * el {@code Optional} de {@link ParametroSinPublicar} porque hay hermanas suyas que no
-         * pueden nombrarla: cuando lo que falta es el conjunto entero no hay donde publicar nada.
-         */
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(llave);
+            super(mensaje, ejercicio, llave);
         }
     }
 

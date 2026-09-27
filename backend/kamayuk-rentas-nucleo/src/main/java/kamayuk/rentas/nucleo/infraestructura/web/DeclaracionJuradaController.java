@@ -13,8 +13,6 @@ import kamayuk.rentas.nucleo.aplicacion.ConsultasDeRentas;
 import kamayuk.rentas.nucleo.aplicacion.RegistrarDeclaracionJurada;
 import kamayuk.rentas.nucleo.dominio.DeclaracionJurada;
 import kamayuk.rentas.nucleo.dominio.TipoDeDeclaracion;
-import kamayuk.rentas.parametros.FaltaPublicar;
-import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ProblemaDeNegocio;
@@ -282,13 +280,6 @@ public class DeclaracionJuradaController {
             }
             // #422: la carrera que perdio contra otro acto que ya dejo la DJ anulada o sustituida.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, ACTO_SIMULTANEO);
-        } catch (RegistrarDeclaracionJurada.PlazoSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar falta) {
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(falta);
         } catch (IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
         }

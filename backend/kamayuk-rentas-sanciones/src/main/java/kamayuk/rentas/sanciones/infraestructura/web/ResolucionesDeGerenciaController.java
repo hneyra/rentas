@@ -9,8 +9,6 @@ import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.ModalidadDeNotificacion;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.ResultadoDeNotificacion;
-import kamayuk.rentas.parametros.FaltaPublicar;
-import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.sanciones.aplicacion.AnularPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.NotificarResolucionDeGerencia;
 import kamayuk.rentas.sanciones.aplicacion.ObligacionCompartidaConOtraPapeleta;
@@ -232,15 +230,6 @@ public class ResolucionesDeGerenciaController {
             // valor vivo encima (#495)— dejando primero sin efecto ese valor.
             throw new ProblemaDeNegocio(
                     CodigoDeError.CONFLICTO, PeticionesDeSanciones.mensajeDe(conflicto));
-        } catch (PlazosDeSancionesParametrizados.PlazoSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar falta) {
-            // Las dos de parametros no son un fallo del servidor: es una cifra que todavia nadie
-            // ha publicado, y con D-02a abierta es el estado normal. Ver la cabecera de la clase.
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(falta);
         } catch (RegistrarDescargo.PapeletaSinNadaQueImpugnar
                 | ResolverConResolucionDeGerencia.DescargoDeOtraPapeleta
                 | IllegalArgumentException invalido) {
@@ -294,15 +283,6 @@ public class ResolucionesDeGerenciaController {
         } catch (NotificarResolucionDeGerencia.ResolucionInexistente noExiste) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.NO_ENCONTRADO, PeticionesDeSanciones.mensajeDe(noExiste));
-        } catch (PlazosDeSancionesParametrizados.PlazoSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar falta) {
-            // Igual que en `dictar`: el plazo que concede la resolucion notificada sale del
-            // conjunto sellado, y que falte no es un fallo del servidor. Ver la cabecera.
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(falta);
         } catch (NotificarResolucionDeGerencia.SinDireccion | IllegalArgumentException invalido) {
             throw PeticionesDeSanciones.invalido(invalido);
         }

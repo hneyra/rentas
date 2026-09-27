@@ -21,8 +21,6 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ModalidadDeNotificacion;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.ResultadoDeNotificacion;
-import kamayuk.rentas.parametros.FaltaPublicar;
-import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.valores.aplicacion.ConsultaDeValores;
 import kamayuk.rentas.valores.aplicacion.IniciarCorridaMasiva;
 import kamayuk.rentas.valores.aplicacion.PasarACoactiva;
@@ -97,11 +95,9 @@ import org.springframework.web.bind.annotation.RestController;
  * Una traduccion demasiado ancha —capturar {@code RuntimeException}— es peor que el defecto que
  * arregla, y hay una prueba de contraste que lo mide con un plazo sellado ilegible.
  *
- * <p>La traduccion vive aqui y no en {@code ManejadorDeErrores} porque {@code kamayuk.rentas.web}
- * esta en {@code kamayuk-rentas-plataforma}, que no depende —ni debe— de {@code
- * kamayuk-rentas-parametros}, que es un contexto acotado; y porque la eleccion de codigo no es
- * uniforme en el sistema, asi que decidirla en un sitio unico decidiria tambien por catastro, que
- * traduce la misma excepcion a 404 a proposito.
+ * <p>Desde #435 la traduccion ya no vive aqui: la hace {@code ManejadorDeLoQueFaltaPublicar}, en
+ * {@code kamayuk-rentas-parametros}, para la familia entera. No vive en {@code ManejadorDeErrores}
+ * porque {@code kamayuk-rentas-plataforma} no depende —ni debe— de un contexto acotado.
  */
 @RestController
 @RequestMapping(Api.RAIZ + "/valores")
@@ -266,15 +262,6 @@ public class ValoresController {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noExiste));
         } catch (ValorNoCobrable noSeCobra) {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(noSeCobra));
-        } catch (PlazosParametrizados.PlazoSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar falta) {
-            // `EjercicioSinSellar` no es un fallo del servidor: es que nadie ha sellado todavia
-            // el conjunto del ejercicio de la diligencia (D-02a). Ver la cabecera de la clase.
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(falta);
         } catch (RegistrarNotificacion.SinDomicilio | IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
         }

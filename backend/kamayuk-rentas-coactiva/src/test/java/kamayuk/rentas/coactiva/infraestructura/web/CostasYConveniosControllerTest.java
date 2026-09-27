@@ -42,6 +42,7 @@ import kamayuk.rentas.nucleo.BeneficiosDelContribuyente;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.tesoreria.ConvenioCoactivo;
 import kamayuk.rentas.tesoreria.CuotaDelConvenio;
 import kamayuk.rentas.tesoreria.FraccionamientoCoactivo;
@@ -926,7 +927,9 @@ class CostasYConveniosControllerTest {
 
     private static MockMvc construir(Object controlador) {
         return MockMvcBuilders.standaloneSetup(controlador)
-                .setControllerAdvice(new ManejadorDeErrores())
+                .setControllerAdvice(
+                        new ManejadorDeErrores(),
+                        new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(
                                 JsonMapper.builder()
@@ -1164,27 +1167,13 @@ class CostasYConveniosControllerTest {
          * un {@code IllegalStateException} pelado ya no compila, que es exactamente lo que ese
          * limite existe para conseguir.
          */
-        private static final class FaltaDeMentira extends RuntimeException
-                implements kamayuk.rentas.parametros.ParametroSinPublicar {
+        private static final class FaltaDeMentira
+                extends kamayuk.rentas.parametros.CifraSinPublicar {
 
             @java.io.Serial private static final long serialVersionUID = 1L;
 
-            @SuppressWarnings("serial")
-            private final @org.jspecify.annotations.Nullable String llave;
-
             FaltaDeMentira(String mensaje, @org.jspecify.annotations.Nullable String llave) {
-                super(mensaje);
-                this.llave = llave;
-            }
-
-            @Override
-            public kamayuk.rentas.dominio.Ejercicio ejercicio() {
-                return new kamayuk.rentas.dominio.Ejercicio(2026);
-            }
-
-            @Override
-            public java.util.Optional<String> llave() {
-                return java.util.Optional.ofNullable(llave);
+                super(mensaje, new kamayuk.rentas.dominio.Ejercicio(2026), llave);
             }
         }
 

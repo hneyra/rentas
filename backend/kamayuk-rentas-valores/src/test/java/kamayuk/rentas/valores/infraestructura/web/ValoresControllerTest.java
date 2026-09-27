@@ -21,6 +21,7 @@ import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.parametros.LectorDeParametros;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.valores.aplicacion.ConsultaDeValores;
 import kamayuk.rentas.valores.aplicacion.IniciarCorridaMasiva;
 import kamayuk.rentas.valores.aplicacion.PasarACoactiva;
@@ -153,7 +154,9 @@ class ValoresControllerTest {
                                     iniciarMasivo,
                                     notificar,
                                     pasarACoactiva))
-                    .setControllerAdvice(new ManejadorDeErrores())
+                    .setControllerAdvice(
+                            new ManejadorDeErrores(),
+                            new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                     .setMessageConverters(
                             new JacksonJsonHttpMessageConverter(
                                     JsonMapper.builder()
@@ -824,7 +827,9 @@ class ValoresControllerTest {
                                                 (RegistroDeAuditoria registro) -> {},
                                                 RELOJ_DE_LOS_ACTOS),
                                         pasarACoactiva))
-                        .setControllerAdvice(new ManejadorDeErrores())
+                        .setControllerAdvice(
+                                new ManejadorDeErrores(),
+                                new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                         .setMessageConverters(
                                 new JacksonJsonHttpMessageConverter(
                                         JsonMapper.builder()

@@ -13,6 +13,7 @@ import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.valores.aplicacion.ConsultaDePrescripciones;
 import kamayuk.rentas.valores.aplicacion.DeclararPrescripcion;
 import kamayuk.rentas.valores.aplicacion.PlazosParametrizados;
@@ -77,7 +78,9 @@ class PrescripcionControllerTest {
                                     Clock.fixed(
                                             HOY.atStartOfDay(ZoneOffset.UTC).toInstant(),
                                             ZoneOffset.UTC)))
-                    .setControllerAdvice(new ManejadorDeErrores())
+                    .setControllerAdvice(
+                            new ManejadorDeErrores(),
+                            new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                     .setMessageConverters(
                             new org.springframework.http.converter.json
                                     .JacksonJsonHttpMessageConverter(
@@ -436,7 +439,9 @@ class PrescripcionControllerTest {
                                         Clock.fixed(
                                                 HOY.atStartOfDay(ZoneOffset.UTC).toInstant(),
                                                 ZoneOffset.UTC)))
-                        .setControllerAdvice(new ManejadorDeErrores())
+                        .setControllerAdvice(
+                                new ManejadorDeErrores(),
+                                new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                         .build();
 
         return borde.perform(

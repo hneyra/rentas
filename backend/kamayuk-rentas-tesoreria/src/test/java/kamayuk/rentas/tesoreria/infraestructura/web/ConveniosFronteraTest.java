@@ -51,6 +51,7 @@ import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import kamayuk.rentas.parametros.aplicacion.LectorDeParametrosSellados;
 import kamayuk.rentas.parametros.infraestructura.ParametrosRepositoryJdbc;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.tesoreria.aplicacion.CerrarConvenio;
 import kamayuk.rentas.tesoreria.aplicacion.CondicionesParametrizadas;
@@ -288,7 +289,9 @@ class ConveniosFronteraTest {
                                                                 "DNI 40606002")),
                                         RELOJ))
                         .addInterceptors(new GuardiaDeAcceso(new TodoAutorizado(), RELOJ))
-                        .setControllerAdvice(new ManejadorDeErrores())
+                        .setControllerAdvice(
+                                new ManejadorDeErrores(),
+                                new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                         .setMessageConverters(
                                 new JacksonJsonHttpMessageConverter(
                                         JsonMapper.builder()

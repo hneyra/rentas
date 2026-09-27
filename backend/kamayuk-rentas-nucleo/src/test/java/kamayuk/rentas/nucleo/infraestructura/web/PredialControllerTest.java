@@ -49,6 +49,7 @@ import kamayuk.rentas.nucleo.dominio.predial.ValuacionRecibida;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.jspecify.annotations.Nullable;
@@ -2070,7 +2071,9 @@ class PredialControllerTest {
                                         new DirectorioDePrueba(), determinaciones, cuadro),
                                 RELOJ))
                 .addInterceptors(new GuardiaDeAcceso(comprobador, RELOJ))
-                .setControllerAdvice(new ManejadorDeErrores())
+                .setControllerAdvice(
+                        new ManejadorDeErrores(),
+                        new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(
                                 JsonMapper.builder()

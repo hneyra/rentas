@@ -28,8 +28,6 @@ import kamayuk.rentas.licencias.dominio.EstadoDeLicencia;
 import kamayuk.rentas.licencias.dominio.LicenciaRepository;
 import kamayuk.rentas.licencias.dominio.MovimientoDeLicenciaRepository;
 import kamayuk.rentas.licencias.dominio.TipoDeLicencia;
-import kamayuk.rentas.parametros.FaltaPublicar;
-import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.tesoreria.ReciboYaAplicado;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
@@ -288,18 +286,6 @@ public class LicenciaController {
             // 409 y no 422 (#383): el recibo es bueno —las cinco comprobaciones pasan—, y lo que
             // no admite la peticion es que ya pago otro acto. Se arregla con otro recibo.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(gastado));
-        } catch (DerechosDeTramiteParametrizados.DerechoSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar sinParametro) {
-            // 422 y no 500: la peticion esta bien y el sistema tampoco esta roto. Lo que falta es
-            // un dato de configuracion, y quien opera tiene que enterarse de cual para poder
-            // pedirlo, en vez de recibir «error interno» y un identificador de incidencia.
-            // `EjercicioSinSellar` —que no haya NINGUN conjunto sellado— es el mismo caso y hasta
-            // #562 seguia saliendo como 500 con incidencia. Ver la cabecera de la clase.
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(sinParametro);
         } catch (LicenciaRepository.NumeroDuplicado repetido) {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(repetido));
         }
@@ -376,13 +362,6 @@ public class LicenciaController {
             // 409 y no 422 (#383): el recibo es bueno —las cinco comprobaciones pasan—, y lo que
             // no admite la peticion es que ya pago otro acto. Se arregla con otro recibo.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(gastado));
-        } catch (DerechosDeTramiteParametrizados.DerechoSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar sinParametro) {
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(sinParametro);
         } catch (DuplicadoDeLicenciaRepository.DuplicadoDuplicado carrera) {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(carrera));
         }

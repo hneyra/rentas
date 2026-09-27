@@ -14,6 +14,7 @@ import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.licencias.dominio.EstructuraDelProyecto;
 import kamayuk.rentas.licencias.dominio.TablaDeValoresUnitarios;
 import kamayuk.rentas.licencias.dominio.ValorizacionDeObra;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import org.jspecify.annotations.Nullable;
@@ -260,11 +261,7 @@ public class ValorizacionDelFue {
                             + ", asi que no hay politica con que redondear el valor de obra"
                             + " (ADR-0018)",
                     null);
-        } catch (PoliticasDeRedondeoSelladas.SinPuntosObservados
-                | PoliticasDeRedondeoSelladas.PuntoSinObservar
-                | PoliticasDeRedondeoSelladas.MediaPolitica
-                | PoliticasDeRedondeoSelladas.EscalaNoEntera
-                | PoliticasDeRedondeoSelladas.ModoDesconocido falta) {
+        } catch (CifraSinPublicar falta) {
             return new Redondeo(
                     null,
                     "El valor de obra no se imprime sin redondear, y el conjunto sellado no dice"

@@ -45,6 +45,7 @@ import kamayuk.rentas.parametros.aplicacion.AdministrarParametros;
 import kamayuk.rentas.parametros.aplicacion.LectorDeParametrosSellados;
 import kamayuk.rentas.parametros.dominio.ConjuntoDeParametros;
 import kamayuk.rentas.parametros.infraestructura.ParametrosRepositoryJdbc;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
@@ -176,7 +177,9 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
                                                         new PrediosDeLaHoja(),
                                                         new DeterminacionRepositoryJdbc(jdbc))),
                                         RELOJ))
-                        .setControllerAdvice(new ManejadorDeErrores())
+                        .setControllerAdvice(
+                                new ManejadorDeErrores(),
+                                new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                         .setMessageConverters(
                                 new JacksonJsonHttpMessageConverter(
                                         JsonMapper.builder()

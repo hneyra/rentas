@@ -36,6 +36,7 @@ import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacion;
 import kamayuk.rentas.nucleo.DeclaracionDelEjercicio;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.junit.jupiter.api.BeforeEach;
@@ -149,7 +150,9 @@ class LiquidacionControllerTest {
                                                 liquidaciones, resoluciones, new LibroEnMemoria()),
                                         directorio,
                                         reloj))
-                        .setControllerAdvice(new ManejadorDeErrores())
+                        .setControllerAdvice(
+                                new ManejadorDeErrores(),
+                                new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                         .setMessageConverters(
                                 new JacksonJsonHttpMessageConverter(
                                         JsonMapper.builder()

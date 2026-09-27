@@ -16,8 +16,8 @@ import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.dominio.Vigencia;
 import kamayuk.rentas.nucleo.dominio.beneficios.BaseDelBeneficio;
 import kamayuk.rentas.nucleo.dominio.beneficios.CampaniaDeBeneficio;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
-import kamayuk.rentas.parametros.ParametroSinPublicar;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -311,18 +311,9 @@ public class CampaniasDeBeneficioParametrizadas {
      * preferible a simular con un porcentaje razonable: lo que sale de esa simulacion es una cifra
      * que el contribuyente se lleva escrita y que ninguna norma respalda.
      */
-    public static final class CampaniaSinParametrizar extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class CampaniaSinParametrizar extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final String llave;
 
         CampaniaSinParametrizar(Ejercicio ejercicio, String campania, boolean sinConjunto) {
             super(
@@ -334,20 +325,9 @@ public class CampaniasDeBeneficioParametrizadas {
                             + " no publica el parametro BENEFICIO:"
                             + campania
                             + ". Sin el no hay descuento que aplicar, y uno inventado perdona deuda"
-                            + " que ninguna ordenanza condona (regla 5, D-02b, D-02c)");
-            this.ejercicio = ejercicio;
-            this.llave = "BENEFICIO:" + campania;
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        /** La llave que falta, {@code tipo:clave}, legible por programa. */
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(llave);
+                            + " que ninguna ordenanza condona (regla 5, D-02b, D-02c)",
+                    ejercicio,
+                    "BENEFICIO:" + campania);
         }
     }
 
@@ -419,18 +399,9 @@ public class CampaniasDeBeneficioParametrizadas {
     }
 
     /** La campana esta publicada a medias: falta una de las dos mitades de una de sus dos filas. */
-    public static final class CampaniaIncompleta extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class CampaniaIncompleta extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final String llave;
 
         CampaniaIncompleta(Ejercicio ejercicio, String llave, String queFalta) {
             super(
@@ -441,35 +412,16 @@ public class CampaniasDeBeneficioParametrizadas {
                             + " no dice "
                             + queFalta
                             + ". Media campana no es una campana: aparenta estar resuelta y"
-                            + " descuenta con lo que el programa suponga");
-            this.ejercicio = ejercicio;
-            this.llave = llave;
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(llave);
+                            + " descuenta con lo que el programa suponga",
+                    ejercicio,
+                    llave);
         }
     }
 
     /** La ordenanza dice aplicarse sobre algo que este sistema no sabe nombrar. */
-    public static final class BaseDesconocida extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class BaseDesconocida extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final String llave;
 
         BaseDesconocida(Ejercicio ejercicio, String llave, String texto) {
             super(
@@ -480,19 +432,9 @@ public class CampaniasDeBeneficioParametrizadas {
                             + "', que no es ninguna de las bases admitidas "
                             + Arrays.toString(BaseDelBeneficio.values())
                             + ". Elegir la mas parecida seria condonar sobre algo distinto de lo que"
-                            + " dice la ordenanza");
-            this.ejercicio = ejercicio;
-            this.llave = llave;
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(llave);
+                            + " dice la ordenanza",
+                    ejercicio,
+                    llave);
         }
     }
 }

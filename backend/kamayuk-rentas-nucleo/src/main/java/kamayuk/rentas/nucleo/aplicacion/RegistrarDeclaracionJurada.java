@@ -2,7 +2,6 @@ package kamayuk.rentas.nucleo.aplicacion;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
-import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -18,8 +17,8 @@ import kamayuk.rentas.nucleo.dominio.DeclaracionJuradaRepository;
 import kamayuk.rentas.nucleo.dominio.EstadoDeDeclaracion;
 import kamayuk.rentas.nucleo.dominio.PlantillaDeNumeroDeDeclaracion;
 import kamayuk.rentas.nucleo.dominio.TipoDeDeclaracion;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
-import kamayuk.rentas.parametros.ParametroSinPublicar;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -410,15 +409,8 @@ public class RegistrarDeclaracionJurada {
      * en ventanilla no puede hacer nada con «falta un parametro», y quien carga los parametros
      * necesita saber cual (regla 5).
      */
-    public static final class PlazoSinParametrizar extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class PlazoSinParametrizar extends CifraSinPublicar {
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
 
         PlazoSinParametrizar(Ejercicio ejercicio) {
             super(
@@ -428,18 +420,9 @@ public class RegistrarDeclaracionJurada {
                             + TIPO_PARAMETRO_PLAZO
                             + ":"
                             + CLAVE_PLAZO_DJ
-                            + ")");
-            this.ejercicio = ejercicio;
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(TIPO_PARAMETRO_PLAZO + ":" + CLAVE_PLAZO_DJ);
+                            + ")",
+                    ejercicio,
+                    TIPO_PARAMETRO_PLAZO + ":" + CLAVE_PLAZO_DJ);
         }
     }
 }

@@ -20,8 +20,6 @@ import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.MotivoDeInalcanzable;
 import kamayuk.rentas.dominio.Observacion;
-import kamayuk.rentas.parametros.FaltaPublicar;
-import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import kamayuk.rentas.tesoreria.AnulacionesDeRecibo;
 import kamayuk.rentas.tesoreria.aplicacion.CerrarConvenio;
@@ -133,10 +131,9 @@ import org.springframework.web.bind.annotation.RestController;
  * Una traduccion demasiado ancha —convertirlo todo en 422— es peor que el defecto que arregla, y
  * hay una prueba de contraste que lo mide.
  *
- * <p>La traduccion vive aqui y no en {@code ManejadorDeErrores} porque {@code kamayuk.rentas.web}
- * esta en {@code kamayuk-rentas-plataforma}, que no depende —ni debe— de {@code
- * kamayuk-rentas-parametros}, que es un contexto acotado; y porque la eleccion de codigo no es
- * uniforme en el sistema, asi que decidirla en un sitio unico decidiria tambien por catastro.
+ * <p>Desde #435 la traduccion ya no vive aqui: la hace {@code ManejadorDeLoQueFaltaPublicar}, en
+ * {@code kamayuk-rentas-parametros}, para la familia entera. No vive en {@code ManejadorDeErrores}
+ * porque {@code kamayuk-rentas-plataforma} no depende —ni debe— de un contexto acotado.
  */
 @RestController
 @RequestMapping(Api.RAIZ + "/tesoreria")
@@ -216,14 +213,6 @@ public class ConvenioController {
             try {
                 return ResponseEntity.ok(
                         ConvenioResource.SimulacionResource.de(registrar.simular(pedido)));
-            } catch (CondicionesParametrizadas.CondicionSinParametrizar
-                    | LectorDeParametros.EjercicioSinSellar
-                    | PoliticasDeRedondeoSelladas.SinPuntosObservados
-                    | PoliticasDeRedondeoSelladas.PuntoSinObservar
-                    | PoliticasDeRedondeoSelladas.MediaPolitica
-                    | PoliticasDeRedondeoSelladas.EscalaNoEntera
-                    | PoliticasDeRedondeoSelladas.ModoDesconocido falta) {
-                throw FaltaPublicar.problema(falta);
             } catch (AcogimientoAConvenio.CuotaYaAcogida yaAcogida) {
                 // Hasta #442 esto contestaba 200 con un cronograma sobre deuda ya fraccionada: un
                 // plan que no se puede firmar. Las dos ramas dicen lo mismo, con el mismo codigo.
@@ -259,14 +248,6 @@ public class ConvenioController {
             // Hasta #442 esto llegaba hasta el INSERT de `convenio_deuda`, que lo rechazaba con
             // un 23514, y salia 500 ERROR_INTERNO con su incidencia.
             throw yaFraccionada(yaAcogida, contribuyente.id());
-        } catch (CondicionesParametrizadas.CondicionSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar
-                | PoliticasDeRedondeoSelladas.SinPuntosObservados
-                | PoliticasDeRedondeoSelladas.PuntoSinObservar
-                | PoliticasDeRedondeoSelladas.MediaPolitica
-                | PoliticasDeRedondeoSelladas.EscalaNoEntera
-                | PoliticasDeRedondeoSelladas.ModoDesconocido falta) {
-            throw FaltaPublicar.problema(falta);
         } catch (RegistrarPreconvenio.SinDeudaQueFraccionar
                 | CondicionesDelConvenio.DemasiadasCuotas
                 | Cronograma.NadaQueFraccionar
@@ -424,17 +405,6 @@ public class ConvenioController {
                     remedioDe(noSePudo.motivo())
                             + ", asi que no se pudo comprobar el recibo de la cuota inicial: "
                             + mensajeDe(noSePudo));
-        } catch (CondicionesParametrizadas.CondicionSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar
-                | PoliticasDeRedondeoSelladas.SinPuntosObservados
-                | PoliticasDeRedondeoSelladas.PuntoSinObservar
-                | PoliticasDeRedondeoSelladas.MediaPolitica
-                | PoliticasDeRedondeoSelladas.EscalaNoEntera
-                | PoliticasDeRedondeoSelladas.ModoDesconocido falta) {
-            // La reformulacion registra un preconvenio nuevo, y ese pide sus condiciones al
-            // conjunto sellado del ejercicio en que se firma: lo mismo que /fraccionamientos,
-            // y por eso se traduce igual —con su discriminador incluido (#604)—.
-            throw FaltaPublicar.problema(falta);
         } catch (RegistrarPreconvenio.SinDeudaQueFraccionar
                 | CerrarConvenio.ConvenioSinFormalizar
                 | CondicionesDelConvenio.DemasiadasCuotas

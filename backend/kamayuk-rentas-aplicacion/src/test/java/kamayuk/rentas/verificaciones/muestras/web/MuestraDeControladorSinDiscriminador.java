@@ -83,15 +83,6 @@ public final class MuestraDeControladorSinDiscriminador {
         }
     }
 
-    /** BUENO: el mismo 404, por el sitio que si pone el discriminador (#723). */
-    public String enReglaConUn404(Ejercicio ejercicio) {
-        try {
-            return parametros.vigenteEn(ejercicio).toString();
-        } catch (LectorDeParametros.EjercicioSinSellar sinSellar) {
-            throw FaltaPublicar.noEncontrado(sinSellar);
-        }
-    }
-
     /**
      * BUENO: capturar una de la familia y <b>no componer ninguna respuesta</b> no es asunto de esta
      * guarda. Es lo que hace el resumen anual de licencias: cuenta los anios que si puede contar y

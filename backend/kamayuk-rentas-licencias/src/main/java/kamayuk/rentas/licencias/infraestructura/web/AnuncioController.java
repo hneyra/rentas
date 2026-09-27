@@ -20,8 +20,6 @@ import kamayuk.rentas.licencias.dominio.CriterioDeAnuncios;
 import kamayuk.rentas.licencias.dominio.MovimientoDeAnuncio;
 import kamayuk.rentas.licencias.dominio.MovimientoDeAnuncioRepository;
 import kamayuk.rentas.licencias.dominio.TipoDeAnuncio;
-import kamayuk.rentas.parametros.FaltaPublicar;
-import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.EntradaNumerica;
@@ -212,17 +210,6 @@ public class AnuncioController {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
         } catch (RegistrarAnuncio.EstablecimientoDesconocido sinLocal) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(sinLocal));
-        } catch (TasaDeAnunciosParametrizada.TasaSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar sinTarifa) {
-            // 422 y no 500: la peticion esta bien y el sistema tampoco esta roto. Lo que falta es
-            // un dato de configuracion —la ordenanza de D-02b, #199— y quien opera tiene que
-            // enterarse de cual para poder pedirlo. `EjercicioSinSellar` —que no haya NINGUN
-            // conjunto sellado— es el mismo caso y hasta #562 salia como 500 con incidencia.
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(sinTarifa);
         } catch (AnuncioRepository.ClaveRepetida carrera) {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(carrera));
         } catch (AnuncioRepository.NumeroDuplicado repetido) {
@@ -259,13 +246,6 @@ public class AnuncioController {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(cesado));
         } catch (MovimientoDeAnuncioRepository.CargoYaAsentado dosVeces) {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(dosVeces));
-        } catch (TasaDeAnunciosParametrizada.TasaSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar sinTarifa) {
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(sinTarifa);
         } catch (RenovarAnuncio.VigenciaHaciaAtras
                 | MovimientoDeAnuncio.ProrrogaDeVariosEjercicios mal) {
             // #417: una prorroga de varios ejercicios tampoco se cobra; se renueva año a año.

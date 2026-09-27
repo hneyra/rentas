@@ -13,8 +13,6 @@ import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
-import kamayuk.rentas.parametros.FaltaPublicar;
-import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.valores.aplicacion.ConsultaDePrescripciones;
 import kamayuk.rentas.valores.aplicacion.DeclararPrescripcion;
 import kamayuk.rentas.valores.aplicacion.PlazosParametrizados;
@@ -181,13 +179,6 @@ public class PrescripcionController {
                             observacion);
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(PrescripcionResource.de(guardada, contribuyente.codigo()));
-        } catch (PlazosParametrizados.PlazoSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar falta) {
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(falta);
         } catch (DeclararPrescripcion.RangoInvertido
                 | DeclararPrescripcion.HechoSinAlcance
                 | DeclararPrescripcion.AlcanceFueraDelRango
