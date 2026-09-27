@@ -79,6 +79,8 @@ class ContratoDeApiTest {
                     "GET /catastro/predios/{predioId}/titulares",
                     "GET /rentas/vehiculos/{placa}",
                     "GET /rentas/vehiculos",
+                    // #611 — el cambio de placa, que llena el historial que la ficha publica.
+                    "POST /rentas/vehiculos/{placa}/placa",
                     // #489 — el alta del predio, sin ficha. `RegistrarPredio.registrar` existia
                     // desde #16 y ningun endpoint la llamaba: un predio solo nacia como efecto
                     // secundario de inscribir su ficha, o por la carga cartografica de #487.
@@ -274,6 +276,8 @@ class ContratoDeApiTest {
                     "PATCH /transito/papeletas/{numero}/codigo",
                     "GET /transito/estado-cuenta",
                     "POST /infracciones/administrativas/notificaciones",
+                    // #611 — la subsanacion, que escribe el SUBSANADA que la tabla admite.
+                    "POST /infracciones/administrativas/notificaciones/{numero}/subsanacion",
                     "GET /infracciones/actas",
                     "GET /infracciones/administrativas/estado-cuenta",
                     "GET /infracciones/administrativas/reportes/vencidas",

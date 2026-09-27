@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import kamayuk.rentas.coactiva.dominio.CriterioDeLiquidaciones;
 import kamayuk.rentas.coactiva.dominio.EstadoDeLaLiquidacion;
 import kamayuk.rentas.coactiva.dominio.ExpedienteCoactivo;
@@ -88,14 +87,6 @@ public class ConsultaDeCostas {
                         .toList();
         return new PaginaDescartadaTrasPaginar<>(
                 filas, pagina.pagina(), pagina.tamano(), pagina.totalElementos());
-    }
-
-    /** Una liquidacion por su numero, con su detalle. */
-    @Transactional(readOnly = true)
-    public Optional<LiquidacionEnConsulta> porNumero(String numero, LocalDate aLaFecha) {
-        return liquidaciones
-                .porNumero(numero)
-                .map(fila -> componer(fila, aLaFecha, new HashMap<>()));
     }
 
     // ------------------------------------------------------------------

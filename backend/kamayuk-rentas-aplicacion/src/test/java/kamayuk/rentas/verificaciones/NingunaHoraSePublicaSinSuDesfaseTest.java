@@ -148,10 +148,11 @@ class NingunaHoraSePublicaSinSuDesfaseTest {
                         "las siete horas que #188 convirtio, en sus cinco operaciones, y las tres"
                                 + " que salian como texto en UTC y #327 convirtio: «recibidoEn» y"
                                 + " «aplicadoEn» de POST /pagos y «historialDePlacas[].fecha» de"
-                                + " GET /rentas/vehiculos/{placa}. Si esta lista se vacia, el"
+                                + " GET /rentas/vehiculos/{placa}, que desde #611 publica tambien"
+                                + " POST /rentas/vehiculos/{placa}/placa. Si esta lista se vacia, el"
                                 + " recorrido dejo de entrar en los Resource y la prueba de arriba"
                                 + " esta saliendo verde sin mirar nada")
-                .hasSize(10);
+                .hasSize(11);
     }
 
     /**

@@ -141,29 +141,6 @@ public class RegistrarMovimientoDeDeuda {
     }
 
     /**
-     * Registra el movimiento sobre <b>una</b> obligacion: la que su propia clave identifica.
-     *
-     * <p>Atajo de {@link #registrar(MovimientoDeDeuda, RangoDeCuotas, String, Observacion)} para
-     * quien no abarca ningun rango: los contextos que generan cargos por su cuenta —licencias,
-     * anuncios, tesoreria, coactiva— y que ya traen su propia transaccion.
-     *
-     * <p><b>Lleva su propio {@code @Transactional} y no lo hereda del metodo al que delega</b>: una
-     * llamada de un metodo de la clase a otro <b>no pasa por el proxy</b>, asi que la anotacion del
-     * otro seria inerte y este camino correria sin transaccion —y sin transaccion no hay {@code SET
-     * LOCAL}, de modo que la politica RLS no devuelve vacio: revienta (#486)—. Es el mismo defecto
-     * de auto-invocacion que #400 encontro en el importador de fichas.
-     */
-    @Transactional
-    public Registro registrar(
-            MovimientoDeDeuda movimiento, String codigoContribuyente, Observacion observacion) {
-        return registrar(
-                movimiento,
-                RangoDeCuotas.deUnaSola(movimiento.clave().periodo()),
-                codigoContribuyente,
-                observacion);
-    }
-
-    /**
      * Registra el acto sobre las cuotas que abarca y devuelve <b>todos</b> los asientos que
      * produjo.
      *
@@ -187,31 +164,14 @@ public class RegistrarMovimientoDeDeuda {
      *     identifica el tributo, el ejercicio y la unidad, y el rango dice sobre que cuotas cae
      * @param cuotas las cuotas que el acto abarca; {@link RangoDeCuotas#ANUAL} para la obligacion
      *     que no se divide
+     * @param comprobacion si hay que comprobar que la unidad sea del contribuyente (#635); ver
+     *     {@link ComprobacionDeUnidad}. Hasta #611 habia dos sobrecargas mas cortas, con {@code
+     *     NO_APLICA}, que solo llamaban las pruebas
      * @param codigoContribuyente el codigo que se imprime en el formato; el identificador ya viaja
      *     dentro del movimiento, y el codigo es lo que el papel tiene que mostrar
      * @param observacion por que se registra; sin ella no se guarda (regla 10, RNF-052). Es
      *     <b>una</b> para el acto y queda copiada en los {@code n} asientos: lo que se explica es
      *     por que se dio de alta la deuda, no por que se dio de alta cada cuota
-     */
-    @Transactional
-    public Registro registrar(
-            MovimientoDeDeuda movimiento,
-            RangoDeCuotas cuotas,
-            String codigoContribuyente,
-            Observacion observacion) {
-        return registrar(
-                movimiento,
-                cuotas,
-                ComprobacionDeUnidad.NO_APLICA,
-                codigoContribuyente,
-                observacion);
-    }
-
-    /**
-     * El mismo acto, diciendo si hay que comprobar que la unidad sea del contribuyente (#635).
-     *
-     * <p>Ver {@link ComprobacionDeUnidad}. Las dos sobrecargas de arriba conservan las firmas que
-     * usan los contextos que generan sus propios cargos, y con ellas su comportamiento.
      */
     @Transactional
     public Registro registrar(

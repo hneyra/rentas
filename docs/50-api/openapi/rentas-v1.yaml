@@ -1910,6 +1910,43 @@ paths:
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
           $ref: "#/components/responses/ErrorDeValidacion"
+  "/rentas/vehiculos/{placa}/placa":
+    post:
+      operationId: cambiar_placa_vehiculo
+      summary: "Cambio de placa de un vehiculo"
+      description: "Cambia la placa del vehiculo, dejando traza en la auditoria (#611): es lo que llena el `historialDePlacas` de la ficha, que hasta aqui salia siempre vacio. Las papeletas NO se tocan: cuelgan del identificador del vehiculo y cada una conserva la placa que escribio su acta. Una placa que ya lleva otro vehiculo es 409, y la misma que ya tiene tambien."
+      tags: ["Rentas · Registro"]
+      parameters:
+        - name: placa
+          in: path
+          required: true
+          description: "La placa que el vehiculo lleva hoy"
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        200:
+          description: Operacion realizada
+          content:
+            application/json:
+              schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          $ref: "#/components/responses/SinMunicipalidad"
+        "422":
+          $ref: "#/components/responses/ErrorDeValidacion"
   "/rentas/vehiculos":
     get:
       operationId: vehiculos_del_contribuyente
@@ -5637,6 +5674,43 @@ paths:
             schema: { type: object }
       responses:
         201:
+          description: Operacion realizada
+          content:
+            application/json:
+              schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          $ref: "#/components/responses/SinMunicipalidad"
+        "422":
+          $ref: "#/components/responses/ErrorDeValidacion"
+  "/infracciones/administrativas/notificaciones/{numero}/subsanacion":
+    post:
+      operationId: subsanar_notificacion_administrativa
+      summary: "Subsanacion de una notificacion administrativa"
+      description: "Cierra la notificacion por subsanacion (#47 AC2): sin papeleta ni deuda, solo cambia su estado a SUBSANADA. La fecha es la del acto —sin ella, hoy— y no puede ser futura; una notificacion que ya no esta EMITIDA, o cuyo plazo vencio a esa fecha, es 409."
+      tags: ["Infracciones administrativas"]
+      parameters:
+        - name: numero
+          in: path
+          required: true
+          description: "Numero de la notificacion"
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        200:
           description: Operacion realizada
           content:
             application/json:

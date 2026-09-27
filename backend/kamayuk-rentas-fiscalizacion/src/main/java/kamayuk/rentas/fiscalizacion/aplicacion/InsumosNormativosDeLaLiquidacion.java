@@ -124,11 +124,10 @@ public class InsumosNormativosDeLaLiquidacion {
     /**
      * Qué conjunto usaría la valorización de esta línea.
      *
-     * <p>Se publica para que la comprobación del AC 1 pueda mirar el identificador sin necesitar
-     * que el conjunto tenga valores dentro: lo que el criterio exige es que sea <b>el mismo</b>
-     * después de sellar otra versión, no cuánto vale la UIT.
+     * <p>El de la línea y no el vigente: lo que el AC 1 de #49 exige es que sea <b>el mismo</b>
+     * después de sellar otra versión. Era público para una comprobación que nunca lo llamó (#611).
      */
-    public IdentificadorDeConjunto conjuntoQueUsa(LineaDeLiquidacion linea) {
+    private IdentificadorDeConjunto conjuntoQueUsa(LineaDeLiquidacion linea) {
         return IdentificadorDeConjunto.de(linea.conjuntoId());
     }
 }

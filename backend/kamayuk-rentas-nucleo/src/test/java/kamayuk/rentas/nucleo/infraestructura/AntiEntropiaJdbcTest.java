@@ -12,10 +12,13 @@ import java.util.List;
 import java.util.UUID;
 import kamayuk.rentas.catastro.AntiEntropia;
 import kamayuk.rentas.catastro.HuellaDelLote;
+import kamayuk.rentas.catastro.HuellasDelPadronDeCatastro;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.DatosDePrueba;
+import kamayuk.rentas.nucleo.aplicacion.ConciliarConElPadron;
+import kamayuk.rentas.nucleo.aplicacion.LecturaDeLasHuellasDeLaProyeccion;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -72,6 +75,7 @@ class AntiEntropiaJdbcTest {
     private static TransactionTemplate transaccion;
     private static HuellasDeLaProyeccionJdbc repositorio;
     private static JdbcClient jdbc;
+    private static DriverManagerDataSource pool;
 
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
@@ -79,7 +83,7 @@ class AntiEntropiaJdbcTest {
         municipalidad =
                 DatosDePrueba.crearMunicipalidad(base, "250901", "Municipalidad de anti-entropia");
 
-        DriverManagerDataSource pool = new DriverManagerDataSource();
+        pool = new DriverManagerDataSource();
         pool.setUrl(base.url());
         pool.setUsername(BaseDeDatosDePrueba.APP);
         pool.setPassword(base.clave(BaseDeDatosDePrueba.APP));
@@ -115,6 +119,53 @@ class AntiEntropiaJdbcTest {
     void seConectaComoKamayukApp() {
         assertThat(comoApp(() -> jdbc.sql("SELECT current_user").query(String.class).single()))
                 .isEqualTo(BaseDeDatosDePrueba.APP);
+    }
+
+    /**
+     * #611 — el caso de uso, montado como lo monta Spring, lee la proyeccion DENTRO de su
+     * transaccion.
+     *
+     * <p>Hasta #611 {@code conciliar} llamaba a su propio {@code huellasDeLaProyeccion()}, y una
+     * llamada a {@code this} no pasa por el proxy: el {@code @Transactional(readOnly = true)} no se
+     * aplicaba, no habia {@code SET LOCAL} y la politica RLS de {@code predio_ref} evaluaba la
+     * municipalidad vacia. Ninguna prueba lo veia porque todas llamaban a la funcion pura con el
+     * repositorio envuelto a mano en {@link #comoApp}; aqui no hay transaccion de fuera que la
+     * tape: la tiene que abrir el caso de uso.
+     */
+    @Test
+    @DisplayName("#611 — ConciliarConElPadron, con su proxy y sin transaccion de fuera, compara")
+    void elCasoDeUsoLeeLaProyeccionEnSuTransaccion() {
+        TenantContext.fijar(new MunicipalidadId(municipalidad));
+        TenantTransactionManager gestor = new TenantTransactionManager(pool);
+        ConciliarConElPadron conciliar =
+                enProxy(
+                        new ConciliarConElPadron(
+                                enProxy(new LecturaDeLasHuellasDeLaProyeccion(repositorio), gestor),
+                                new HuellasDelPadronDeCatastro() {
+                                    @Override
+                                    public List<AntiEntropia.HuellaDeSector> porSector() {
+                                        return deCatastro(PADRON);
+                                    }
+                                }),
+                        gestor);
+
+        AntiEntropia.Informe informe = conciliar.conciliar(HOY);
+
+        assertThat(informe.sectoresComparados()).isEqualTo(4);
+        assertThat(informe.cuadra()).as(informe.comoTexto()).isTrue();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T enProxy(T objetivo, TenantTransactionManager gestor) {
+        org.springframework.aop.framework.ProxyFactory fabrica =
+                new org.springframework.aop.framework.ProxyFactory(objetivo);
+        fabrica.setProxyTargetClass(true);
+        fabrica.addAdvice(
+                new org.springframework.transaction.interceptor.TransactionInterceptor(
+                        (org.springframework.transaction.TransactionManager) gestor,
+                        new org.springframework.transaction.annotation
+                                .AnnotationTransactionAttributeSource()));
+        return (T) fabrica.getProxy();
     }
 
     @Test

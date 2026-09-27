@@ -1,6 +1,5 @@
 package kamayuk.rentas.nucleo.dominio;
 
-import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
@@ -51,7 +50,4 @@ public interface CorridaDeEmisionRepository {
 
     /** Los observados de una corrida, paginados: son la lista de cosas que arreglar. */
     Pagina<CorridaDeEmision.Observado> observadosDe(long corridaId, Paginacion paginacion);
-
-    /** Las ultimas corridas, mas reciente primero y sin observados. */
-    List<CorridaDeEmision> ultimas(int cuantas);
 }

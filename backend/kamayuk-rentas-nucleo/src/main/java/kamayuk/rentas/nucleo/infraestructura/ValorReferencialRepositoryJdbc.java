@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
-import kamayuk.rentas.nucleo.dominio.MarcaYModelo;
 import kamayuk.rentas.nucleo.dominio.ValorReferencial;
 import kamayuk.rentas.nucleo.dominio.ValorReferencialRepository;
 import kamayuk.rentas.nucleo.dominio.ValorReferencialRepository.ValorReferencialAmbiguo;
@@ -131,22 +130,6 @@ public class ValorReferencialRepositoryJdbc extends RepositorioJdbc
                         """)
                 .param("conjunto", conjunto.valor())
                 .query((ResultSet fila, int numero) -> fila.getString("categoria"))
-                .list();
-    }
-
-    @Override
-    public List<MarcaYModelo> catalogo(IdentificadorDeConjunto conjunto) {
-        return jdbc().sql(
-                        """
-                        SELECT DISTINCT v.marca, v.modelo
-                          FROM normativa_valor_referencial v
-                         WHERE v.conjunto_id = :conjunto
-                         ORDER BY v.marca, v.modelo
-                        """)
-                .param("conjunto", conjunto.valor())
-                .query(
-                        (ResultSet fila, int numero) ->
-                                new MarcaYModelo(fila.getString("marca"), fila.getString("modelo")))
                 .list();
     }
 

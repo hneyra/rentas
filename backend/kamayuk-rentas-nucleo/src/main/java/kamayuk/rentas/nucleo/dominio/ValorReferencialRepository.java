@@ -46,9 +46,6 @@ public interface ValorReferencialRepository {
      */
     List<String> categorias(IdentificadorDeConjunto conjunto);
 
-    /** El catalogo de marcas y modelos del conjunto, ordenado y sin repetir. */
-    List<MarcaYModelo> catalogo(IdentificadorDeConjunto conjunto);
-
     /**
      * El cuadro trae mas de una cifra para ese vehiculo y falta la categoria para elegir.
      *

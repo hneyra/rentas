@@ -53,45 +53,6 @@ public class ReimprimirActoCoactivo {
     }
 
     /**
-     * Vuelve a sacar el acto identificado por el numero de su documento.
-     *
-     * @param numeroDelActo el numero impreso
-     * @param formato en que formato se quiere ahora; no tiene por que ser el de la emision
-     * @param observacion por que se reimprime (regla 10, RNF-052)
-     * @throws NotificarActoCoactivo.ActoInexistente si no hay ningun acto con ese numero
-     * @throws EmitirDocumento.LaReimpresionNoCoincide si dibujar los datos guardados ya no da los
-     *     mismos bytes
-     */
-    @Transactional
-    public Reimpresion reimprimir(
-            String numeroDelActo, FormatoDeDocumento formato, Observacion observacion) {
-
-        ActoCoactivo acto =
-                actos.porNumero(numeroDelActo)
-                        .orElseThrow(
-                                () -> new NotificarActoCoactivo.ActoInexistente(numeroDelActo));
-        ExpedienteCoactivo expediente =
-                expedientes
-                        .porId(acto.expedienteId())
-                        .orElseThrow(
-                                () ->
-                                        new IllegalStateException(
-                                                "El acto "
-                                                        + acto.numero()
-                                                        + " apunta a un expediente que no"
-                                                        + " existe"));
-
-        EmitirDocumento.Emision emision =
-                documentos.reimprimir(
-                        acto.tipo().name(),
-                        expediente.ejercicio(),
-                        acto.numero(),
-                        formato,
-                        observacion);
-        return new Reimpresion(acto, emision);
-    }
-
-    /**
      * Vuelve a sacar el ultimo acto de ese tipo del expediente.
      *
      * <p>Es lo que las acciones «Imprimir», «Caratula» y «REC 2» de {@code rec_impresion} piden:

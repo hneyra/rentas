@@ -1,11 +1,13 @@
 package kamayuk.rentas.sanciones.infraestructura.web;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarNotificacionAdministrativa;
+import kamayuk.rentas.sanciones.aplicacion.SubsanarNotificacion;
 import kamayuk.rentas.sanciones.dominio.NotificacionAdministrativaRepository;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
@@ -13,6 +15,7 @@ import kamayuk.rentas.web.FiltroDeLaConsulta;
 import kamayuk.rentas.web.ProblemaDeNegocio;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,9 +41,51 @@ import org.springframework.web.bind.annotation.RestController;
 public class NotificacionAdministrativaController {
 
     private final RegistrarNotificacionAdministrativa servicio;
+    private final SubsanarNotificacion subsanar;
+    private final Clock reloj;
 
-    public NotificacionAdministrativaController(RegistrarNotificacionAdministrativa servicio) {
+    public NotificacionAdministrativaController(
+            RegistrarNotificacionAdministrativa servicio,
+            SubsanarNotificacion subsanar,
+            Clock reloj) {
         this.servicio = servicio;
+        this.subsanar = subsanar;
+        this.reloj = reloj;
+    }
+
+    /**
+     * Cierra la notificacion por subsanacion (#47 AC2, #611): sin papeleta ni deuda.
+     *
+     * <p>Hasta #611 {@link SubsanarNotificacion} no tenia ruta, y {@code SUBSANADA} —que {@code
+     * notificacion_administrativa} admite desde la baseline— no la escribia nada en produccion. La
+     * fecha es la del acto, y sin ella la de hoy; una fecha futura no se admite.
+     */
+    @PostMapping("/{numero}/subsanacion")
+    public NotificacionAdministrativaResource subsanar(
+            @PathVariable String numero, @RequestBody PeticionDeSubsanacion peticion) {
+        Observacion observacion = observacionDe(peticion.observacion());
+        LocalDate hoy = LocalDate.now(reloj);
+        LocalDate fecha =
+                peticion.fechaSubsanacion() == null
+                        ? hoy
+                        : fechaDe(peticion.fechaSubsanacion(), "fechaSubsanacion");
+        if (fecha.isAfter(hoy)) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.VALIDACION,
+                    "La subsanacion no se fecha despues de hoy: "
+                            + fecha
+                            + " todavia no ha llegado");
+        }
+        try {
+            return NotificacionAdministrativaResource.de(
+                    subsanar.subsanar(numero, fecha, observacion));
+        } catch (SubsanarNotificacion.NotificacionInexistente noEsta) {
+            throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
+        } catch (SubsanarNotificacion.EstadoInvalido | SubsanarNotificacion.FueraDePlazo cerrada) {
+            // 409: la peticion esta bien escrita; lo que no la admite es que la notificacion ya no
+            // este EMITIDA, o que su plazo haya vencido a esa fecha.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(cerrada));
+        }
     }
 
     @PostMapping
@@ -133,6 +178,14 @@ public class NotificacionAdministrativaController {
         String mensaje = excepcion.getMessage();
         return mensaje == null ? "El valor recibido no es valido" : mensaje;
     }
+
+    /**
+     * El cuerpo de una subsanacion: su fecha —sin ella, hoy— y por que (regla 10).
+     *
+     * @param fechaSubsanacion {@code AAAA-MM-DD}
+     */
+    public record PeticionDeSubsanacion(
+            @Nullable String fechaSubsanacion, @Nullable String observacion) {}
 
     /**
      * El cuerpo de un registro de notificación. <b>Lista blanca</b>: lo que no está aquí no entra.

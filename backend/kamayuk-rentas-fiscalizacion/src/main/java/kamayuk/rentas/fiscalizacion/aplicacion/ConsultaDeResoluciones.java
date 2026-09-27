@@ -114,12 +114,6 @@ public class ConsultaDeResoluciones {
         return new CopiaDeLaResolucion(resolucion.numero(), formato, emision.contenido());
     }
 
-    /** Las transferencias de un contribuyente, de la mas reciente a la primera. */
-    @Transactional(readOnly = true)
-    public List<ResolucionConsultada> deContribuyente(long contribuyenteId) {
-        return resoluciones.deContribuyente(contribuyenteId).stream().map(this::componer).toList();
-    }
-
     /**
      * La <b>relacion</b> de resoluciones de determinacion, paginada (#192).
      *

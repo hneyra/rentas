@@ -49,25 +49,6 @@ public class CambiarEstadoDelExpediente {
         this.reloj = reloj;
     }
 
-    /** Cambia el estado con fecha de hoy. */
-    @Transactional
-    public MovimientoDelExpediente cambiar(
-            String numeroDeExpediente,
-            EstadoDelExpediente nuevo,
-            String motivo,
-            @Nullable LocalDate documentoFecha,
-            @Nullable String documentoNumero,
-            Observacion observacion) {
-        return cambiar(
-                numeroDeExpediente,
-                nuevo,
-                LocalDate.now(reloj),
-                motivo,
-                documentoFecha,
-                documentoNumero,
-                observacion);
-    }
-
     /**
      * Cambia el estado con una fecha explicita.
      *

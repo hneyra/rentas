@@ -2,14 +2,18 @@ package kamayuk.rentas.nucleo.infraestructura.web;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
+import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Placa;
+import kamayuk.rentas.nucleo.aplicacion.CambiarPlaca;
 import kamayuk.rentas.nucleo.aplicacion.ConsultaDeVehiculos;
 import kamayuk.rentas.nucleo.dominio.CriterioDeVehiculo;
+import kamayuk.rentas.nucleo.dominio.VehiculoRepository;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ParametrosDePaginacion;
@@ -19,6 +23,8 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -84,15 +90,61 @@ public class VehiculoController {
     private static final String ORDEN_POR_OMISION = "placa";
 
     private final ConsultaDeVehiculos consulta;
+    private final CambiarPlaca cambiarPlaca;
     private final DirectorioDeContribuyentes directorio;
     private final Clock reloj;
 
     public VehiculoController(
-            ConsultaDeVehiculos consulta, DirectorioDeContribuyentes directorio, Clock reloj) {
+            ConsultaDeVehiculos consulta,
+            CambiarPlaca cambiarPlaca,
+            DirectorioDeContribuyentes directorio,
+            Clock reloj) {
         this.consulta = consulta;
+        this.cambiarPlaca = cambiarPlaca;
         this.directorio = directorio;
         this.reloj = reloj;
     }
+
+    /**
+     * Cambia la placa del vehiculo, dejando traza (#611).
+     *
+     * <p>Hasta #611 {@link CambiarPlaca} no tenia ruta, y era lo unico que escribe la auditoria de
+     * la que {@code historialDePlacas} lee: ese campo publicado salia siempre vacio. Las papeletas
+     * no se tocan —cuelgan del identificador y conservan el texto de su acta—, y la respuesta es la
+     * ficha del vehiculo con su historial, ya con este cambio.
+     */
+    @PostMapping("/{placa}/placa")
+    @RequiereAcceso(acceso = "vehiculos", privilegio = Privilegio.REGISTRO)
+    public VehiculoResource cambiarPlaca(
+            @PathVariable String placa, @RequestBody PeticionDeCambioDePlaca peticion) {
+        Observacion observacion;
+        Placa nueva;
+        try {
+            observacion = Observacion.de(peticion.observacion());
+            nueva = Placa.de(Objects.requireNonNullElse(peticion.placaNueva(), ""));
+        } catch (IllegalArgumentException invalida) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.VALIDACION,
+                    Objects.requireNonNullElse(invalida.getMessage(), "La peticion no es valida"));
+        }
+        long vehiculoId =
+                Objects.requireNonNull(
+                        consulta.porPlaca(Placa.de(placa)).vehiculo().id(),
+                        "Un vehiculo leido de la base tiene identificador");
+        try {
+            cambiarPlaca.cambiar(vehiculoId, nueva, observacion);
+        } catch (VehiculoRepository.PlacaRepetida repetida) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.CONFLICTO,
+                    Objects.requireNonNullElse(repetida.getMessage(), "La placa ya existe"));
+        }
+        ConsultaDeVehiculos.FichaDeVehiculo ficha = consulta.porPlaca(nueva);
+        return VehiculoResource.de(ficha.vehiculo(), ficha.historial());
+    }
+
+    /** Lo que la pantalla manda para cambiar la placa: la nueva y por que (regla 10). */
+    public record PeticionDeCambioDePlaca(
+            @Nullable String placaNueva, @Nullable String observacion) {}
 
     @GetMapping("/{placa}")
     public VehiculoResource porPlaca(@PathVariable String placa) {

@@ -57,10 +57,4 @@ public class ConsultaDeLaCorridaDeValores {
     public List<Long> corridasConPendientes() {
         return corridas.corridasConPendientes();
     }
-
-    /** El siguiente lote de candidatos, resueltos o no. */
-    @Transactional(readOnly = true)
-    public List<ItemDeCorrida> items(long corridaId, long despuesDe, int cuantos) {
-        return corridas.items(corridaId, despuesDe, cuantos);
-    }
 }

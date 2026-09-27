@@ -3,7 +3,6 @@ package kamayuk.rentas.nucleo.aplicacion;
 import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.dominio.Ejercicio;
-import kamayuk.rentas.nucleo.dominio.MarcaYModelo;
 import kamayuk.rentas.nucleo.dominio.ValorReferencial;
 import kamayuk.rentas.nucleo.dominio.ValorReferencialRepository;
 import kamayuk.rentas.nucleo.dominio.Vehiculo;
@@ -87,12 +86,6 @@ public class ValoresReferenciales {
             }
         }
         return valor;
-    }
-
-    /** Marcas y modelos del ejercicio: el catalogo que la pantalla ofrece para elegir. */
-    @Transactional(readOnly = true)
-    public List<MarcaYModelo> catalogoDe(Ejercicio ejercicio) {
-        return repositorio.catalogo(parametros.conjuntoVigenteEn(ejercicio));
     }
 
     /**

@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
+import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.autorizacion.ComprobadorDeAcceso;
 import kamayuk.rentas.autorizacion.GuardiaDeAcceso;
 import kamayuk.rentas.autorizacion.Privilegio;
@@ -26,6 +27,7 @@ import kamayuk.rentas.dominio.CodigoContribuyente;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Placa;
+import kamayuk.rentas.nucleo.aplicacion.CambiarPlaca;
 import kamayuk.rentas.nucleo.aplicacion.ConsultaDeVehiculos;
 import kamayuk.rentas.nucleo.dominio.CambioDePlaca;
 import kamayuk.rentas.nucleo.dominio.CriterioDeVehiculo;
@@ -90,6 +92,7 @@ class VehiculosDelContribuyenteControllerTest {
             MockMvcBuilders.standaloneSetup(
                             new VehiculoController(
                                     new ConsultaDeVehiculos(padron, new DeudaDePrueba()),
+                                    new CambiarPlaca(padron, (RegistroDeAuditoria registro) -> {}),
                                     directorio,
                                     RELOJ))
                     .addInterceptors(new GuardiaDeAcceso(comprobador, RELOJ))
