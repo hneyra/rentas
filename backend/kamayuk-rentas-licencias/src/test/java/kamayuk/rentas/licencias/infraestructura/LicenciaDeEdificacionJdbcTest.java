@@ -16,7 +16,6 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -52,6 +51,7 @@ import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
+import kamayuk.rentas.licencias.aplicacion.AnularLicenciaDeEdificacion;
 import kamayuk.rentas.licencias.aplicacion.CompletarSeccionDelFue;
 import kamayuk.rentas.licencias.aplicacion.ComprobacionDelDerecho;
 import kamayuk.rentas.licencias.aplicacion.ConsultaDeFue;
@@ -212,6 +212,7 @@ class LicenciaDeEdificacionJdbcTest {
     private static EmitirLicenciaDeEdificacion emitir;
     private static EmitirLicenciaDeEdificacion emitirSinParametro;
     private static RevalidarLicenciaDeEdificacion revalidar;
+    private static AnularLicenciaDeEdificacion anular;
     private static ConsultaDeFue consulta;
 
     @BeforeAll
@@ -344,6 +345,15 @@ class LicenciaDeEdificacionJdbcTest {
                                                 RELOJ_DE_LOS_ACTOS)),
                                 recibos,
                                 derechos));
+        anular =
+                envolver(
+                        new AnularLicenciaDeEdificacion(
+                                expedientes,
+                                movimientos,
+                                padron,
+                                documentos,
+                                auditoria,
+                                RELOJ_DE_LOS_ACTOS));
         // Las DOS van envueltas, como en el contenedor: `envolver` usa
         // `AnnotationTransactionAttributeSource`, asi que OBEDECE a la anotacion y sobre
         // `ConsultaDeFue` —que no declara ninguna— no abre nada. Envolver solo `LecturaDelFue`
@@ -2279,33 +2289,180 @@ class LicenciaDeEdificacionJdbcTest {
             return tramite;
         }
 
-        /** No hay caso de uso que anule un FUE: el movimiento se escribe como lo haria el. */
+        /** Anula con el caso de uso de #455: hasta alli el movimiento se escribia a mano. */
         private static void anularEl(
                 EmitirLicenciaDeEdificacion.LicenciaEmitida emitida,
                 String expediente,
                 LocalDate fecha) {
-            long fueId = identificadorDe(expediente);
             enContexto(
                     () ->
-                            transaccion.execute(
-                                    estado ->
-                                            movimientos.registrar(
-                                                    new MovimientoDeEdificacion(
-                                                            null,
-                                                            fueId,
-                                                            TipoDeMovimientoDeEdificacion.ANULACION,
-                                                            fecha,
-                                                            null,
-                                                            "Se deja sin efecto, prueba de #425",
-                                                            null,
-                                                            Objects.requireNonNull(
-                                                                    emitida.documento()
-                                                                            .registro()
-                                                                            .id()),
-                                                            "RES-ANUL-425-" + fueId,
-                                                            RELOJ.instant(),
-                                                            null,
-                                                            PORQUE))));
+                            anular.anular(
+                                    expediente,
+                                    fecha,
+                                    "Se deja sin efecto, prueba de #425",
+                                    FormatoDeDocumento.PDF,
+                                    PORQUE));
+        }
+    }
+
+    // ==================================================================
+
+    /**
+     * #455 — La anulacion de una licencia de edificacion se escribe: estaba en el enumerado, el
+     * {@code CHECK}, el indice y el filtro de estado, y ninguna linea la escribia.
+     */
+    @Nested
+    @DisplayName("#455 — La anulacion se escribe, y el reporte de anuladas deja de salir vacio")
+    class LaAnulacionSeEscribe {
+
+        /**
+         * Un dia de declaracion que ninguna otra prueba usa: aisla la siembra del reporte, porque
+         * el titular de todas las pruebas es el mismo ({@code contribuyente()}).
+         */
+        private static final LocalDate PRESENTADO = LocalDate.of(2025, 12, 30);
+
+        /** Y otro para las que anulan sin mirar el reporte, que no deben caer en su filtro. */
+        private static final LocalDate PRESENTADO_APARTE = LocalDate.of(2025, 12, 23);
+
+        private static final LocalDate EMITIDA = LocalDate.of(2026, 2, 2);
+        private static final LocalDate ANTES_DEL_CORTE = LocalDate.of(2026, 3, 1);
+        private static final LocalDate CORTE = LocalDate.of(2026, 3, 10);
+        private static final LocalDate DESPUES_DEL_CORTE = LocalDate.of(2026, 3, 14);
+
+        @Test
+        @DisplayName(
+                "con el corte entre dos anulaciones, ?estado=ANULADA trae solo la anterior al corte")
+        void elReporteDeAnuladas() {
+            long titular = contribuyente();
+            String vigente = expedienteCompletoEn(municipalidad, titular, PRESENTADO);
+            emitirLicencia(vigente, EMITIDA, HOY.plusYears(3));
+            String anulada = expedienteCompletoEn(municipalidad, titular, PRESENTADO);
+            emitirLicencia(anulada, EMITIDA, HOY.plusYears(3));
+            String anuladaDespues = expedienteCompletoEn(municipalidad, titular, PRESENTADO);
+            emitirLicencia(anuladaDespues, EMITIDA, HOY.plusYears(3));
+
+            AnularLicenciaDeEdificacion.Anulacion hecha =
+                    enContexto(
+                            () ->
+                                    anular.anular(
+                                            anulada,
+                                            ANTES_DEL_CORTE,
+                                            "El administrado desiste de la obra",
+                                            FormatoDeDocumento.PDF,
+                                            PORQUE));
+            enContexto(
+                    () ->
+                            anular.anular(
+                                    anuladaDespues,
+                                    DESPUES_DEL_CORTE,
+                                    "Se detecto un vicio en el expediente",
+                                    FormatoDeDocumento.PDF,
+                                    PORQUE));
+
+            assertThat(hecha.movimiento().tipo())
+                    .isEqualTo(TipoDeMovimientoDeEdificacion.ANULACION);
+            assertThat(hecha.resolucion().registro().numero()).isNotBlank();
+
+            Pagina<ConsultaDeFue.FilaDelReporte> anuladas =
+                    enContexto(
+                            () ->
+                                    consulta.reporte(
+                                            new CriterioDeFue(
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    PRESENTADO,
+                                                    PRESENTADO,
+                                                    java.util.Set.of(titular)),
+                                            null,
+                                            EstadoDelFue.ANULADA,
+                                            CORTE,
+                                            Paginacion.de(0, 20, "expediente")));
+
+            assertThat(anuladas.contenido())
+                    .as(
+                            "hasta #455 nada escribia una anulacion y el filtro salia vacio; y la"
+                                    + " anulada DESPUES del corte todavia estaba vigente al corte")
+                    .extracting(fila -> fila.fila().fue().expediente())
+                    .containsExactly(anulada);
+        }
+
+        @Test
+        @DisplayName("una segunda anulacion de la misma licencia se rechaza, y el indice tambien")
+        void unaSolaAnulacion() {
+            long titular = contribuyente();
+            String expediente = expedienteCompletoEn(municipalidad, titular, PRESENTADO_APARTE);
+            EmitirLicenciaDeEdificacion.LicenciaEmitida emitida =
+                    emitirLicencia(expediente, EMITIDA, HOY.plusYears(3));
+            AnularLicenciaDeEdificacion.Anulacion primera =
+                    enContexto(
+                            () ->
+                                    anular.anular(
+                                            expediente,
+                                            ANTES_DEL_CORTE,
+                                            "Primera anulacion",
+                                            FormatoDeDocumento.PDF,
+                                            PORQUE));
+
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    anular.anular(
+                                                            expediente,
+                                                            CORTE,
+                                                            "Segunda anulacion",
+                                                            FormatoDeDocumento.PDF,
+                                                            PORQUE)))
+                    .isInstanceOf(AnularLicenciaDeEdificacion.YaEstabaAnulada.class);
+
+            // La garantia no es el `if`: dos peticiones a la vez lo pasan las dos. La da
+            // `edificacion_movimiento_anulacion_uq`, y se mide escribiendo por debajo del caso de
+            // uso.
+            long fueId = identificadorDe(expediente);
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    transaccion.execute(
+                                                            estado ->
+                                                                    movimientos.registrar(
+                                                                            MovimientoDeEdificacion
+                                                                                    .anulacion(
+                                                                                            fueId,
+                                                                                            CORTE,
+                                                                                            "Carrera",
+                                                                                            primera.movimiento()
+                                                                                                    .documentoId(),
+                                                                                            "RES-455-CARRERA",
+                                                                                            RELOJ
+                                                                                                    .instant(),
+                                                                                            PORQUE)))))
+                    .isInstanceOf(MovimientoDeEdificacionRepository.YaEstabaAnulada.class);
+            assertThat(emitida.numeroDeLicencia()).isEqualTo(primera.numeroDeLicencia());
+        }
+
+        @Test
+        @DisplayName(
+                "un expediente sin licencia otorgada no se anula: no hay acto que dejar sin efecto")
+        void sinLicenciaNoSeAnula() {
+            String enTramite =
+                    expedienteCompletoEn(municipalidad, contribuyente(), PRESENTADO_APARTE);
+
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    anular.anular(
+                                                            enTramite,
+                                                            CORTE,
+                                                            "No hay licencia",
+                                                            FormatoDeDocumento.PDF,
+                                                            PORQUE)))
+                    .isInstanceOf(AnularLicenciaDeEdificacion.SinLicenciaQueAnular.class);
         }
     }
 

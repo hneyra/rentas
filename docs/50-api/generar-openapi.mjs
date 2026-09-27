@@ -4187,6 +4187,18 @@ const OPERACIONES_ADICIONALES = {
         ' vigencia original: agrega el tramo siguiente, y la respuesta devuelve los dos con el acto' +
         ' que concedió cada uno. Se cobra en caja de tasas antes, con su propio concepto del TUPA.',
     },
+    {
+      operationId: 'anular_licencia_edificacion',
+      metodo: 'post',
+      ruta: '/api/v1/licencias/edificacion/{expediente}/anulacion',
+      descripcionesDeRuta: { expediente: 'Numero de expediente cuya licencia se anula' },
+      titulo: 'Anulación de licencia de edificación',
+      descripcion:
+        'Deja sin efecto la licencia del expediente, con su resolución y su motivo (#455). NO la' +
+        ' borra: agrega un movimiento ANULACION, y el estado se deriva de él —a una fecha anterior' +
+        ' la licencia sigue vigente—. Sin recibo: ninguna norma condiciona dejar sin efecto un acto' +
+        ' a un pago. Una segunda anulación de la misma licencia se rechaza.',
+    },
   ],
   // `prescripcion` declara «POST /coactiva/prescripcion» —el acto que la declara—;
   // #674 le añade la LECTURA por la que quien audita ve qué deuda quedó sin acción

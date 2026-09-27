@@ -165,6 +165,40 @@ final class ModeloDelFue {
                 null);
     }
 
+    /** La resolucion que deja la licencia de edificacion sin efecto (#455). */
+    static ModeloDeDocumento deLaAnulacion(
+            FueDeEdificacion fue,
+            String numeroDeLicencia,
+            String solicitante,
+            LocalDate fecha,
+            String motivo) {
+        return new ModeloDeDocumento(
+                "Resolucion de anulacion de licencia de edificacion",
+                numeroDeLicencia,
+                fecha,
+                List.of(
+                        Campo.de("Licencia anulada", numeroDeLicencia),
+                        Campo.de("Expediente", fue.expediente()),
+                        Campo.de("Solicitante", solicitante),
+                        Campo.de("Fecha de la anulacion", fecha.toString()),
+                        Campo.de("Motivo", motivo)),
+                List.of(),
+                List.of(
+                        "Ley 29090 — Ley de regulacion de habilitaciones urbanas y de"
+                                + " edificaciones.",
+                        "La anulacion NO borra la licencia: la deja sin efecto desde su fecha. La"
+                                + " emision, sus vigencias y esta resolucion quedan en el"
+                                + " expediente (regla 4, RNF-051).",
+                        "",
+                        "_______________________________",
+                        "        Gerencia municipal",
+                        "",
+                        "Documento sin firma digital: el regimen de firma de resoluciones es la"
+                                + " decision D-05, abierta."),
+                null,
+                null);
+    }
+
     // ------------------------------------------------------------------
 
     private static String valorDeObra(ValorizacionDelFue.Resultado valorizacion) {

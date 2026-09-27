@@ -898,6 +898,13 @@
     "opcionales": [],
     "enElCuerpo": []
   },
+  "POST /licencias/edificacion/{expediente}/anulacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
   "POST /licencias/edificacion/{expediente}/licencia": {
     "obligatorios": [],
     "algunoDeEstos": [],
