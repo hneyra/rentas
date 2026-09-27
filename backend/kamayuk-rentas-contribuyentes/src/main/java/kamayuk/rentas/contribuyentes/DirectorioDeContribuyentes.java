@@ -44,6 +44,11 @@ public interface DirectorioDeContribuyentes {
      */
     List<ResumenDeContribuyente> buscar(String texto, int maximo);
 
+    /**
+     * El contribuyente de ese codigo, <b>como se haya tecleado</b>: con espacios o en minusculas lo
+     * pasa a su forma el adaptador, con {@code CodigoContribuyente} (#423, #515). Quien llama no
+     * copia la regla.
+     */
     Optional<ResumenDeContribuyente> porCodigo(String codigo);
 
     /**

@@ -6,6 +6,7 @@ import java.util.Optional;
 import kamayuk.rentas.coactiva.dominio.ActoCoactivo;
 import kamayuk.rentas.coactiva.dominio.ActoCoactivoRepository;
 import kamayuk.rentas.coactiva.dominio.TipoDeActoCoactivo;
+import kamayuk.rentas.dominio.NumeroImpreso;
 
 /**
  * Un {@link ActoCoactivoRepository} en memoria, para probar el transporte HTTP sin base de datos.
@@ -67,7 +68,9 @@ public final class ActosEnMemoria implements ActoCoactivoRepository {
 
     @Override
     public Optional<ActoCoactivo> porNumero(String numero) {
-        return guardados.stream().filter(a -> a.numero().equalsIgnoreCase(numero)).findFirst();
+        return guardados.stream()
+                .filter(a -> a.numero().equals(NumeroImpreso.formaDeBusqueda(numero)))
+                .findFirst();
     }
 
     /**

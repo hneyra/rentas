@@ -2,8 +2,8 @@ package kamayuk.rentas.sanciones.dominio;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Locale;
 import java.util.Objects;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.OrdenDeLosActos;
 import org.jspecify.annotations.Nullable;
@@ -70,7 +70,7 @@ public record Descargo(
             throw new IllegalArgumentException("Un descargo se presenta contra una papeleta");
         }
         Objects.requireNonNull(numeroExpediente, "El descargo necesita su numero de expediente");
-        numeroExpediente = numeroExpediente.strip().toUpperCase(Locale.ROOT);
+        numeroExpediente = NumeroImpreso.formaDeBusqueda(numeroExpediente);
         if (numeroExpediente.isEmpty() || numeroExpediente.length() > EXPEDIENTE_MAXIMO) {
             throw new IllegalArgumentException(
                     "El numero de expediente va de 1 a "

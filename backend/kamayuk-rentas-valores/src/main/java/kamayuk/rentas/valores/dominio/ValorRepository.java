@@ -39,6 +39,9 @@ public interface ValorRepository {
      * <p>La unicidad real es {@code (municipalidad_id, tipo, numero)} (V3), asi que en teoria dos
      * tipos podrian compartir numero. Si eso llegara a pasar, esto falla en vez de elegir uno: un
      * valor notificado por error es un acto administrativo sobre la deuda equivocada.
+     *
+     * <p>El numero se normaliza aqui, en el adaptador, con {@code NumeroImpreso} (#515): quien
+     * llama lo pasa como lo tecleo.
      */
     Optional<Valor> porNumero(String numero);
 

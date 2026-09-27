@@ -56,9 +56,7 @@ public class ReferenciasDeLaSiembra {
 
     /** El identificador interno del contribuyente cuyo codigo de padron es ese. */
     public Optional<Long> contribuyenteDe(String codigo) {
-        return directorio
-                .porCodigo(codigo.strip().toUpperCase(java.util.Locale.ROOT))
-                .map(resumen -> resumen.id());
+        return directorio.porCodigo(codigo).map(resumen -> resumen.id());
     }
 
     /**

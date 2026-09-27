@@ -3,10 +3,10 @@ package kamayuk.rentas.valores.aplicacion;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.valores.ObligacionDelValor;
 import kamayuk.rentas.valores.ValorParaCoactiva;
@@ -79,7 +79,7 @@ public class ValoresEnCoactivaValores implements ValoresEnCoactiva {
     public Optional<ValorParaCoactiva> porNumero(String numero, LocalDate aLaFecha) {
         CriterioDeConsultaDeValores criterio =
                 new CriterioDeConsultaDeValores(
-                        numero.strip().toUpperCase(Locale.ROOT), null, null, null, null, aLaFecha);
+                        NumeroImpreso.formaDeBusqueda(numero), null, null, null, null, aLaFecha);
         return repositorio.consultar(criterio, Paginacion.de(0, 1, "numero")).contenido().stream()
                 .findFirst()
                 .map(this::aPublico);

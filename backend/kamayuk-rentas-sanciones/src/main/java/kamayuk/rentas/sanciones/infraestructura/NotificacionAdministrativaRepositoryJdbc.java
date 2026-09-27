@@ -5,11 +5,11 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import kamayuk.rentas.sanciones.dominio.CriterioDeNotificacion;
@@ -86,7 +86,7 @@ public class NotificacionAdministrativaRepositoryJdbc extends RepositorioJdbc
     @Override
     public Optional<NotificacionAdministrativa> porNumero(String numero) {
         return jdbc().sql("SELECT " + COLUMNAS + DESDE + " WHERE n.numero = :numero")
-                .param("numero", numero.strip().toUpperCase(Locale.ROOT))
+                .param("numero", NumeroImpreso.formaDeBusqueda(numero))
                 .query(NotificacionAdministrativaRepositoryJdbc::mapear)
                 .optional();
     }

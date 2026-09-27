@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.OrigenContext;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacion;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacionRepository;
@@ -93,7 +94,7 @@ public class ResolucionDeDeterminacionRepositoryJdbc extends RepositorioJdbc
                         "SELECT "
                                 + COLUMNAS
                                 + " FROM resolucion_determinacion WHERE numero = :numero")
-                .param("numero", numero.strip().toUpperCase(java.util.Locale.ROOT))
+                .param("numero", NumeroImpreso.formaDeBusqueda(numero))
                 .query(ResolucionDeDeterminacionRepositoryJdbc::mapear)
                 .optional();
     }

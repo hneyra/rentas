@@ -157,6 +157,19 @@ class ValorRepositoryJdbcTest {
             assertThat(releido.usuarioRegistro()).isEqualTo("ventanilla.valores");
             assertThat(releido.estado()).isEqualTo(EstadoDeValor.EMITIDO);
 
+            // #515: el numero solo, como lo teclean quienes notifican o pasan a coactiva. Hasta
+            // #515 lo ponian en mayusculas `PasarACoactiva` y `RegistrarNotificacion`, cada uno
+            // con su copia; ahora lo hace el adaptador.
+            java.util.Optional<Valor> tecleado =
+                    transaccion.execute(
+                            estado -> {
+                                TenantContext.fijar(new MunicipalidadId(municipalidadA));
+                                return repositorio.porNumero(" op-2026-000001 ");
+                            });
+            assertThat(tecleado)
+                    .as("en minusculas y con espacios es el mismo valor")
+                    .hasValueSatisfying(v -> assertThat(v.id()).isEqualTo(releido.id()));
+
             List<ValorDetalle> detalle =
                     transaccion.execute(
                             estado -> {

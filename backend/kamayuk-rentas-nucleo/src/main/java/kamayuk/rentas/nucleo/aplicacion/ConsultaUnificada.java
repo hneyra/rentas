@@ -16,6 +16,7 @@ import kamayuk.rentas.cuentacorriente.MovimientoDelLibro;
 import kamayuk.rentas.cuentacorriente.MovimientosDelLibro;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.TributoDelLibro;
+import kamayuk.rentas.dominio.CodigoContribuyente;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.nucleo.dominio.DeclaracionJurada;
 import kamayuk.rentas.nucleo.dominio.DeclaracionJuradaRepository;
@@ -302,7 +303,7 @@ public class ConsultaUnificada {
 
         public Criterio {
             Objects.requireNonNull(codigoContribuyente, "La ficha es de un contribuyente");
-            codigoContribuyente = codigoContribuyente.strip().toUpperCase(Locale.ROOT);
+            codigoContribuyente = CodigoContribuyente.formaDeBusqueda(codigoContribuyente);
             if (codigoContribuyente.isEmpty()) {
                 throw new IllegalArgumentException(
                         "El codigo de contribuyente no puede estar vacio");

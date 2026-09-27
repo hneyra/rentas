@@ -15,6 +15,7 @@ import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
@@ -229,7 +230,7 @@ public class ValorRepositoryJdbc extends RepositorioJdbc implements ValorReposit
     public Optional<Valor> porNumero(String numero) {
         List<Valor> encontrados =
                 jdbc().sql("SELECT " + COLUMNAS_VALOR + " FROM valor WHERE numero = :numero")
-                        .param("numero", numero.strip())
+                        .param("numero", NumeroImpreso.formaDeBusqueda(numero))
                         .query(this::mapearValor)
                         .list();
         if (encontrados.size() > 1) {

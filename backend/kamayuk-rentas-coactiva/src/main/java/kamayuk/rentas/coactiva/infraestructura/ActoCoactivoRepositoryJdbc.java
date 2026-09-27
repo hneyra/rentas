@@ -11,6 +11,7 @@ import kamayuk.rentas.coactiva.dominio.ActoCoactivo;
 import kamayuk.rentas.coactiva.dominio.ActoCoactivoRepository;
 import kamayuk.rentas.coactiva.dominio.TipoDeActoCoactivo;
 import kamayuk.rentas.coactiva.dominio.TipoDeMedidaCautelar;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import org.springframework.dao.DuplicateKeyException;
@@ -146,7 +147,7 @@ public class ActoCoactivoRepositoryJdbc extends RepositorioJdbc implements ActoC
     @Override
     public Optional<ActoCoactivo> porNumero(String numero) {
         return jdbc().sql("SELECT " + COLUMNAS + " FROM acto_coactivo WHERE numero = :numero")
-                .param("numero", numero)
+                .param("numero", NumeroImpreso.formaDeBusqueda(numero))
                 .query(ActoCoactivoRepositoryJdbc::mapear)
                 .optional();
     }

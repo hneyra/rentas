@@ -22,6 +22,7 @@ import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
+import kamayuk.rentas.dominio.CodigoContribuyente;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Placa;
@@ -270,9 +271,8 @@ class VehiculosDelContribuyenteControllerTest {
     void elCodigoQueViajaEsElCanonico() throws Exception {
         mvc.perform(deQuien("c-000501")).andReturn();
 
-        assertThat(directorio.preguntado)
-                .as("se pregunta en mayusculas, como hace su hermana de predios")
-                .isEqualTo("C-000501");
+        // Quien pasa el codigo a su forma es el adaptador del directorio (#515), no el
+        // controlador: aqui se mide lo que importa, que al padron vehicular llega el canonico.
         assertThat(padron.buscado).isNotNull();
         assertThat(padron.buscado.contribuyente()).isEqualTo("C-000501");
     }
@@ -282,8 +282,6 @@ class VehiculosDelContribuyenteControllerTest {
     /** El padron de contribuyentes: solo C-000501 esta en el. */
     private static final class DirectorioDePrueba implements DirectorioDeContribuyentes {
 
-        private String preguntado;
-
         @Override
         public List<ResumenDeContribuyente> buscar(String texto, int maximo) {
             return List.of();
@@ -291,8 +289,9 @@ class VehiculosDelContribuyenteControllerTest {
 
         @Override
         public Optional<ResumenDeContribuyente> porCodigo(String codigo) {
-            preguntado = codigo;
-            return "C-000501".equals(codigo)
+            // Como el adaptador de verdad (`DirectorioJdbc`, que construye `CodigoContribuyente`):
+            // el puerto recibe lo tecleado y lo compara en su forma.
+            return "C-000501".equals(CodigoContribuyente.formaDeBusqueda(codigo))
                     ? Optional.of(
                             new ResumenDeContribuyente(
                                     CONTRIBUYENTE,

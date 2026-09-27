@@ -1,8 +1,8 @@
 package kamayuk.rentas.fiscalizacion.dominio;
 
 import java.time.LocalDate;
-import java.util.Locale;
 import java.util.Objects;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import org.jspecify.annotations.Nullable;
 
@@ -81,7 +81,7 @@ public record MovimientoDeLiquidacion(
                                 + estado.etiqueta()
                                 + " diria que se notifico");
             }
-            numeroNotificacion = numeroNotificacion.strip().toUpperCase(Locale.ROOT);
+            numeroNotificacion = NumeroImpreso.formaDeBusqueda(numeroNotificacion);
             if (numeroNotificacion.isEmpty() || numeroNotificacion.length() > NUMERO_MAXIMO) {
                 throw new IllegalArgumentException(
                         "El numeroNotificacion va de 1 a " + NUMERO_MAXIMO + " caracteres");

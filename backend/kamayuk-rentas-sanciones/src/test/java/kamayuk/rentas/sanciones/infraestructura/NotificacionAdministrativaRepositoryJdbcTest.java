@@ -112,6 +112,12 @@ class NotificacionAdministrativaRepositoryJdbcTest {
             assertThat(releida.id()).isEqualTo(guardada.id());
             assertThat(releida.plazoDias()).isEqualTo((short) 10);
             assertThat(releida.estado()).isEqualTo(EstadoDeNotificacion.EMITIDA);
+            // #515: como se teclea. La forma la pone el adaptador.
+            java.util.Optional<NotificacionAdministrativa> tecleada =
+                    transaccion.execute(estado -> repositorio.porNumero(" na-0001 "));
+            assertThat(tecleada)
+                    .as("en minusculas y con espacios es la misma notificacion")
+                    .hasValueSatisfying(n -> assertThat(n.id()).isEqualTo(guardada.id()));
         }
 
         @Test

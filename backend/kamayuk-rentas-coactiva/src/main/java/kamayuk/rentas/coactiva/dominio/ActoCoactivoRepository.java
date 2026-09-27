@@ -40,7 +40,11 @@ public interface ActoCoactivoRepository {
      */
     Optional<ActoCoactivo> ultimoDe(long expedienteId, TipoDeActoCoactivo tipo);
 
-    /** Un acto por el numero de su documento, tal como sale impreso. */
+    /**
+     * Un acto por el numero de su documento, tal como sale impreso. Como se escriba —con espacios,
+     * en minusculas— lo normaliza el adaptador con {@code NumeroImpreso} (#515): quien llama no lo
+     * copia.
+     */
     Optional<ActoCoactivo> porNumero(String numero);
 
     /**

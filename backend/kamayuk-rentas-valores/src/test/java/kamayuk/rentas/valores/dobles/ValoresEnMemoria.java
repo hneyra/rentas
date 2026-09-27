@@ -8,6 +8,7 @@ import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.valores.dominio.CriterioDeConsultaDeValores;
 import kamayuk.rentas.valores.dominio.CriterioDeValor;
 import kamayuk.rentas.valores.dominio.EstadoDeValor;
@@ -74,7 +75,9 @@ public final class ValoresEnMemoria implements ValorRepository {
 
     @Override
     public Optional<Valor> porNumero(String numero) {
-        return porId.values().stream().filter(v -> v.numero().equals(numero)).findFirst();
+        return porId.values().stream()
+                .filter(v -> v.numero().equals(NumeroImpreso.formaDeBusqueda(numero)))
+                .findFirst();
     }
 
     @Override

@@ -3,6 +3,7 @@ package kamayuk.rentas.cuentacorriente.dominio;
 import java.util.Locale;
 import java.util.Objects;
 import kamayuk.rentas.cuentacorriente.CausalDeBaja;
+import kamayuk.rentas.dominio.CodigoContribuyente;
 import kamayuk.rentas.dominio.Ejercicio;
 import org.jspecify.annotations.Nullable;
 
@@ -55,7 +56,7 @@ public record CriterioDeAltasBajas(
 
     public CriterioDeAltasBajas {
         Objects.requireNonNull(codigoContribuyente, "Las altas y bajas son de un contribuyente");
-        codigoContribuyente = codigoContribuyente.strip().toUpperCase(Locale.ROOT);
+        codigoContribuyente = CodigoContribuyente.formaDeBusqueda(codigoContribuyente);
         if (codigoContribuyente.isEmpty()) {
             throw new IllegalArgumentException("El codigo de contribuyente no puede estar vacio");
         }

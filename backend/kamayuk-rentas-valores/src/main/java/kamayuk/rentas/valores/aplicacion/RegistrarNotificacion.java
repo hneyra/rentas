@@ -2,7 +2,6 @@ package kamayuk.rentas.valores.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.Locale;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -170,8 +169,7 @@ public class RegistrarNotificacion {
     // ------------------------------------------------------------------
 
     private Valor valorDe(String numero) {
-        return valores.porNumero(numero.strip().toUpperCase(Locale.ROOT))
-                .orElseThrow(() -> new ValorInexistente(numero));
+        return valores.porNumero(numero).orElseThrow(() -> new ValorInexistente(numero));
     }
 
     private String direccionDe(Valor valor, @Nullable String dada, LocalDate fecha) {

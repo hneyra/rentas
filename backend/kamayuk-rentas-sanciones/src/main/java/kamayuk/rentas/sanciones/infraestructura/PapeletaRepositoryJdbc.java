@@ -13,6 +13,7 @@ import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Placa;
 import kamayuk.rentas.persistencia.OrdenSeguro;
@@ -124,7 +125,7 @@ public class PapeletaRepositoryJdbc extends RepositorioJdbc implements PapeletaR
                                 + COLUMNAS
                                 + DESDE
                                 + " WHERE p.familia = 'TRANSITO' AND p.numero = :numero")
-                .param("numero", numero.strip().toUpperCase(java.util.Locale.ROOT))
+                .param("numero", NumeroImpreso.formaDeBusqueda(numero))
                 .query(PapeletaRepositoryJdbc::mapear)
                 .optional();
     }
@@ -137,7 +138,7 @@ public class PapeletaRepositoryJdbc extends RepositorioJdbc implements PapeletaR
                                 + DESDE
                                 + " WHERE p.familia = :familia AND p.numero = :numero")
                 .param("familia", familia.name())
-                .param("numero", numero.strip().toUpperCase(java.util.Locale.ROOT))
+                .param("numero", NumeroImpreso.formaDeBusqueda(numero))
                 .query(PapeletaRepositoryJdbc::mapear)
                 .optional();
     }
@@ -221,7 +222,7 @@ public class PapeletaRepositoryJdbc extends RepositorioJdbc implements PapeletaR
 
     @Override
     public Papeleta cambiarNumero(long papeletaId, String numeroNuevo, String motivo) {
-        String nuevoLimpio = numeroNuevo.strip().toUpperCase(java.util.Locale.ROOT);
+        String nuevoLimpio = NumeroImpreso.formaDeBusqueda(numeroNuevo);
         String usuario = kamayuk.rentas.auditoria.OrigenContext.actual().usuario();
 
         String numeroAnterior =

@@ -1,6 +1,5 @@
 package kamayuk.rentas.coactiva.aplicacion;
 
-import java.util.Locale;
 import kamayuk.rentas.coactiva.dominio.ActoCoactivo;
 import kamayuk.rentas.coactiva.dominio.ActoCoactivoRepository;
 import kamayuk.rentas.coactiva.dominio.ExpedienteCoactivo;
@@ -68,7 +67,7 @@ public class ReimprimirActoCoactivo {
             String numeroDelActo, FormatoDeDocumento formato, Observacion observacion) {
 
         ActoCoactivo acto =
-                actos.porNumero(numeroDelActo.strip().toUpperCase(Locale.ROOT))
+                actos.porNumero(numeroDelActo)
                         .orElseThrow(
                                 () -> new NotificarActoCoactivo.ActoInexistente(numeroDelActo));
         ExpedienteCoactivo expediente =

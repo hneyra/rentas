@@ -1,9 +1,9 @@
 package kamayuk.rentas.sanciones.dominio;
 
 import java.time.LocalDate;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -46,7 +46,7 @@ public record NotificacionAdministrativa(
 
     public NotificacionAdministrativa {
         Objects.requireNonNull(numero, "La notificacion necesita su numero");
-        numero = numero.strip().toUpperCase(Locale.ROOT);
+        numero = NumeroImpreso.formaDeBusqueda(numero);
         if (numero.isEmpty() || numero.length() > NUMERO_MAXIMO) {
             throw new IllegalArgumentException(
                     "El numero va de 1 a " + NUMERO_MAXIMO + " caracteres: '" + numero + "'");

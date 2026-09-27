@@ -1444,6 +1444,31 @@ class ActosCoactivosJdbcTest {
         }
 
         @Test
+        @DisplayName(
+                "#515 — el numero del acto se busca como se teclea: la forma la pone el adaptador")
+        void elNumeroDelActoSeBuscaComoSeTeclea() {
+            String expediente = expedienteConDeuda("B-0515");
+            ActoCoactivo rec1 = dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null).acto();
+
+            assertThat(
+                            enTransaccion(
+                                    () ->
+                                            actos.porNumero(
+                                                    " "
+                                                            + rec1.numero()
+                                                                    .toLowerCase(
+                                                                            java.util.Locale.ROOT)
+                                                            + " ")))
+                    .as(
+                            "hasta #515 la normalizaban NotificarActoCoactivo y ReimprimirActoCoactivo"
+                                    + " a mano, y el adaptador comparaba en crudo")
+                    .hasValueSatisfying(
+                            acto ->
+                                    assertThat(acto.identificador())
+                                            .isEqualTo(rec1.identificador()));
+        }
+
+        @Test
         @DisplayName("desde otra municipalidad el acto no existe: RLS")
         void desdeOtraMunicipalidadNoExiste() {
             String expediente = expedienteConDeuda("B-0007");
