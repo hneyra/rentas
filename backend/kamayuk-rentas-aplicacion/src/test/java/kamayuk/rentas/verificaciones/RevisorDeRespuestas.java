@@ -58,7 +58,6 @@ import org.jspecify.annotations.Nullable;
 final class RevisorDeRespuestas {
 
     /** La unica forma de contestar 404 desde una operacion. */
-    private static final String MARCA = "NO_ENCONTRADO";
 
     /** Modulos donde vive el codigo de produccion. */
     private static final String FUENTES = "src/main/java";
@@ -67,36 +66,119 @@ final class RevisorDeRespuestas {
 
     private RevisorDeRespuestas() {}
 
-    /** Si la operacion que sirve este metodo puede contestar {@code 404}. */
+    /**
+     * Los estados de error que el contrato aprende del codigo, y la constante de {@code
+     * CodigoDeError} que los produce (#436).
+     *
+     * <p>Son los que ningun otro mecanismo declara: el 404 (#732), el 409 —«ya estaba», o «el
+     * estado no lo admite»— y el 503 —«reintenta»—. El 422 y el 403 los declara el generador en
+     * toda operacion, el 401 el esquema de seguridad y el 501 {@code
+     * escrituras-no-completables.json}.
+     */
+    static final Map<String, String> MARCAS =
+            Map.of(
+                    "NO_ENCONTRADO", "404",
+                    "CONFLICTO", "409",
+                    "SERVICIO_NO_DISPONIBLE", "503");
+
+    /** Si ese metodo puede contestar 404 (#732): la pregunta de antes, sobre el censo nuevo. */
     static boolean puedeContestar404(Method metodo) {
+        return estadosQuePuedeContestar(metodo).contains("404");
+    }
+
+    /**
+     * Los estados de {@link #MARCAS} que ese metodo de controlador puede contestar (#436).
+     *
+     * <p>Una marca cuenta si aparece en el cuerpo del metodo, en un ayudante de la MISMA clase al
+     * que llama —directa o indirectamente: el analisis se repite hasta que no aparecen ayudantes
+     * nuevos, y no para en un salto como hasta #436, que se dejaba {@code exigirQueExista ->
+     * noExiste -> NO_ENCONTRADO}— o en un metodo de un colaborador inyectado que la lanza.
+     */
+    static Set<String> estadosQuePuedeContestar(Method metodo) {
         Class<?> controlador = metodo.getDeclaringClass();
         String fuente = fuenteDe(controlador);
+        Set<String> estados = new java.util.TreeSet<>();
         if (fuente == null) {
-            return false;
+            return estados;
         }
         String cuerpo = cuerpoDe(fuente, metodo.getName());
         if (cuerpo == null) {
-            return false;
+            return estados;
         }
-        if (cuerpo.contains(MARCA)) {
-            return true;
-        }
-        for (String ayudante : metodosQueMencionanLaMarca(fuente)) {
-            if (llama(cuerpo, ayudante)) {
-                return true;
-            }
-        }
-        return colaboradorQueLaLanza(controlador, cuerpo);
-    }
-
-    /** Un colaborador inyectado cuyo metodo llamado lanza el 404. */
-    private static boolean colaboradorQueLaLanza(Class<?> controlador, String cuerpo) {
-        for (Field campo : controlador.getDeclaredFields()) {
-            String fuenteDelColaborador = fuenteDe(campo.getType());
-            if (fuenteDelColaborador == null || !fuenteDelColaborador.contains(MARCA)) {
+        for (Map.Entry<String, String> marca : MARCAS.entrySet()) {
+            if (cuerpo.contains(marca.getKey())) {
+                estados.add(marca.getValue());
                 continue;
             }
-            for (String metodo : metodosQueMencionanLaMarca(fuenteDelColaborador)) {
+            boolean porUnAyudante = false;
+            for (String ayudante : metodosQueLlevanLaMarca(fuente, marca.getKey())) {
+                if (llama(cuerpo, ayudante)) {
+                    porUnAyudante = true;
+                    break;
+                }
+            }
+            if (porUnAyudante || colaboradorQueLaLanza(controlador, cuerpo, marca.getKey())) {
+                estados.add(marca.getValue());
+            }
+        }
+        return estados;
+    }
+
+    /**
+     * El estado de EXITO que ese metodo contesta (#436), leido del codigo y no supuesto.
+     *
+     * <p>Hasta #436 el generador escribia 201 para todo {@code POST}. Aqui: el
+     * {@code @ResponseStatus} del metodo, o lo que su {@code ResponseEntity} pida —{@code CREATED},
+     * {@code OK}, {@code ok(...)}, {@code accepted()}—, o el 200 que Spring pone sin decir nada. Un
+     * metodo que contesta dos (201 o 200 segun la clave de idempotencia) publica los dos.
+     */
+    static Set<String> exitosDe(Method metodo) {
+        Set<String> exitos = new java.util.TreeSet<>();
+        org.springframework.web.bind.annotation.ResponseStatus anotada =
+                metodo.getAnnotation(org.springframework.web.bind.annotation.ResponseStatus.class);
+        if (anotada != null) {
+            exitos.add(
+                    String.valueOf(
+                            anotada.value().value() != 500
+                                    ? anotada.value().value()
+                                    : anotada.code().value()));
+            return exitos;
+        }
+        if (org.springframework.http.ResponseEntity.class.isAssignableFrom(
+                metodo.getReturnType())) {
+            String fuente = fuenteDe(metodo.getDeclaringClass());
+            String cuerpo = fuente == null ? null : cuerpoDe(fuente, metodo.getName());
+            if (cuerpo != null) {
+                if (cuerpo.contains("HttpStatus.CREATED")) {
+                    exitos.add("201");
+                }
+                if (cuerpo.contains("HttpStatus.OK") || cuerpo.contains("ResponseEntity.ok(")) {
+                    exitos.add("200");
+                }
+                if (cuerpo.contains("HttpStatus.ACCEPTED")
+                        || cuerpo.contains("ResponseEntity.accepted(")) {
+                    exitos.add("202");
+                }
+                if (cuerpo.contains("HttpStatus.NO_CONTENT")
+                        || cuerpo.contains("ResponseEntity.noContent(")) {
+                    exitos.add("204");
+                }
+            }
+        }
+        if (exitos.isEmpty()) {
+            exitos.add("200");
+        }
+        return exitos;
+    }
+
+    private static boolean colaboradorQueLaLanza(
+            Class<?> controlador, String cuerpo, String marca) {
+        for (Field campo : controlador.getDeclaredFields()) {
+            String fuenteDelColaborador = fuenteDe(campo.getType());
+            if (fuenteDelColaborador == null || !fuenteDelColaborador.contains(marca)) {
+                continue;
+            }
+            for (String metodo : metodosQueLlevanLaMarca(fuenteDelColaborador, marca)) {
                 if (cuerpo.contains(campo.getName() + "." + metodo + "(")) {
                     return true;
                 }
@@ -105,19 +187,44 @@ final class RevisorDeRespuestas {
         return false;
     }
 
-    /** Los metodos de ese archivo cuyo cuerpo menciona la marca. */
-    private static Set<String> metodosQueMencionanLaMarca(String fuente) {
-        Set<String> nombres = new LinkedHashSet<>();
+    /**
+     * Los metodos de esa fuente que llevan la marca, directa o indirectamente: el conjunto crece
+     * con los que llaman a uno que ya esta dentro, hasta que deja de crecer (#436).
+     */
+    private static Set<String> metodosQueLlevanLaMarca(String fuente, String marca) {
+        Map<String, String> cuerpos = new java.util.LinkedHashMap<>();
         for (String nombre : nombresDeMetodo(fuente)) {
             String cuerpo = cuerpoDe(fuente, nombre);
-            if (cuerpo != null && cuerpo.contains(MARCA)) {
-                nombres.add(nombre);
+            if (cuerpo != null) {
+                cuerpos.put(nombre, cuerpo);
             }
         }
-        return nombres;
+        Set<String> conLaMarca = new LinkedHashSet<>();
+        cuerpos.forEach(
+                (nombre, cuerpo) -> {
+                    if (cuerpo.contains(marca)) {
+                        conLaMarca.add(nombre);
+                    }
+                });
+        boolean crecio = true;
+        while (crecio) {
+            crecio = false;
+            for (Map.Entry<String, String> otro : cuerpos.entrySet()) {
+                if (conLaMarca.contains(otro.getKey())) {
+                    continue;
+                }
+                for (String yaDentro : List.copyOf(conLaMarca)) {
+                    if (llama(otro.getValue(), yaDentro)) {
+                        conLaMarca.add(otro.getKey());
+                        crecio = true;
+                        break;
+                    }
+                }
+            }
+        }
+        return conLaMarca;
     }
 
-    /** Todo nombre que en ese archivo aparece como declaracion de metodo. */
     private static Set<String> nombresDeMetodo(String fuente) {
         Set<String> nombres = new LinkedHashSet<>();
         Matcher encontrado = Pattern.compile("\\b([a-z][A-Za-z0-9_]*)\\s*\\(").matcher(fuente);
@@ -256,6 +363,10 @@ final class RevisorDeRespuestas {
             List<Path> candidatos = new ArrayList<>();
             for (Path modulo : modulos.toList()) {
                 candidatos.add(modulo.resolve(FUENTES).resolve(relativa));
+                // Las muestras de este revisor viven en src/test (#436): solo ellas se leen de ahi.
+                if (nombreDeLaClase.startsWith("kamayuk.rentas.verificaciones.muestras.")) {
+                    candidatos.add(modulo.resolve("src/test/java").resolve(relativa));
+                }
             }
             for (Path candidato : candidatos) {
                 if (Files.exists(candidato)) {

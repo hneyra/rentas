@@ -48,10 +48,11 @@ class RespuestasDeLaApiTest {
     private static final String PROCEDENCIA =
             "ARCHIVO GENERADO — no editar a mano. Lo produce RespuestasDeLaApiTest leyendo el"
                     + " codigo de cada controlador; se regenera con"
-                    + " -Dkamayuk.respuestas.regenerar=true. Dice que operaciones pueden contestar 404"
-                    + " —la unica forma de hacerlo es ProblemaDeNegocio con"
-                    + " CodigoDeError.NO_ENCONTRADO— y lo lee generar-openapi.mjs para declararlo"
-                    + " en el contrato (#732).";
+                    + " -Dkamayuk.respuestas.regenerar=true. Dice, por operacion, que estados puede"
+                    + " contestar: los de error que ningun otro mecanismo declara —404, 409 y 503,"
+                    + " de CodigoDeError.NO_ENCONTRADO, CONFLICTO y SERVICIO_NO_DISPONIBLE— y el de"
+                    + " exito que el controlador pide. Lo lee generar-openapi.mjs para declararlos"
+                    + " en el contrato (#732, #436).";
 
     @Test
     @DisplayName("el archivo de respuestas es el que producen los controladores de hoy")
@@ -78,44 +79,50 @@ class RespuestasDeLaApiTest {
     }
 
     @Test
-    @DisplayName("el censo no esta vacio, y no las declara todas")
+    @DisplayName(
+            "el censo no esta vacio, y no las declara todas: 404 y 409 en algunas, no en todas")
     void elCensoNoEsVacioNiUniversal() {
-        Map<String, Boolean> censo = censo();
-        long conCuatrocientosCuatro = censo.values().stream().filter(Boolean::booleanValue).count();
-
-        assertThat(conCuatrocientosCuatro)
-                .as("sin ninguna, el archivo no diria nada y el contrato seguiria callando")
-                .isPositive();
-        assertThat(conCuatrocientosCuatro)
-                .as(
-                        "y declararlo en TODAS es tan inutil como no declararlo en ninguna: lo que"
-                                + " da valor a la declaracion es que distinga. Es el mismo argumento"
-                                + " por el que «parametroQueFalta» no va en todos los 422 (#691)")
-                .isLessThan(censo.size());
+        Map<String, java.util.Set<String>> censo = censo();
+        for (String estado : List.of("404", "409")) {
+            long conEse = censo.values().stream().filter(e -> e.contains(estado)).count();
+            assertThat(conEse)
+                    .as(
+                            "%s: sin ninguna el contrato seguiria callando, y en todas no distingue"
+                                    + " nada (#691)",
+                            estado)
+                    .isPositive()
+                    .isLessThan(censo.size());
+        }
     }
 
     @Test
-    @DisplayName("el contrato declara un 404 exactamente donde el codigo puede contestarlo")
+    @DisplayName(
+            "el contrato declara 404, 409, 503 y el 2xx exactamente donde el codigo los contesta")
     void elContratoDeclaraLoQueElCodigoPuede() throws IOException {
-        Map<String, Boolean> censo = censo();
-        Map<String, Boolean> delContrato = losQueDeclaraElContrato();
-
+        Map<String, java.util.Set<String>> censo = censo();
+        Map<String, java.util.Set<String>> delContrato = losQueDeclaraElContrato();
         List<String> callados = new ArrayList<>();
         List<String> prometidos = new ArrayList<>();
-        for (Map.Entry<String, Boolean> operacion : censo.entrySet()) {
-            boolean declarado = Boolean.TRUE.equals(delContrato.get(operacion.getKey()));
-            if (operacion.getValue() && !declarado) {
-                callados.add(operacion.getKey());
+        for (Map.Entry<String, java.util.Set<String>> operacion : censo.entrySet()) {
+            java.util.Set<String> declarados =
+                    delContrato.getOrDefault(operacion.getKey(), java.util.Set.of());
+            for (String estado : operacion.getValue()) {
+                if (!declarados.contains(estado)) {
+                    callados.add(estado + " " + operacion.getKey());
+                }
             }
-            if (!operacion.getValue() && declarado) {
-                prometidos.add(operacion.getKey());
+            for (String estado : declarados) {
+                if (!operacion.getValue().contains(estado)) {
+                    prometidos.add(estado + " " + operacion.getKey());
+                }
             }
         }
-
         assertThat(callados)
                 .as(
-                        "estas operaciones contestan 404 y el contrato no lo dice: quien escribe"
-                                + " contra el contrato lo tratara como un fallo del servidor")
+                        "estas operaciones contestan ese estado y el contrato no lo dice: quien"
+                                + " escribe contra el contrato lo tratara como un fallo del servidor"
+                                + " —el 409 de POST /pagos es «ya lo tengo», y un cliente generado lo"
+                                + " reintentaria—")
                 .isEmpty();
         assertThat(prometidos)
                 .as(
@@ -124,34 +131,132 @@ class RespuestasDeLaApiTest {
                 .isEmpty();
     }
 
-    // ------------------------------------------------------------------
+    @Test
+    @DisplayName("el censo sigue la cadena de ayudantes y ve el 409: sobre su muestra")
+    void elCensoMuerdeSobreSuMuestra() throws NoSuchMethodException {
+        Class<?> muestra = kamayuk.rentas.verificaciones.muestras.web.MuestrasDeRespuestas.class;
 
-    /** Cada operacion publicada y si puede contestar 404. */
-    private static Map<String, Boolean> censo() {
-        Map<String, Boolean> censo = new TreeMap<>();
-        for (Map.Entry<String, Method> endpoint : EndpointsPublicados.porOperacion().entrySet()) {
-            censo.put(
-                    endpoint.getKey(), RevisorDeRespuestas.puedeContestar404(endpoint.getValue()));
-        }
-        assertThat(censo).as("sin endpoints publicados no hay nada que censar").isNotEmpty();
-        return censo;
+        assertThat(
+                        RevisorDeRespuestas.estadosQuePuedeContestar(
+                                muestra.getMethod("conCadenaDeDosAyudantes", long.class)))
+                .as("exigirQueExista -> noExiste -> NO_ENCONTRADO: un censo de un salto no lo ve")
+                .containsExactly("404");
+        assertThat(RevisorDeRespuestas.estadosQuePuedeContestar(muestra.getMethod("conConflicto")))
+                .containsExactly("409");
+        assertThat(RevisorDeRespuestas.estadosQuePuedeContestar(muestra.getMethod("sinNada")))
+                .isEmpty();
     }
 
-    /**
-     * Las operaciones del contrato y si declaran un 404.
-     *
-     * <p>Se lee el YAML como texto y no con una libreria: el contrato es el archivo comprometido, y
-     * meter un analizador entre el y esta prueba es una traduccion mas que puede diferir de la que
-     * hace el generador (#312).
-     */
-    private static Map<String, Boolean> losQueDeclaraElContrato() throws IOException {
-        Map<String, Boolean> declaradas = new TreeMap<>();
+    @Test
+    @DisplayName("el contrato declara required: true exactamente donde el codigo lo exige")
+    void losObligatoriosSonLosDelCodigo() throws IOException {
+        Map<String, java.util.Set<String>> exigidos = new TreeMap<>();
+        tools.jackson.databind.JsonNode parametros =
+                new tools.jackson.databind.json.JsonMapper()
+                        .readTree(
+                                Files.readString(
+                                        RaizDelRepositorio.ruta()
+                                                .resolve("docs/50-api/parametros-de-la-api.json"),
+                                        StandardCharsets.UTF_8));
+        parametros
+                .properties()
+                .forEach(
+                        entrada -> {
+                            java.util.Set<String> nombres = new java.util.TreeSet<>();
+                            entrada.getValue()
+                                    .path("obligatorios")
+                                    .forEach(nombre -> nombres.add(nombre.asString()));
+                            if (!entrada.getKey().startsWith("_")) {
+                                exigidos.put(entrada.getKey(), nombres);
+                            }
+                        });
+
+        Map<String, java.util.Set<String>> declarados = obligatoriosDelContrato();
+        List<String> distintos = new ArrayList<>();
+        for (Map.Entry<String, java.util.Set<String>> operacion : declarados.entrySet()) {
+            java.util.Set<String> delCodigo =
+                    exigidos.getOrDefault(operacion.getKey(), java.util.Set.of());
+            if (!delCodigo.equals(operacion.getValue())) {
+                distintos.add(
+                        operacion.getKey()
+                                + ": contrato "
+                                + operacion.getValue()
+                                + ", codigo "
+                                + delCodigo);
+            }
+        }
+        assertThat(distintos)
+                .as(
+                        "hasta #436 los 760 parametros de consulta salian required: false, tambien"
+                                + " `fecha` de GET /pagos/conciliacion —la unica lectura que caja hace—"
+                                + " y `ano` de las cinco rutas de la DJ")
+                .isEmpty();
+        assertThat(declarados.get("GET /pagos/conciliacion")).contains("fecha");
+    }
+
+    /** Los parametros de consulta que el YAML declara {@code required: true}, por operacion. */
+    private static Map<String, java.util.Set<String>> obligatoriosDelContrato() throws IOException {
+        Map<String, java.util.Set<String>> declarados = new TreeMap<>();
         List<String> lineas =
                 Files.readAllLines(
                         RaizDelRepositorio.ruta().resolve("docs/50-api/openapi/rentas-v1.yaml"),
                         StandardCharsets.UTF_8);
         String ruta = null;
-        String verbo = null;
+        String operacion = null;
+        String nombre = null;
+        boolean enConsulta = false;
+        for (String linea : lineas) {
+            if (linea.startsWith("  \"/")) {
+                ruta = linea.strip().replace("\"", "").replace(":", "");
+                continue;
+            }
+            if (ruta != null && linea.matches("^    (get|post|put|patch|delete):$")) {
+                String verbo = linea.strip().replace(":", "").toUpperCase(java.util.Locale.ROOT);
+                operacion = verbo + " " + ruta;
+                declarados.putIfAbsent(operacion, new java.util.TreeSet<>());
+                continue;
+            }
+            if (linea.startsWith("        - name: ")) {
+                nombre = linea.substring("        - name: ".length()).strip();
+                enConsulta = false;
+            } else if (linea.equals("          in: query")) {
+                enConsulta = true;
+            } else if (operacion != null
+                    && enConsulta
+                    && nombre != null
+                    && linea.equals("          required: true")) {
+                declarados.get(operacion).add(nombre);
+            }
+        }
+        return declarados;
+    }
+
+    // ------------------------------------------------------------------
+
+    /** Cada operacion publicada y si puede contestar 404. */
+    private static Map<String, java.util.Set<String>> censo() {
+        Map<String, java.util.Set<String>> censo = new TreeMap<>();
+        for (Map.Entry<String, Method> endpoint : EndpointsPublicados.porOperacion().entrySet()) {
+            java.util.Set<String> estados =
+                    new java.util.TreeSet<>(
+                            RevisorDeRespuestas.estadosQuePuedeContestar(endpoint.getValue()));
+            estados.addAll(RevisorDeRespuestas.exitosDe(endpoint.getValue()));
+            censo.put(endpoint.getKey(), estados);
+        }
+        assertThat(censo).as("sin endpoints publicados no hay nada que censar").isNotEmpty();
+        return censo;
+    }
+
+    /** Los estados que el YAML declara en cada operacion, de los que este censo deriva. */
+    private static Map<String, java.util.Set<String>> losQueDeclaraElContrato() throws IOException {
+        Map<String, java.util.Set<String>> declaradas = new TreeMap<>();
+        List<String> lineas =
+                Files.readAllLines(
+                        RaizDelRepositorio.ruta().resolve("docs/50-api/openapi/rentas-v1.yaml"),
+                        StandardCharsets.UTF_8);
+        java.util.regex.Pattern codigo =
+                java.util.regex.Pattern.compile("^        \"?(\\d{3})\"?:$");
+        String ruta = null;
         String operacion = null;
         for (String linea : lineas) {
             if (linea.startsWith("  \"/")) {
@@ -159,19 +264,25 @@ class RespuestasDeLaApiTest {
                 continue;
             }
             if (ruta != null && linea.matches("^    (get|post|put|patch|delete):$")) {
-                verbo = linea.strip().replace(":", "").toUpperCase(java.util.Locale.ROOT);
+                String verbo = linea.strip().replace(":", "").toUpperCase(java.util.Locale.ROOT);
                 operacion = verbo + " " + ruta;
-                declaradas.putIfAbsent(operacion, false);
+                declaradas.putIfAbsent(operacion, new java.util.TreeSet<>());
                 continue;
             }
-            if (operacion != null && linea.strip().equals("\"404\":")) {
-                declaradas.put(operacion, true);
+            java.util.regex.Matcher encontrado = codigo.matcher(linea);
+            if (operacion != null && encontrado.matches() && esDerivado(encontrado.group(1))) {
+                declaradas.get(operacion).add(encontrado.group(1));
             }
         }
         return declaradas;
     }
 
-    private static String comoJson(Map<String, Boolean> censo) {
+    /** Los estados que este censo deriva del codigo: los de exito y los de {@code MARCAS}. */
+    private static boolean esDerivado(String estado) {
+        return estado.startsWith("2") || RevisorDeRespuestas.MARCAS.containsValue(estado);
+    }
+
+    private static String comoJson(Map<String, java.util.Set<String>> censo) {
         StringBuilder json = new StringBuilder("{\n");
         json.append("  ")
                 .append(entrecomillado("_procedencia"))
@@ -184,7 +295,10 @@ class RespuestasDeLaApiTest {
             json.append("  ")
                     .append(entrecomillado(operacion))
                     .append(": ")
-                    .append(censo.get(operacion) ? "[\"404\"]" : "[]")
+                    .append(
+                            censo.get(operacion).stream()
+                                    .map(estado -> "\"" + estado + "\"")
+                                    .collect(java.util.stream.Collectors.joining(", ", "[", "]")))
                     .append(i == operaciones.size() - 1 ? "\n" : ",\n");
         }
         return json.append("}\n").toString();
