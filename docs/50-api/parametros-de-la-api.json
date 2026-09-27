@@ -842,6 +842,13 @@
     "opcionales": ["numero"],
     "enElCuerpo": []
   },
+  "POST /infracciones/administrativas/notificaciones/{numero}/subsanacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
   "POST /infracciones/administrativas/reportes": {
     "obligatorios": [],
     "algunoDeEstos": [],
@@ -1085,6 +1092,13 @@
     "algunoDeEstos": [],
     "condicionales": ["ejercicio"],
     "opcionales": ["codContribuyente", "placa"],
+    "enElCuerpo": []
+  },
+  "POST /rentas/vehiculos/{placa}/placa": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
     "enElCuerpo": []
   },
   "POST /seguridad/respaldos": {

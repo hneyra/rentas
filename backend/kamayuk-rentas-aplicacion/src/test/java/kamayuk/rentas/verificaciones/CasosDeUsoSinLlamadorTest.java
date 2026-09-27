@@ -61,9 +61,6 @@ class CasosDeUsoSinLlamadorTest {
      */
     private static final Map<String, String> SIN_LLAMADOR_CON_MOTIVO = new LinkedHashMap<>();
 
-    private static final String SIN_DUENO =
-            "sin llamador en src/main y sin dueño: se retira, se hace no publico o se cablea (#611)";
-
     static {
         SIN_LLAMADOR_CON_MOTIVO.put(
                 "FormalizarConvenio#formalizar(NumeroDeConvenio, long, Dinero, LocalDate, Observacion)",
@@ -73,7 +70,7 @@ class CasosDeUsoSinLlamadorTest {
                 "La leia `CobrarDeuda` para cobrar la cuota inicial en ventanilla, y se fue a `caja` en P5D (#430)");
         SIN_LLAMADOR_CON_MOTIVO.put(
                 "ImprimirCorridaMasiva#imprimir(long, FormatoDeDocumento, Function)",
-                "#400 cerro el PROCESAMIENTO de la generacion masiva, no su impresion: no hay ruta ni proceso que imprima la corrida (#611)");
+                "#400 cerro el PROCESAMIENTO de la generacion masiva, no su impresion: no hay ruta ni proceso que imprima la corrida (#631)");
         SIN_LLAMADOR_CON_MOTIVO.put(
                 "RegistrarBeneficio#registrar(Beneficio, Observacion)",
                 "El alta de un beneficio no se publica todavia: `BeneficioController` es de solo lectura y el contrato no declara POST (NEG-03)");
@@ -89,53 +86,21 @@ class CasosDeUsoSinLlamadorTest {
         SIN_LLAMADOR_CON_MOTIVO.put(
                 "DeterminarArbitrios#determinarPredio(long, Ejercicio, Observacion)",
                 "La determinacion de arbitrios no se publica: sus tasas son de ordenanza local, bloqueado por D-02b (`ArbitriosController`)");
-        // Sin dueño todavia: la tabla de #611 dice, para cada uno, que pruebas lo ejercitan y
-        // si es una sobrecarga que la ruta no usa, un metodo solo de pruebas o un heredado sin
-        // ruta.
         SIN_LLAMADOR_CON_MOTIVO.put(
-                "CambiarDireccionReferencial#cambiar(String, String, String, Observacion)",
-                SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "CambiarDireccionReferencial#vigenteDe(ExpedienteCoactivo)", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "CambiarEstadoDelExpediente#cambiar(String, EstadoDelExpediente, String, LocalDate, String, Observacion)",
-                SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put("CambiarPlaca#cambiar(long, Placa, Observacion)", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put("ConciliarConElPadron#huellasDeLaProyeccion()", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "ConciliarConElPadron#lotesQueDifieren(String, List)", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put("ConsultaDeCostas#porNumero(String, LocalDate)", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "ConsultaDeLaCorridaDeValores#items(long, long, int)", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put("ConsultaDeResoluciones#deContribuyente(long)", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put("ConsultarDeuda#deudaActualizadaA(CriterioDeDeuda)", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "ImportarValoresACoactiva#importar(Peticion, Observacion)", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "InsumosNormativosDeLaLiquidacion#conjuntoQueUsa(LineaDeLiquidacion)", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "InsumosNormativosDeLaLiquidacion#de(LineaDeLiquidacion)", SIN_DUENO);
+                "InsumosNormativosDeLaLiquidacion#de(LineaDeLiquidacion)",
+                "La valorizacion de la liquidacion de fiscalizacion espera las cifras de D-02a: esta escrita para que el dia que lleguen no haya que escribirla (#49, bloqueado)");
         SIN_LLAMADOR_CON_MOTIVO.put(
                 "MantenerCatalogoDeInfracciones#modificar(Familia, String, CodigoInfraccion, Observacion)",
-                SIN_DUENO);
+                "Sin ruta ni pantalla: si el catalogo se mantiene desde la aplicacion o llega como dato de ordenanza esta por decidir (#632)");
         SIN_LLAMADOR_CON_MOTIVO.put(
                 "MantenerCatalogoDeInfracciones#registrar(CodigoInfraccion, Observacion)",
-                SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put("ReconstruirPadron#reconstruir(long)", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put("ReconstruirSaldo#conciliar(long)", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put("RegistrarCorridaDeEmision#ultimas(int)", SIN_DUENO);
+                "Por lo mismo que modificar (#632)");
         SIN_LLAMADOR_CON_MOTIVO.put(
-                "RegistrarMovimientoDeDeuda#registrar(MovimientoDeDeuda, RangoDeCuotas, String, Observacion)",
-                SIN_DUENO);
+                "ReconstruirPadron#reconstruir(long)",
+                "La red de seguridad de ADR-0006 no tiene proceso que la corra (#630)");
         SIN_LLAMADOR_CON_MOTIVO.put(
-                "RegistrarMovimientoDeDeuda#registrar(MovimientoDeDeuda, String, Observacion)",
-                SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "ReimprimirActoCoactivo#reimprimir(String, FormatoDeDocumento, Observacion)",
-                SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "SubsanarNotificacion#subsanar(String, LocalDate, Observacion)", SIN_DUENO);
-        SIN_LLAMADOR_CON_MOTIVO.put("ValoresReferenciales#catalogoDe(Ejercicio)", SIN_DUENO);
+                "ReconstruirSaldo#conciliar(long)",
+                "La conciliacion del saldo contra el libro no tiene proceso que la corra (#630)");
     }
 
     @Test

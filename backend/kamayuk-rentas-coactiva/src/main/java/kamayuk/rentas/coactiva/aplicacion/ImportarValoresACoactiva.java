@@ -110,16 +110,6 @@ public class ImportarValoresACoactiva {
         this.reloj = reloj;
     }
 
-    /** Importa a la fecha de hoy, con la plantilla de numeracion vigente. */
-    @Transactional
-    public InformeDeImportacion importar(Peticion peticion, Observacion observacion) {
-        return importar(
-                peticion,
-                LocalDate.now(reloj),
-                PlantillaDeNumeroDeExpediente.POR_OMISION,
-                observacion);
-    }
-
     /**
      * Importa a una fecha explicita.
      *

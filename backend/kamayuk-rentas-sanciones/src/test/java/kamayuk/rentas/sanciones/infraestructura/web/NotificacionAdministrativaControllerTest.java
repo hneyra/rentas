@@ -8,6 +8,7 @@ import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarNotificacionAdministrativa;
+import kamayuk.rentas.sanciones.aplicacion.SubsanarNotificacion;
 import kamayuk.rentas.sanciones.dobles.PadronDeMentira;
 import kamayuk.rentas.sanciones.dominio.CriterioDeNotificacion;
 import kamayuk.rentas.sanciones.dominio.EstadoDeNotificacion;
@@ -27,13 +28,24 @@ import tools.jackson.databind.json.JsonMapper;
 @DisplayName("Capa web — POST /api/v1/infracciones/administrativas/notificaciones")
 class NotificacionAdministrativaControllerTest {
 
+    /** El dia de las pruebas de la subsanacion (#611). */
+    private static final java.time.Clock RELOJ =
+            java.time.Clock.fixed(
+                    java.time.Instant.parse("2026-09-26T15:00:00Z"),
+                    java.time.ZoneId.of("America/Lima"));
+
     private final RepositorioDeMentira repositorio = new RepositorioDeMentira();
     private final RegistrarNotificacionAdministrativa servicio =
             new RegistrarNotificacionAdministrativa(
                     repositorio, new PadronDeMentira(), (RegistroDeAuditoria r) -> {});
 
     private final MockMvc mvc =
-            MockMvcBuilders.standaloneSetup(new NotificacionAdministrativaController(servicio))
+            MockMvcBuilders.standaloneSetup(
+                            new NotificacionAdministrativaController(
+                                    servicio,
+                                    new SubsanarNotificacion(
+                                            repositorio, (RegistroDeAuditoria r) -> {}),
+                                    RELOJ))
                     .setControllerAdvice(new ManejadorDeErrores())
                     .setMessageConverters(
                             new JacksonJsonHttpMessageConverter(

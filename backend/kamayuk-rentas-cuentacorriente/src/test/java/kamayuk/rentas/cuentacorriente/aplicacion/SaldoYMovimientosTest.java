@@ -27,6 +27,7 @@ import kamayuk.rentas.cuentacorriente.dominio.Divergencia;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
 import kamayuk.rentas.cuentacorriente.dominio.MovimientoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.PoliticaDeMora;
+import kamayuk.rentas.cuentacorriente.dominio.RangoDeCuotas;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoProyectado;
 import kamayuk.rentas.cuentacorriente.dominio.SentidoDelMovimiento;
 import kamayuk.rentas.cuentacorriente.dominio.TipoAsiento;
@@ -187,7 +188,7 @@ class SaldoYMovimientosTest {
     void asentarDejaElSaldoAlDia() {
         long titular = crearContribuyente("S-0001", "60100001");
 
-        movimientos.registrar(alta(titular, Dinero.de(1000)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(alta(titular, Dinero.de(1000)), codigoDe(titular), OBSERVACION);
 
         assertThat(saldoDe(titular))
                 .as("el mantenimiento va en la misma transaccion que el asiento (ADR-0006)")
@@ -201,8 +202,8 @@ class SaldoYMovimientosTest {
     void reconstruirDaLoMismoQueElLibro() {
         long titular = crearContribuyente("S-0002", "60100002");
 
-        movimientos.registrar(alta(titular, Dinero.de(1000)), codigoDe(titular), OBSERVACION);
-        movimientos.registrar(baja(titular, Dinero.de(250)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(alta(titular, Dinero.de(1000)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(baja(titular, Dinero.de(250)), codigoDe(titular), OBSERVACION);
 
         List<SaldoProyectado> reconstruidos = reconstruir.deContribuyente(titular);
 
@@ -220,7 +221,7 @@ class SaldoYMovimientosTest {
             "una fila corrompida a proposito: la conciliacion la detecta y la reparacion la repara")
     void laConciliacionDetectaLaCorrupcionYLaReconstruccionLaRepara() throws SQLException {
         long titular = crearContribuyente("S-0003", "60100003");
-        movimientos.registrar(alta(titular, Dinero.de(1000)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(alta(titular, Dinero.de(1000)), codigoDe(titular), OBSERVACION);
 
         corromperElSaldo(titular);
 
@@ -245,7 +246,7 @@ class SaldoYMovimientosTest {
     @DisplayName("la conciliacion no repara: reportar y arreglar son dos actos distintos")
     void laConciliacionNoRepara() throws SQLException {
         long titular = crearContribuyente("S-0004", "60100004");
-        movimientos.registrar(alta(titular, Dinero.de(500)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(alta(titular, Dinero.de(500)), codigoDe(titular), OBSERVACION);
         corromperElSaldo(titular);
 
         reconstruir.conciliar(titular);
@@ -263,8 +264,8 @@ class SaldoYMovimientosTest {
     void laReconstruccionMasivaEsReanudable() throws SQLException {
         long primero = crearContribuyente("S-0010", "60100010");
         long segundo = crearContribuyente("S-0011", "60100011");
-        movimientos.registrar(alta(primero, Dinero.de(100)), codigoDe(primero), OBSERVACION);
-        movimientos.registrar(alta(segundo, Dinero.de(200)), codigoDe(segundo), OBSERVACION);
+        registrarDeUnaCuota(alta(primero, Dinero.de(100)), codigoDe(primero), OBSERVACION);
+        registrarDeUnaCuota(alta(segundo, Dinero.de(200)), codigoDe(segundo), OBSERVACION);
         corromperElSaldo(primero);
         corromperElSaldo(segundo);
 
@@ -282,8 +283,8 @@ class SaldoYMovimientosTest {
     void reanudarNoVuelveATocarLoAnterior() throws SQLException {
         long anterior = crearContribuyente("S-0020", "60100020");
         long posterior = crearContribuyente("S-0021", "60100021");
-        movimientos.registrar(alta(anterior, Dinero.de(100)), codigoDe(anterior), OBSERVACION);
-        movimientos.registrar(alta(posterior, Dinero.de(200)), codigoDe(posterior), OBSERVACION);
+        registrarDeUnaCuota(alta(anterior, Dinero.de(100)), codigoDe(anterior), OBSERVACION);
+        registrarDeUnaCuota(alta(posterior, Dinero.de(200)), codigoDe(posterior), OBSERVACION);
         corromperElSaldo(anterior);
         corromperElSaldo(posterior);
 
@@ -303,12 +304,10 @@ class SaldoYMovimientosTest {
         long titular = crearContribuyente("M-0001", "70100001");
 
         List<Asiento> deAlta =
-                movimientos
-                        .registrar(alta(titular, Dinero.de(1000)), codigoDe(titular), OBSERVACION)
+                registrarDeUnaCuota(alta(titular, Dinero.de(1000)), codigoDe(titular), OBSERVACION)
                         .asientos();
         List<Asiento> deBaja =
-                movimientos
-                        .registrar(baja(titular, Dinero.de(300)), codigoDe(titular), OBSERVACION)
+                registrarDeUnaCuota(baja(titular, Dinero.de(300)), codigoDe(titular), OBSERVACION)
                         .asientos();
 
         assertThat(deAlta).singleElement().extracting(Asiento::id).isNotNull();
@@ -348,11 +347,11 @@ class SaldoYMovimientosTest {
     @DisplayName("una baja mayor que la deuda vigente a su fecha se rechaza")
     void unaBajaMayorQueLaDeudaSeRechaza() {
         long titular = crearContribuyente("M-0003", "70100003");
-        movimientos.registrar(alta(titular, Dinero.de(500)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(alta(titular, Dinero.de(500)), codigoDe(titular), OBSERVACION);
 
         assertThatThrownBy(
                         () ->
-                                movimientos.registrar(
+                                registrarDeUnaCuota(
                                         baja(titular, Dinero.de(501)),
                                         codigoDe(titular),
                                         OBSERVACION))
@@ -364,13 +363,13 @@ class SaldoYMovimientosTest {
     @DisplayName("la baja se compara parte por parte, no solo contra el total")
     void laBajaSeComparaParteAParte() {
         long titular = crearContribuyente("M-0004", "70100004");
-        movimientos.registrar(alta(titular, Dinero.de(500)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(alta(titular, Dinero.de(500)), codigoDe(titular), OBSERVACION);
 
         // El total de la baja (500) no excede el insoluto vigente (500), pero la parte de
         // interes si: se estaria extinguiendo interes que nunca se asento.
         assertThatThrownBy(
                         () ->
-                                movimientos.registrar(
+                                registrarDeUnaCuota(
                                         new MovimientoDeDeuda(
                                                 SentidoDelMovimiento.BAJA,
                                                 clave(titular),
@@ -393,11 +392,11 @@ class SaldoYMovimientosTest {
     @DisplayName("una baja rechazada no deja ningun asiento a medias")
     void unaBajaRechazadaNoDejaAsientosAMedias() {
         long titular = crearContribuyente("M-0005", "70100005");
-        movimientos.registrar(alta(titular, Dinero.de(500)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(alta(titular, Dinero.de(500)), codigoDe(titular), OBSERVACION);
 
         assertThatThrownBy(
                         () ->
-                                movimientos.registrar(
+                                registrarDeUnaCuota(
                                         new MovimientoDeDeuda(
                                                 SentidoDelMovimiento.BAJA,
                                                 clave(titular),
@@ -423,8 +422,8 @@ class SaldoYMovimientosTest {
     @DisplayName("una baja parcial deja la deuda restante consultable y explicable")
     void unaBajaParcialDejaLaDeudaExplicable() {
         long titular = crearContribuyente("M-0006", "70100006");
-        movimientos.registrar(alta(titular, Dinero.de(1000)), codigoDe(titular), OBSERVACION);
-        movimientos.registrar(baja(titular, Dinero.de(400)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(alta(titular, Dinero.de(1000)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(baja(titular, Dinero.de(400)), codigoDe(titular), OBSERVACION);
 
         assertThat(saldoDe(titular))
                 .get()
@@ -440,8 +439,8 @@ class SaldoYMovimientosTest {
     @DisplayName("una baja hasta el total deja el saldo en cero, y se admite")
     void unaBajaHastaElTotalSeAdmite() {
         long titular = crearContribuyente("M-0007", "70100007");
-        movimientos.registrar(alta(titular, Dinero.de(700)), codigoDe(titular), OBSERVACION);
-        movimientos.registrar(baja(titular, Dinero.de(700)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(alta(titular, Dinero.de(700)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(baja(titular, Dinero.de(700)), codigoDe(titular), OBSERVACION);
 
         assertThat(saldoDe(titular))
                 .get()
@@ -455,8 +454,7 @@ class SaldoYMovimientosTest {
         long titular = crearContribuyente("M-0008", "70100008");
 
         RegistrarMovimientoDeDeuda.Registro registro =
-                movimientos.registrar(
-                        alta(titular, Dinero.de(900)), codigoDe(titular), OBSERVACION);
+                registrarDeUnaCuota(alta(titular, Dinero.de(900)), codigoDe(titular), OBSERVACION);
 
         assertThat(registro.numeroDeDocumento())
                 .as("un alta es una nota de abono, y se numera como tal")
@@ -483,11 +481,10 @@ class SaldoYMovimientosTest {
     @DisplayName("una baja se numera como nota de cargo, no como nota de abono")
     void unaBajaSeNumeraComoNotaDeCargo() {
         long titular = crearContribuyente("M-0009", "70100009");
-        movimientos.registrar(alta(titular, Dinero.de(500)), codigoDe(titular), OBSERVACION);
+        registrarDeUnaCuota(alta(titular, Dinero.de(500)), codigoDe(titular), OBSERVACION);
 
         RegistrarMovimientoDeDeuda.Registro registro =
-                movimientos.registrar(
-                        baja(titular, Dinero.de(200)), codigoDe(titular), OBSERVACION);
+                registrarDeUnaCuota(baja(titular, Dinero.de(200)), codigoDe(titular), OBSERVACION);
 
         assertThat(registro.numeroDeDocumento())
                 .as("son dos series distintas: mezclarlas rompe el correlativo de cada una")
@@ -514,7 +511,7 @@ class SaldoYMovimientosTest {
         // quedaba en -148,30 —el estado que BajaMayorQueLaDeuda declara imposible—.
         assertThatThrownBy(
                         () ->
-                                movimientos.registrar(
+                                registrarDeUnaCuota(
                                         bajaDelPredio7(
                                                 titular, 1, "148.30", LocalDate.of(2026, 3, 1)),
                                         codigoDe(titular),
@@ -747,7 +744,7 @@ class SaldoYMovimientosTest {
     /** Solo para no repetir {@code .asientos()} en las llamadas con movimiento en linea. */
     private static List<Asiento> registrarYObtenerAsientos(
             MovimientoDeDeuda movimiento, String codigo, Observacion observacion) {
-        return movimientos.registrar(movimiento, codigo, observacion).asientos();
+        return registrarDeUnaCuota(movimiento, codigo, observacion).asientos();
     }
 
     private static String codigoDe(long titular) {
@@ -792,4 +789,18 @@ class SaldoYMovimientosTest {
                     return TitularidadDeLaUnidad.fueraDelPadron();
                 }
             };
+
+    /**
+     * El acto sobre la cuota que su clave nombra, por la firma que usa la ruta (#611): las dos
+     * sobrecargas cortas de {@code RegistrarMovimientoDeDeuda} solo las llamaban las pruebas.
+     */
+    private static RegistrarMovimientoDeDeuda.Registro registrarDeUnaCuota(
+            MovimientoDeDeuda movimiento, String codigoContribuyente, Observacion observacion) {
+        return movimientos.registrar(
+                movimiento,
+                RangoDeCuotas.deUnaSola(movimiento.clave().periodo()),
+                RegistrarMovimientoDeDeuda.ComprobacionDeUnidad.NO_APLICA,
+                codigoContribuyente,
+                observacion);
+    }
 }

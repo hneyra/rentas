@@ -15,7 +15,6 @@ import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.nucleo.dominio.CambioDePlaca;
 import kamayuk.rentas.nucleo.dominio.CriterioDeVehiculo;
 import kamayuk.rentas.nucleo.dominio.EstadoVehiculo;
-import kamayuk.rentas.nucleo.dominio.MarcaYModelo;
 import kamayuk.rentas.nucleo.dominio.Transferencia;
 import kamayuk.rentas.nucleo.dominio.TransferenciaRepository;
 import kamayuk.rentas.nucleo.dominio.ValorReferencial;
@@ -171,11 +170,6 @@ class DeterminacionVehicularDeUnSoloConjuntoTest {
         @Override
         public List<String> categorias(IdentificadorDeConjunto conjunto) {
             return List.of("M1");
-        }
-
-        @Override
-        public List<MarcaYModelo> catalogo(IdentificadorDeConjunto conjunto) {
-            return List.of();
         }
     }
 

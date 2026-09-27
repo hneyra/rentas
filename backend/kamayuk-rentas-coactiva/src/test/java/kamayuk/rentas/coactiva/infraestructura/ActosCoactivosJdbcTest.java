@@ -1084,8 +1084,11 @@ class ActosCoactivosJdbcTest {
             ReimprimirActoCoactivo.Reimpresion duplicado =
                     enTransaccion(
                             () ->
-                                    reimprimir.reimprimir(
-                                            rec1.acto().numero(),
+                                    // Por donde la reimprime la ruta (#611): el expediente y el
+                                    // tipo, que es lo que quien opera marca.
+                                    reimprimir.delExpediente(
+                                            expediente,
+                                            TipoDeActoCoactivo.REC1,
                                             FormatoDeDocumento.PDF,
                                             Observacion.de("Lo pide el obligado")));
 
@@ -1128,7 +1131,7 @@ class ActosCoactivosJdbcTest {
         @DisplayName("si el renderizador cambia, la reimpresion FALLA en vez de dar otro papel")
         void siElRenderizadorCambiaLaReimpresionFalla() {
             String expediente = expedienteConDeuda("D-0004");
-            ActoCoactivo rec1 = dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null).acto();
+            dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null);
 
             // La unica forma real de que la reimpresion difiera es que cambie el dibujo entre la
             // emision y el duplicado: los datos son los mismos, estan guardados. Se simula con un
@@ -1145,8 +1148,9 @@ class ActosCoactivosJdbcTest {
                             () ->
                                     enTransaccion(
                                             () ->
-                                                    conOtroDibujo.reimprimir(
-                                                            rec1.numero(),
+                                                    conOtroDibujo.delExpediente(
+                                                            expediente,
+                                                            TipoDeActoCoactivo.REC1,
                                                             FormatoDeDocumento.PDF,
                                                             PORQUE)))
                     .isInstanceOf(EmitirDocumento.LaReimpresionNoCoincide.class)

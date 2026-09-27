@@ -2675,11 +2675,6 @@ class PredialControllerTest {
         }
 
         @Override
-        public java.util.List<kamayuk.rentas.nucleo.dominio.CorridaDeEmision> ultimas(int cuantas) {
-            return guardadas.reversed().stream().limit(cuantas).toList();
-        }
-
-        @Override
         public kamayuk.rentas.compartido.Pagina<
                         kamayuk.rentas.nucleo.dominio.CorridaDeEmision.Observado>
                 observadosDe(long corridaId, kamayuk.rentas.compartido.Paginacion paginacion) {
@@ -2718,11 +2713,6 @@ class PredialControllerTest {
         public java.util.Optional<kamayuk.rentas.nucleo.dominio.CorridaDeEmision> ultimaEmisionDe(
                 kamayuk.rentas.dominio.Ejercicio ejercicio) {
             return java.util.Optional.empty();
-        }
-
-        @Override
-        public java.util.List<kamayuk.rentas.nucleo.dominio.CorridaDeEmision> ultimas(int cuantas) {
-            return java.util.List.of();
         }
 
         @Override

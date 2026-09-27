@@ -28,7 +28,23 @@ public interface VehiculoRepository {
     /** El padron vehicular que pide el criterio, paginado, con el titular ya resuelto (#25). */
     Pagina<VehiculoEncontrado> buscar(CriterioDeVehiculo criterio, Paginacion paginacion);
 
+    /**
+     * Guarda el vehiculo.
+     *
+     * @throws PlacaRepetida si la placa ya la lleva otro vehiculo; lo decide {@code
+     *     vehiculo_placa_uq}, no un {@code SELECT} previo (#611)
+     */
     Vehiculo save(Vehiculo vehiculo);
+
+    /** La placa ya la lleva otro vehiculo de esta municipalidad (#611). */
+    final class PlacaRepetida extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public PlacaRepetida(String mensaje, Throwable causa) {
+            super(mensaje, causa);
+        }
+    }
 
     /**
      * Las placas que este vehiculo ha tenido, de la mas reciente a la mas antigua.

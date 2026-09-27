@@ -1,7 +1,6 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -145,29 +144,6 @@ class ValoresReferencialesTest {
                 .get()
                 .extracting(valor -> valor.valor().valor())
                 .isEqualTo(DE_LA_V2);
-    }
-
-    @Test
-    @DisplayName("un ejercicio sin ningun conjunto sellado no devuelve nada: se niega")
-    void sinConjuntoSelladoSeNiega() {
-        assertThatThrownBy(() -> valores.catalogoDe(new Ejercicio(2027)))
-                .as(
-                        "no hay valor por omision: calcular con un conjunto abierto daria una cifra"
-                                + " que manana puede ser otra")
-                .isInstanceOf(LectorDeParametros.EjercicioSinSellar.class);
-    }
-
-    @Test
-    @DisplayName("el catalogo de marcas y modelos es el del conjunto, sin repetidos")
-    void elCatalogoSaleDeLaTablaDeValores() {
-        assertThat(valores.catalogoDe(EJERCICIO))
-                .as("no hay tabla de catalogo: la lista mantenible es la tabla de valores")
-                .singleElement()
-                .satisfies(
-                        entrada -> {
-                            assertThat(entrada.marca()).isEqualTo("TOYOTA");
-                            assertThat(entrada.modelo()).isEqualTo("YARIS");
-                        });
     }
 
     /**

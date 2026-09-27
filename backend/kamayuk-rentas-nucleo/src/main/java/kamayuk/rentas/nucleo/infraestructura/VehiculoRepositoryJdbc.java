@@ -21,6 +21,7 @@ import kamayuk.rentas.nucleo.dominio.VehiculoEncontrado;
 import kamayuk.rentas.nucleo.dominio.VehiculoRepository;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -213,9 +214,11 @@ public class VehiculoRepositoryJdbc extends RepositorioJdbc implements VehiculoR
     private Vehiculo actualizar(Vehiculo vehiculo) {
         long id =
                 Objects.requireNonNull(vehiculo.id(), "Un vehiculo existente tiene identificador");
-        int filas =
-                jdbc().sql(
-                                """
+        int filas;
+        try {
+            filas =
+                    jdbc().sql(
+                                    """
                                 UPDATE vehiculo
                                    SET placa = :placa,
                                        contribuyente_id = :contribuyente,
@@ -231,9 +234,18 @@ public class VehiculoRepositoryJdbc extends RepositorioJdbc implements VehiculoR
                                        fecha_adquisicion = :fechaAdquisicion
                                  WHERE id = :id
                                 """)
-                        .params(parametros(vehiculo))
-                        .param("id", id)
-                        .update();
+                            .params(parametros(vehiculo))
+                            .param("id", id)
+                            .update();
+        } catch (DuplicateKeyException repetida) {
+            // `vehiculo_placa_uq` compara la placa sin el guion: dos vehiculos con la misma no se
+            // distinguen en una papeleta. Hasta #611 salia 500 con incidencia.
+            throw new PlacaRepetida(
+                    "La placa "
+                            + vehiculo.placa()
+                            + " ya la lleva otro vehiculo de esta municipalidad",
+                    repetida);
+        }
         if (filas != 1) {
             throw new IllegalStateException("No se actualizo el vehiculo " + id);
         }

@@ -169,14 +169,6 @@ public class CorridaDeEmisionRepositoryJdbc extends RepositorioJdbc
     }
 
     @Override
-    public List<CorridaDeEmision> ultimas(int cuantas) {
-        return jdbc().sql("SELECT " + COLUMNAS + " FROM corrida_predial ORDER BY id DESC LIMIT :n")
-                .param("n", cuantas)
-                .query(CorridaDeEmisionRepositoryJdbc::mapear)
-                .list();
-    }
-
-    @Override
     public Pagina<CorridaDeEmision.Observado> observadosDe(long corridaId, Paginacion paginacion) {
         String desde = " FROM corrida_predial_observado WHERE corrida_id = :corrida";
         return paginar(

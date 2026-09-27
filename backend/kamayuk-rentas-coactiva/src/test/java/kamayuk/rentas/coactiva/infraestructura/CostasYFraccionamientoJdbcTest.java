@@ -1846,12 +1846,19 @@ class CostasYFraccionamientoJdbcTest {
 
             pagarLasCostas(expediente);
 
+            // Por la misma lectura que la ruta (#611): `porNumero` era un atajo que solo usaba esta
+            // prueba.
             ConsultaDeCostas.LiquidacionEnConsulta despues =
                     enTransaccion(
                                     () ->
-                                            consultaDeCostas.porNumero(
-                                                    liquidacion.numero(), LIQUIDACION))
-                            .orElseThrow();
+                                            consultaDeCostas.buscar(
+                                                    new CriterioDeLiquidaciones(
+                                                            liquidacion.numero(), null, null),
+                                                    LIQUIDACION,
+                                                    null,
+                                                    Paginacion.de(0, 20, "fecha")))
+                            .contenido()
+                            .get(0);
             assertThat(despues.estado())
                     .as("cancelada porque el libro lo dice, no porque nadie escribiera una C")
                     .isEqualTo(EstadoDeLaLiquidacion.CANCELADA);

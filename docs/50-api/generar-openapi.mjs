@@ -2065,6 +2065,21 @@ const OPERACIONES_ADICIONALES = {
   // propia resolucion, de tipo RECURSO. Hasta #412 el unico camino era dictar la ordinaria o la
   // sancionadora con `nDeExpediente`, y un recurso presentado despues de las dos no tenia ninguna
   // ruta: las dos son unicas por papeleta.
+  // `adm_notificacion` declara el alta; #611 le anade la subsanacion, que cierra la
+  // notificacion sin papeleta ni deuda (#47 AC2) y que hasta aqui no tenia ruta.
+  adm_notificacion: [
+    {
+      operationId: 'subsanar_notificacion_administrativa',
+      metodo: 'post',
+      ruta: '/api/v1/infracciones/administrativas/notificaciones/{numero}/subsanacion',
+      descripcionesDeRuta: { numero: 'Numero de la notificacion' },
+      titulo: 'Subsanacion de una notificacion administrativa',
+      descripcion:
+        'Cierra la notificacion por subsanacion (#47 AC2): sin papeleta ni deuda, solo cambia su' +
+        ' estado a SUBSANADA. La fecha es la del acto —sin ella, hoy— y no puede ser futura; una' +
+        ' notificacion que ya no esta EMITIDA, o cuyo plazo vencio a esa fecha, es 409.',
+    },
+  ],
   transito_descargos: [
     {
       operationId: 'resolver_recurso',
@@ -2836,6 +2851,18 @@ const OPERACIONES_ADICIONALES = {
         \`domicilioFiscal\` puede ser nulo: un contribuyente recién dado de alta todavía no
         tiene ninguno, y decirlo es más honesto que devolver el último que hubo (regla 9).
       `),
+    },
+    {
+      operationId: 'cambiar_placa_vehiculo',
+      metodo: 'post',
+      ruta: '/api/v1/rentas/vehiculos/{placa}/placa',
+      descripcionesDeRuta: { placa: 'La placa que el vehiculo lleva hoy' },
+      titulo: 'Cambio de placa de un vehiculo',
+      descripcion:
+        'Cambia la placa del vehiculo, dejando traza en la auditoria (#611): es lo que llena el' +
+        ' `historialDePlacas` de la ficha, que hasta aqui salia siempre vacio. Las papeletas NO se' +
+        ' tocan: cuelgan del identificador del vehiculo y cada una conserva la placa que escribio' +
+        ' su acta. Una placa que ya lleva otro vehiculo es 409, y la misma que ya tiene tambien.',
     },
     {
       operationId: 'vehiculos_del_contribuyente',

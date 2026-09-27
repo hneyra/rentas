@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import kamayuk.rentas.catastro.AntiEntropia;
 import kamayuk.rentas.catastro.HuellasDelPadronDeCatastro;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
@@ -45,24 +44,5 @@ public class HuellasDelPadronHttp implements HuellasDelPadronDeCatastro {
                             fila.path("huella").asString("")));
         }
         return List.copyOf(sectores);
-    }
-
-    @Override
-    public List<HuellaDeLote> deUnSector(@Nullable String sectorCodigo) {
-        StringBuilder ruta = new StringBuilder(RUTA).append("?detalle=true");
-        ClienteHttpDeCatastro.anadir(ruta, "sector", sectorCodigo);
-
-        JsonNode cuerpo =
-                catastro.pedir(
-                        ruta.toString(),
-                        "leer las huellas del sector "
-                                + (sectorCodigo == null ? "sin sectorizar" : sectorCodigo));
-        List<HuellaDeLote> lotes = new ArrayList<>();
-        for (JsonNode fila : cuerpo.path("lotes")) {
-            lotes.add(
-                    new HuellaDeLote(
-                            fila.path("predioId").asLong(), fila.path("huella").asString("")));
-        }
-        return List.copyOf(lotes);
     }
 }

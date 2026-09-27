@@ -3594,6 +3594,19 @@
     "estado": "texto",
     "usuarioRegistro": "texto"
   },
+  "POST /infracciones/administrativas/notificaciones/{numero}/subsanacion": {
+    "id": "entero",
+    "numero": "texto",
+    "fecha": "texto",
+    "contribuyenteId": "entero",
+    "predioId": "entero",
+    "direccion": "texto",
+    "motivo": "texto",
+    "plazoDias": "entero",
+    "vencimiento": "texto",
+    "estado": "texto",
+    "usuarioRegistro": "texto"
+  },
   "POST /infracciones/administrativas/reportes": "objeto",
   "POST /infracciones/administrativas/resoluciones": {
     "id": "entero",
@@ -4385,6 +4398,28 @@
         "origenDeLaBase": "texto",
         "montoDeterminado": "texto",
         "simulacion": "booleano"
+      }
+    ]
+  },
+  "POST /rentas/vehiculos/{placa}/placa": {
+    "id": "entero",
+    "placa": "texto",
+    "contribuyenteId": "entero",
+    "marca": "texto",
+    "modelo": "texto",
+    "categoria": "texto",
+    "anioFabricacion": "entero",
+    "anioInscripcion": "entero",
+    "numeroMotor": "texto",
+    "numeroSerie": "texto",
+    "estado": "texto",
+    "historialDePlacas": [
+      {
+        "anterior": "texto",
+        "nueva": "texto",
+        "usuario": "texto",
+        "fecha": "instante",
+        "observacion": "texto"
       }
     ]
   },

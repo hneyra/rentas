@@ -19,7 +19,6 @@ import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeObligacion;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeSaldo;
 import kamayuk.rentas.cuentacorriente.dominio.ConstanciaDeNoAdeudo;
-import kamayuk.rentas.cuentacorriente.dominio.CriterioDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.CriterioDeDeudaPorContribuyente;
 import kamayuk.rentas.cuentacorriente.dominio.DeudaActualizada;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
@@ -70,18 +69,6 @@ public class ConsultarDeuda {
         this.calculo = calculo;
         this.redondeo = redondeo;
         this.reloj = reloj;
-    }
-
-    /**
-     * La deuda de una obligacion, a la fecha de corte del criterio.
-     *
-     * <p>La fecha no la elige este metodo: la trae {@link CriterioDeDeuda#fecha()}, que quien llama
-     * ya resolvio —a hoy, con {@link #hoy()}, o a una fecha pasada—.
-     */
-    @Transactional(readOnly = true)
-    public DeudaActualizada deudaActualizadaA(CriterioDeDeuda criterio) {
-        List<Asiento> asientos = repositorio.paraDeuda(criterio);
-        return calculo.deudaActualizadaA(asientos, criterio.fecha(), redondeo);
     }
 
     /**

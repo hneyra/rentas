@@ -33,6 +33,7 @@ import kamayuk.rentas.cuentacorriente.dominio.ClaveDeSaldo;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
 import kamayuk.rentas.cuentacorriente.dominio.MovimientoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.ObligacionConDeuda;
+import kamayuk.rentas.cuentacorriente.dominio.RangoDeCuotas;
 import kamayuk.rentas.cuentacorriente.dominio.SentidoDelMovimiento;
 import kamayuk.rentas.cuentacorriente.infraestructura.AsientoRepositoryJdbc;
 import kamayuk.rentas.cuentacorriente.infraestructura.SaldoRepositoryJdbc;
@@ -53,6 +54,7 @@ import kamayuk.rentas.dominio.Placa;
 import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
+import kamayuk.rentas.nucleo.aplicacion.CambiarPlaca;
 import kamayuk.rentas.nucleo.aplicacion.ConsultaDeVehiculos;
 import kamayuk.rentas.nucleo.aplicacion.TitularesDeLaUnidadRentas;
 import kamayuk.rentas.nucleo.dominio.Vehiculo;
@@ -126,6 +128,8 @@ class AltaDeDeudaSobreUnVehiculoFronteraTest {
     private static long vehiculo;
     private static long ajeno;
     private static MockMvc mvc;
+    private static VehiculoRepositoryJdbc vehiculos;
+    private static TenantTransactionManager gestor;
     private static RegistrarMovimientoDeDeuda movimientos;
     private static ConsultarDeuda deuda;
     private static TransactionTemplate transaccion;
@@ -143,10 +147,10 @@ class AltaDeDeudaSobreUnVehiculoFronteraTest {
         pool.setPassword(base.clave(BaseDeDatosDePrueba.APP));
 
         JdbcClient jdbc = JdbcClient.create(pool);
-        TenantTransactionManager gestor = new TenantTransactionManager(pool);
+        gestor = new TenantTransactionManager(pool);
         transaccion = new TransactionTemplate(gestor);
 
-        VehiculoRepositoryJdbc vehiculos = new VehiculoRepositoryJdbc(jdbc);
+        vehiculos = new VehiculoRepositoryJdbc(jdbc);
         AsientoRepositoryJdbc asientos = new AsientoRepositoryJdbc(jdbc);
         AuditoriaJdbc auditoria = new AuditoriaJdbc(jdbc, RELOJ);
         JsonMapper json =
@@ -196,7 +200,7 @@ class AltaDeDeudaSobreUnVehiculoFronteraTest {
                                 RELOJ),
                         gestor);
 
-        vehiculo = sembrarVehiculo(vehiculos, gestor);
+        vehiculo = sembrarVehiculo(PLACA);
 
         ConsultaDeVehiculos consulta =
                 envolver(
@@ -205,7 +209,11 @@ class AltaDeDeudaSobreUnVehiculoFronteraTest {
                         new ConsultaDeVehiculos(vehiculos, (quien, cuando) -> List.of()), gestor);
         mvc =
                 MockMvcBuilders.standaloneSetup(
-                                new VehiculoController(consulta, new DirectorioDeUno(), RELOJ),
+                                new VehiculoController(
+                                        consulta,
+                                        envolver(new CambiarPlaca(vehiculos, auditoria), gestor),
+                                        new DirectorioDeUno(),
+                                        RELOJ),
                                 new MovimientosDeDeudaController(
                                         movimientos,
                                         envolver(new ConsultasDelLibro(asientos), gestor),
@@ -334,6 +342,46 @@ class AltaDeDeudaSobreUnVehiculoFronteraTest {
         assertThat(resultado.getResponse().getContentAsString())
                 .contains("999999")
                 .contains("no esta en el padron de esta municipalidad");
+    }
+
+    /**
+     * #611 — el cambio de placa tiene ruta, y deja el historial que la ficha publica.
+     *
+     * <p>Hasta #611 {@code CambiarPlaca} no lo llamaba nada, y era lo unico que escribe la
+     * auditoria de la que {@code historialDePlacas} lee: ese campo publicado salia siempre vacio.
+     */
+    @Test
+    @DisplayName("#611 — cambiar la placa es 200, y la ficha trae el cambio en su historial")
+    void cambiarLaPlacaDejaHistorial() throws Exception {
+        sembrarVehiculo("C6A-611");
+        fijarContexto(); // la siembra limpia el contexto al salir
+
+        MvcResult resultado = cambiarLaPlaca("C6A-611", "C6B-611");
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(resultado.getResponse().getContentAsString())
+                .isEqualTo(200);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"placa\":\"C6B-611\"")
+                .as("el historial que hasta #611 salia vacio")
+                .contains("C6A-611");
+    }
+
+    @Test
+    @DisplayName("#611 — la placa de otro vehiculo es 409, no el 500 del indice unico")
+    void laPlacaDeOtroEs409() throws Exception {
+        sembrarVehiculo("C7A-611");
+        sembrarVehiculo("C7B-611");
+        fijarContexto();
+
+        MvcResult resultado = cambiarLaPlaca("C7A-611", "C7B611");
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(resultado.getResponse().getContentAsString())
+                .isEqualTo(409);
+        assertThat(resultado.getResponse().getContentAsString())
+                .doesNotContain("vehiculo_placa_uq")
+                .doesNotContain("incidencia");
     }
 
     @Test
@@ -745,7 +793,7 @@ class AltaDeDeudaSobreUnVehiculoFronteraTest {
     private static void alta(Long vehiculoId, String insoluto, String documento) {
         transaccion.execute(
                 estado ->
-                        movimientos.registrar(
+                        registrarDeUnaCuota(
                                 new MovimientoDeDeuda(
                                         SentidoDelMovimiento.ALTA,
                                         new ClaveDeSaldo(
@@ -767,8 +815,7 @@ class AltaDeDeudaSobreUnVehiculoFronteraTest {
                                 Observacion.de("Deuda vehicular migrada del sistema anterior")));
     }
 
-    private static long sembrarVehiculo(
-            VehiculoRepositoryJdbc vehiculos, TenantTransactionManager gestor) {
+    private static long sembrarVehiculo(String placa) {
         TenantContext.fijar(new MunicipalidadId(municipalidad));
         OrigenContext.fijar(new Origen("prueba", null, null));
         try {
@@ -779,7 +826,7 @@ class AltaDeDeudaSobreUnVehiculoFronteraTest {
                                             estado ->
                                                     vehiculos.save(
                                                             Vehiculo.nuevo(
-                                                                    Placa.de(PLACA),
+                                                                    Placa.de(placa),
                                                                     contribuyente,
                                                                     "TOYOTA",
                                                                     "YARIS",
@@ -791,6 +838,18 @@ class AltaDeDeudaSobreUnVehiculoFronteraTest {
             TenantContext.limpiar();
             OrigenContext.limpiar();
         }
+    }
+
+    private MvcResult cambiarLaPlaca(String placa, String nueva) throws Exception {
+        return mvc.perform(
+                        post("/rentas/api/v1/rentas/vehiculos/" + placa + "/placa")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"placaNueva\":\""
+                                                + nueva
+                                                + "\",\"observacion\":\"Cambio de placa por"
+                                                + " duplicado de SUNARP\"}"))
+                .andReturn();
     }
 
     @SuppressWarnings("unchecked")
@@ -1024,5 +1083,19 @@ class AltaDeDeudaSobreUnVehiculoFronteraTest {
      */
     private static String conCausal(String cuerpo) {
         return cuerpo.replace("\"observacion\"", "\"causal\":\"ERROR_MATERIAL\",\"observacion\"");
+    }
+
+    /**
+     * El acto sobre la cuota que su clave nombra, por la firma que usa la ruta (#611): las dos
+     * sobrecargas cortas de {@code RegistrarMovimientoDeDeuda} solo las llamaban las pruebas.
+     */
+    private static RegistrarMovimientoDeDeuda.Registro registrarDeUnaCuota(
+            MovimientoDeDeuda movimiento, String codigoContribuyente, Observacion observacion) {
+        return movimientos.registrar(
+                movimiento,
+                RangoDeCuotas.deUnaSola(movimiento.clave().periodo()),
+                RegistrarMovimientoDeDeuda.ComprobacionDeUnidad.NO_APLICA,
+                codigoContribuyente,
+                observacion);
     }
 }

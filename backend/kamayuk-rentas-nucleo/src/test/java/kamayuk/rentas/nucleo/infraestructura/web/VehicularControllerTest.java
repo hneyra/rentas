@@ -30,7 +30,6 @@ import kamayuk.rentas.nucleo.aplicacion.RegistrarDeterminacionVehicular;
 import kamayuk.rentas.nucleo.aplicacion.ValoresReferenciales;
 import kamayuk.rentas.nucleo.dominio.CambioDePlaca;
 import kamayuk.rentas.nucleo.dominio.CriterioDeVehiculo;
-import kamayuk.rentas.nucleo.dominio.MarcaYModelo;
 import kamayuk.rentas.nucleo.dominio.Transferencia;
 import kamayuk.rentas.nucleo.dominio.TransferenciaRepository;
 import kamayuk.rentas.nucleo.dominio.ValorReferencial;
@@ -975,11 +974,6 @@ class VehicularControllerTest {
         @Override
         public List<String> categorias(IdentificadorDeConjunto conjunto) {
             return categoriasDelCuadro;
-        }
-
-        @Override
-        public List<MarcaYModelo> catalogo(IdentificadorDeConjunto conjunto) {
-            return List.of();
         }
     }
 

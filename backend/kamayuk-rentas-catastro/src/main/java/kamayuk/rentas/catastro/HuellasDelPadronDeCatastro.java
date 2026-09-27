@@ -1,7 +1,6 @@
 package kamayuk.rentas.catastro;
 
 import java.util.List;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Lo que el padron de {@code catastro} dice de si mismo. El puerto de la anti-entropia.
@@ -15,15 +14,4 @@ public interface HuellasDelPadronDeCatastro {
 
     /** Una cifra por sector. Es lo que se compara a diario. */
     List<AntiEntropia.HuellaDeSector> porSector();
-
-    /**
-     * El detalle de UN sector: sus lotes con su huella.
-     *
-     * <p>Solo se pide del sector que no cuadro. Pedirlo siempre seria leer el catastro entero cada
-     * dia, que es exactamente lo que la escalera de huellas existe para no hacer.
-     */
-    List<HuellaDeLote> deUnSector(@Nullable String sectorCodigo);
-
-    /** La huella de un lote del origen. */
-    record HuellaDeLote(long predioId, String huella) {}
 }

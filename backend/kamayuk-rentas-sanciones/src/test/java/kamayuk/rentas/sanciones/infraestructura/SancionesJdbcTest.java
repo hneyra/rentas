@@ -92,6 +92,7 @@ import kamayuk.rentas.sanciones.aplicacion.RegistrarInternamiento;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarNotificacionAdministrativa;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ResolverConResolucionDeGerencia;
+import kamayuk.rentas.sanciones.aplicacion.SubsanarNotificacion;
 import kamayuk.rentas.sanciones.dobles.CobrosDeMentira;
 import kamayuk.rentas.sanciones.dominio.ActoDeLaPapeleta;
 import kamayuk.rentas.sanciones.dominio.AcuseDelActo;
@@ -476,7 +477,13 @@ class SancionesJdbcTest {
                                                         new NotificacionAdministrativaRepositoryJdbc(
                                                                 jdbc),
                                                         padron,
-                                                        auditoria))))
+                                                        auditoria)),
+                                        envolver(
+                                                new SubsanarNotificacion(
+                                                        new NotificacionAdministrativaRepositoryJdbc(
+                                                                jdbc),
+                                                        auditoria)),
+                                        RELOJ))
                         .setControllerAdvice(new ManejadorDeErrores())
                         .setMessageConverters(
                                 new JacksonJsonHttpMessageConverter(
@@ -3222,6 +3229,82 @@ class SancionesJdbcTest {
 
     /** Lo que un rechazo contesta, y las lineas ERROR que dejo en el registro del manejador. */
     private record Rechazo(int estado, String cuerpo, List<String> errores) {}
+
+    /**
+     * #611 — la subsanacion de una notificacion administrativa tiene ruta.
+     *
+     * <p>{@code SubsanarNotificacion} existia desde #47 y nada la llamaba: {@code SUBSANADA}, que
+     * la tabla admite desde la baseline, no la escribia nada en produccion.
+     */
+    @Nested
+    @DisplayName("#611 — POST /infracciones/administrativas/notificaciones/{numero}/subsanacion")
+    class LaSubsanacionTieneRuta {
+
+        private static final String RUTA =
+                "/rentas/api/v1/infracciones/administrativas/notificaciones";
+
+        private MvcResult registrar(String numero, @Nullable Integer plazoDias) throws Exception {
+            return enviar(
+                    post(RUTA),
+                    "{\"observacion\":\"Notificacion previa de la prueba\",\"numero\":\""
+                            + numero
+                            + "\",\"fecha\":\"2026-03-10\",\"direccion\":\"Av. Grau 100\","
+                            + "\"motivo\":\"Construccion sin licencia\""
+                            + (plazoDias == null ? "" : ",\"plazoDias\":" + plazoDias)
+                            + "}");
+        }
+
+        private MvcResult subsanar(String numero, String cuerpo) throws Exception {
+            return enviar(post(RUTA + "/" + numero + "/subsanacion"), cuerpo);
+        }
+
+        @Test
+        @DisplayName("una notificacion emitida se subsana: 200 y queda SUBSANADA, y no dos veces")
+        void seSubsana() throws Exception {
+            assertThat(registrar("NA-611-1", null).getResponse().getStatus()).isEqualTo(201);
+
+            MvcResult hecha =
+                    subsanar(
+                            "na-611-1", "{\"observacion\":\"El administrado regularizo la obra\"}");
+
+            assertThat(hecha.getResponse().getStatus())
+                    .as(hecha.getResponse().getContentAsString())
+                    .isEqualTo(200);
+            assertThat(hecha.getResponse().getContentAsString()).contains("SUBSANADA");
+            assertThat(
+                            subsanar("NA-611-1", "{\"observacion\":\"Otra vez la misma\"}")
+                                    .getResponse()
+                                    .getStatus())
+                    .as("ya no esta EMITIDA")
+                    .isEqualTo(409);
+        }
+
+        @Test
+        @DisplayName("fuera de plazo 409, una fecha futura 422 y un numero que no existe 404")
+        void losRechazos() throws Exception {
+            assertThat(registrar("NA-611-2", 5).getResponse().getStatus()).isEqualTo(201);
+
+            assertThat(
+                            subsanar("NA-611-2", "{\"observacion\":\"Llega tarde a subsanar\"}")
+                                    .getResponse()
+                                    .getStatus())
+                    .as("vencio el 15 de marzo y hoy es 20 de abril")
+                    .isEqualTo(409);
+            assertThat(
+                            subsanar(
+                                            "NA-611-2",
+                                            "{\"fechaSubsanacion\":\"2026-05-01\","
+                                                    + "\"observacion\":\"Con una fecha futura\"}")
+                                    .getResponse()
+                                    .getStatus())
+                    .isEqualTo(422);
+            assertThat(
+                            subsanar("NA-611-NO", "{\"observacion\":\"Una que no existe\"}")
+                                    .getResponse()
+                                    .getStatus())
+                    .isEqualTo(404);
+        }
+    }
 
     private static Rechazo rechazo(Callable<MvcResult> peticion) throws Exception {
         ch.qos.logback.classic.Logger registro =

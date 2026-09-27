@@ -51,13 +51,6 @@ public class CambiarDireccionReferencial {
         this.reloj = reloj;
     }
 
-    /** Cambia la direccion con fecha de hoy. */
-    @Transactional
-    public MovimientoDelExpediente cambiar(
-            String numeroDeExpediente, String nueva, String motivo, Observacion observacion) {
-        return cambiar(numeroDeExpediente, nueva, LocalDate.now(reloj), motivo, observacion);
-    }
-
     /**
      * Cambia la direccion con una fecha explicita.
      *
@@ -129,10 +122,10 @@ public class CambiarDireccionReferencial {
      * La direccion referencial vigente: la del ultimo cambio, o la de apertura si no hubo ninguno.
      *
      * <p>Es la que la pantalla {@code cambiar_direccion_ref} muestra como «Dirección referencial
-     * actual (expediente)» antes de dejar escribir la nueva.
+     * actual (expediente)» antes de dejar escribir la nueva. Solo la lee {@link #cambiar}, dentro
+     * de su transaccion (#611): no hay ruta que la publique suelta.
      */
-    @Transactional(readOnly = true)
-    public @Nullable String vigenteDe(ExpedienteCoactivo expediente) {
+    private @Nullable String vigenteDe(ExpedienteCoactivo expediente) {
         Optional<MovimientoDelExpediente> ultimo =
                 movimientos.ultimoCambioDeDireccion(expediente.identificador());
         return ultimo.map(MovimientoDelExpediente::direccionNueva)

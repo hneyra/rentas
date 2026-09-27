@@ -1,6 +1,5 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
-import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
@@ -62,12 +61,6 @@ public class RegistrarCorridaDeEmision {
     @Transactional(readOnly = true)
     public Optional<CorridaDeEmision> ultimaEmisionDe(Ejercicio ejercicio) {
         return repositorio.ultimaEmisionDe(ejercicio);
-    }
-
-    /** Las ultimas corridas, mas reciente primero. */
-    @Transactional(readOnly = true)
-    public List<CorridaDeEmision> ultimas(int cuantas) {
-        return repositorio.ultimas(cuantas);
     }
 
     /** Los observados de una corrida: la lista de cosas que arreglar. */
