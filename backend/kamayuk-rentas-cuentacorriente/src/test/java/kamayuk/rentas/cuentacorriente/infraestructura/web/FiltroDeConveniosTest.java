@@ -10,7 +10,6 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
@@ -268,11 +267,6 @@ class FiltroDeConveniosTest {
 
         @Override
         public List<Asiento> porDocumentoOrigen(String documentoOrigen) {
-            throw noLoUsa();
-        }
-
-        @Override
-        public Map<String, Dinero> abonadoPorDocumento(Collection<String> documentosOrigen) {
             throw noLoUsa();
         }
 

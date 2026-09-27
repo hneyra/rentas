@@ -368,59 +368,6 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
     }
 
     /**
-     * Lo que cada documento <b>sigue</b> abonando, agrupado en el motor (#36).
-     *
-     * <p>Una sola consulta para todo el turno, con {@code documento_origen IN (…)}: es {@code
-     * asiento_documento_origen_ix} (V30) el que la resuelve por indice en cada particion. Con la
-     * lista vacia no se pregunta nada —{@code IN ()} no es SQL valido— y se devuelve el mapa vacio,
-     * que es la respuesta correcta a «cuanto abonaron cero documentos».
-     *
-     * <p>Dos filtros, y el segundo es el que hace util la respuesta:
-     *
-     * <ul>
-     *   <li>{@code tipo = 'ABONO'}: el cargo con el que la cobranza cristaliza el reajuste y el
-     *       interes devengados no es dinero que entro. Sumarlo daria una cifra que no coincide con
-     *       ningun recibo —el recibo cobra la suma de sus abonos—.
-     *   <li><b>que nadie los haya reversado</b>. Un recibo anulado conserva sus asientos —no se
-     *       borran, se reversan (V2)—, asi que preguntar «cuanto abono» devolveria el importe
-     *       entero de un recibo que ya no vale. Preguntar «cuanto sigue abonado» devuelve cero, que
-     *       es lo que el arqueo necesita: el neto de ese recibo tambien es cero.
-     * </ul>
-     *
-     * <p>Que se resuelva asi y no restando el documento de la anulacion tiene una consecuencia que
-     * importa: quien pregunta <b>no tiene que saber</b> que documento reversa a que otro, ni que la
-     * reversion de un abono se escribe como cargo. Ese conocimiento vive aqui, que es donde vive el
-     * libro.
-     */
-    @Override
-    public Map<String, Dinero> abonadoPorDocumento(java.util.Collection<String> documentosOrigen) {
-        if (documentosOrigen.isEmpty()) {
-            return Map.of();
-        }
-        Map<String, Dinero> abonado = new HashMap<>();
-        jdbc().sql(
-                        "SELECT a.documento_origen, sum(a.monto) AS abonado"
-                                + DESDE
-                                + " WHERE a.documento_origen IN (:documentos)"
-                                + "   AND a.tipo = 'ABONO'"
-                                + "   AND NOT EXISTS ("
-                                + "         SELECT 1 FROM cuenta_corriente_asiento r"
-                                + "          WHERE r.municipalidad_id = a.municipalidad_id"
-                                + "            AND r.asiento_reversado_id = a.id)"
-                                + " GROUP BY a.documento_origen")
-                .param("documentos", List.copyOf(documentosOrigen))
-                .query(
-                        (fila, numeroDeFila) -> {
-                            abonado.put(
-                                    fila.getString("documento_origen"),
-                                    new Dinero(fila.getBigDecimal("abonado")));
-                            return null;
-                        })
-                .list();
-        return Map.copyOf(abonado);
-    }
-
-    /**
      * Los conceptos con los que una cobranza imputa lo que entro por ventanilla.
      *
      * <p>Son <b>exactamente</b> las cuatro partes que {@code RegistroDeAbonos#abonarPagoIntegro}

@@ -18,8 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p><b>No interpreta nada.</b> No sabe que es una papeleta ni que {@code MULTA_TRANSITO} sea una
  * multa: recibe nombres de tributo y devuelve lo que el libro dice de ellos. Quien pregunta es
- * quien sabe que tributos le corresponden, igual que en {@link ConciliacionDeCajaCuentaCorriente}
- * es tesoreria quien sabe cuales de sus recibos abonan.
+ * quien sabe que tributos le corresponden.
  *
  * <p>{@code readOnly = true} y ni un bloqueo: un resumen de recaudacion se mira mientras la
  * ventanilla sigue cobrando, y una lectura que pidiera {@code FOR UPDATE} pondria la cola a esperar

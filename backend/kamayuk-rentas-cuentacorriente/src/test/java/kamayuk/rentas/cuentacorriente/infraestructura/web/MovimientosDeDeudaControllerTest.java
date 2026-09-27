@@ -8,7 +8,6 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
@@ -27,7 +26,6 @@ import kamayuk.rentas.cuentacorriente.dominio.CriterioDePagos;
 import kamayuk.rentas.cuentacorriente.dominio.MovimientoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.RangoDeCuotas;
 import kamayuk.rentas.cuentacorriente.dominio.RecaudacionAgregada;
-import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.web.ConfiguracionDeJson;
@@ -558,11 +556,6 @@ class MovimientosDeDeudaControllerTest {
 
         @Override
         public List<Asiento> porDocumentoOrigen(String documentoOrigen) {
-            throw noLoUsa();
-        }
-
-        @Override
-        public Map<String, Dinero> abonadoPorDocumento(Collection<String> documentosOrigen) {
             throw noLoUsa();
         }
 
