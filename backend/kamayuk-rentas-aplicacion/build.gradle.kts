@@ -84,6 +84,14 @@ dependencies {
 // #192 punto 2, aplicada al contrato: lo destapo #399 al mutar el YAML y ver la
 // prueba dar BUILD SUCCESSFUL sin haber corrido.
 tasks.test {
+    // El heap de la JVM de pruebas, dicho y no heredado. Aqui corren las barreras que importan
+    // TODO el backend —ArchUnit sobre las clases de los diecisiete modulos, los escaneres de
+    // fuentes, el bytecode de `CasosDeUsoSinLlamadorTest` y los censos del contrato—, y con los
+    // 512 MB que Gradle pone por omision la CI salio `OutOfMemoryError: Java heap space` tres veces
+    // seguidas, siempre al terminar `RespuestasDeLaApiTest`: en `main` (run 36281244516) y en dos
+    // PR que no tocaban nada de esto. En el puesto pasaba, que es justo por lo que no avisaba nadie.
+    maxHeapSize = "1g"
+
     inputs
         .file(rootProject.file("../docs/50-api/openapi/rentas-v1.yaml"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
