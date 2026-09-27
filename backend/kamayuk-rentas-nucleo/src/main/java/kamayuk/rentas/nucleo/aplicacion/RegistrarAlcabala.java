@@ -1,6 +1,8 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -151,24 +153,23 @@ public class RegistrarAlcabala {
                         .con(null, descripcion(guardada, eleccion)));
     }
 
-    private static String descripcion(Determinacion determinacion, EleccionDeBase eleccion) {
-        return "{\"tributo\":\"ALCABALA\",\"predioId\":"
-                + determinacion.predioId()
-                + ",\"contribuyenteId\":"
-                + determinacion.contribuyenteId()
-                + ",\"ejercicio\":\""
-                + determinacion.ejercicio()
-                + "\",\"conjuntoId\":"
-                + determinacion.conjuntoId()
-                + ",\"baseImponible\":\""
-                + determinacion.baseImponible()
-                + "\",\"montoDeterminado\":\""
-                + determinacion.montoDeterminado()
-                + "\",\"origenDeLaBase\":\""
-                + eleccion.origen()
-                + "\",\"fundamento\":\""
-                + eleccion.fundamento().replace("\"", "'")
-                + "\"}";
+    private static Map<String, Object> descripcion(
+            Determinacion determinacion, EleccionDeBase eleccion) {
+        // Campos con nombre, no JSON a mano (#434): los escribe `JsonDeAuditoria`, que escapa el
+        // texto libre entero. Una comilla en el texto daba 500, y una clave inyectada se quedaba.
+        // El fundamento va tal cual: hasta #434 se le cambiaban las comillas por apostrofes, y la
+        // auditoria no decia lo que se escribio.
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("tributo", "ALCABALA");
+        campos.put("predioId", determinacion.predioId());
+        campos.put("contribuyenteId", determinacion.contribuyenteId());
+        campos.put("ejercicio", String.valueOf(determinacion.ejercicio()));
+        campos.put("conjuntoId", determinacion.conjuntoId());
+        campos.put("baseImponible", String.valueOf(determinacion.baseImponible()));
+        campos.put("montoDeterminado", String.valueOf(determinacion.montoDeterminado()));
+        campos.put("origenDeLaBase", eleccion.origen());
+        campos.put("fundamento", eleccion.fundamento());
+        return campos;
     }
 
     private static long requerirPredioId(Transferencia transferencia) {

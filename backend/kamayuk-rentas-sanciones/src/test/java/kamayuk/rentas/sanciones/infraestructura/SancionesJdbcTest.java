@@ -2038,6 +2038,84 @@ class SancionesJdbcTest {
         }
     }
 
+    /**
+     * <b>El texto libre llega a la auditoria entero</b> (#434), contra PostgreSQL de verdad: lo que
+     * fallaba es el {@code cast(... AS jsonb)}, y un doble de {@code Auditoria} no lo ve. La
+     * siembra que distingue lleva comilla, barra final, tabulador y salto de linea; con letras
+     * ASCII el JSON a mano y el escrito con su escape dan lo mismo.
+     */
+    @Nested
+    @DisplayName("#434 — el texto libre del acto llega a la auditoria entero, y no inyecta claves")
+    class LaAuditoriaEscapa {
+
+        @Test
+        @DisplayName(
+                "un deposito con comilla, barra, tabulador o salto de linea se interna y se audita")
+        void elDepositoLlegaEntero() {
+            String[] depositos = {
+                "Deposito Municipal \"San Jose\"",
+                "Deposito Central \\",
+                "Deposito\tNorte",
+                "Deposito\nNorte"
+            };
+            for (int i = 0; i < depositos.length; i++) {
+                String deposito = depositos[i];
+                Papeleta papeleta = papeletaDeTransito("K4" + i);
+                RegistrarInternamiento.Internado internado =
+                        internarCon(papeleta, "K4Q-40" + i, deposito);
+
+                assertThat(datoAuditado(internado, "deposito"))
+                        .as(
+                                "hasta #434 la comilla o el tabulador daban 500 por el cast, y se"
+                                        + " revertia el internamiento con su acta")
+                        .isEqualTo(deposito);
+            }
+        }
+
+        @Test
+        @DisplayName("un deposito que trae una clave inyectada no reescribe la placa auditada")
+        void noSeInyectanClaves() {
+            Papeleta papeleta = papeletaDeTransito("K49");
+            RegistrarInternamiento.Internado internado =
+                    internarCon(papeleta, "K4Q-409", "Central\",\"placa\":\"XYZ-999");
+
+            assertThat(datoAuditado(internado, "placa"))
+                    .as("jsonb se quedaba con la ultima clave repetida: la inyectada")
+                    .isEqualTo("K4Q-409");
+        }
+
+        private RegistrarInternamiento.Internado internarCon(
+                Papeleta papeleta, String placa, String deposito) {
+            return enTransaccion(
+                    () ->
+                            internar.internar(
+                                    new RegistrarInternamiento.Peticion(
+                                            placa,
+                                            null,
+                                            papeleta.numero(),
+                                            deposito,
+                                            INGRESO_DE_DIA,
+                                            "CUSTODIA",
+                                            "Conducir sin licencia vigente"),
+                                    FormatoDeDocumento.PDF,
+                                    PORQUE));
+        }
+
+        private String datoAuditado(RegistrarInternamiento.Internado internado, String campo) {
+            return enTransaccion(
+                    () ->
+                            jdbc.sql(
+                                            "SELECT datos_nuevos->>:campo FROM auditoria"
+                                                    + " WHERE tabla = 'internamiento'"
+                                                    + " AND clave = :clave AND operacion = 'ALTA'"
+                                                    + " ORDER BY id DESC LIMIT 1")
+                                    .param("campo", campo)
+                                    .param("clave", String.valueOf(internado.internamiento().id()))
+                                    .query(String.class)
+                                    .single());
+        }
+    }
+
     // ==================================================================
     //  #402 — la anulacion no se fecha antes de la infraccion ni despues de hoy
     // ==================================================================

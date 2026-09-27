@@ -115,6 +115,10 @@ public class OrdenDeCobroController {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(nada));
         } catch (EmitirOrdenDeCobro.ObligacionRepetida repetida) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(repetida));
+        } catch (OrdenesDeCobro.OrdenRechazada rechazada) {
+            // 422 y no 503 (#434): la caja contesto, y lo que contesto es que no. Reintentar no
+            // cambia nada; el motivo es el de la caja.
+            throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(rechazada));
         } catch (OrdenesDeCobro.CajaInalcanzable noContesta) {
             // 503 y no 500: no es un defecto de este servidor, es que el otro no esta. Y no es 422:
             // reintentar SI puede cambiar el resultado, que es justo lo contrario.

@@ -3,6 +3,8 @@ package kamayuk.rentas.tesoreria.infraestructura;
 import kamayuk.rentas.tesoreria.pagos.OrdenesDeCobro;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Da de alta una orden en la caja, por HTTP (P5D, ADR-0026 §1).
@@ -20,6 +22,8 @@ public class OrdenesDeCobroHttp implements OrdenesDeCobro {
 
     private static final String RUTA = "/ordenes-de-cobro";
 
+    private static final JsonMapper JSON = new JsonMapper();
+
     private final ClienteHttpDeCaja caja;
 
     public OrdenesDeCobroHttp(ClienteHttpDeCaja caja) {
@@ -28,45 +32,38 @@ public class OrdenesDeCobroHttp implements OrdenesDeCobro {
 
     @Override
     public Emitida emitir(Peticion peticion) {
-        String cuerpo =
-                "{\"sistemaOrigen\":\"rentas\""
-                        + ",\"referenciaExterna\":\""
-                        + peticion.referencia().texto()
-                        + "\",\"concepto\":\""
-                        + escapar(peticion.concepto())
-                        + "\""
-                        + (peticion.detalle() == null
-                                ? ""
-                                : ",\"detalle\":\"" + escapar(peticion.detalle()) + "\"")
-                        // El importe como CADENA (RNF-055): un numero de coma flotante puede
-                        // volver con otro valor, y esto es el camino del dinero.
-                        + ",\"importe\":\""
-                        + peticion.importe().valor().toPlainString()
-                        + "\",\"fechaExigibilidad\":\""
-                        + peticion.fechaExigibilidad()
-                        + "\",\"actualizadoA\":\""
-                        + peticion.actualizadoA()
-                        + "\""
-                        + (peticion.pagadorDocumento() == null
-                                ? ""
-                                : ",\"pagadorDocumento\":\""
-                                        + escapar(peticion.pagadorDocumento())
-                                        + "\"")
-                        + (peticion.pagadorNombre() == null
-                                ? ""
-                                : ",\"pagadorNombre\":\""
-                                        + escapar(peticion.pagadorNombre())
-                                        + "\"")
-                        + ",\"pagadorIdExterno\":"
-                        + peticion.contribuyenteId()
-                        + ",\"observacion\":\""
-                        + escapar(peticion.observacion().texto())
-                        + "\"}";
+        // Con un `ObjectNode` y no a mano (#434): `put` de una cadena escapa entera —comilla, barra
+        // y caracteres de control—, y ninguna configuracion cambia ese escape. A mano solo se
+        // escapaban la barra y la comilla, y un salto de linea en la observacion hacia que la caja
+        // rechazara la orden con un 422.
+        ObjectNode orden = JSON.createObjectNode();
+        orden.put("sistemaOrigen", "rentas");
+        orden.put("referenciaExterna", peticion.referencia().texto());
+        orden.put("concepto", peticion.concepto());
+        if (peticion.detalle() != null) {
+            orden.put("detalle", peticion.detalle());
+        }
+        // El importe como CADENA (RNF-055): un numero de coma flotante puede volver con otro
+        // valor, y esto es el camino del dinero.
+        orden.put("importe", peticion.importe().valor().toPlainString());
+        orden.put("fechaExigibilidad", peticion.fechaExigibilidad().toString());
+        orden.put("actualizadoA", peticion.actualizadoA().toString());
+        if (peticion.pagadorDocumento() != null) {
+            orden.put("pagadorDocumento", peticion.pagadorDocumento());
+        }
+        if (peticion.pagadorNombre() != null) {
+            orden.put("pagadorNombre", peticion.pagadorNombre());
+        }
+        orden.put("pagadorIdExterno", peticion.contribuyenteId());
+        orden.put("observacion", peticion.observacion().texto());
+        String cuerpo = orden.toString();
 
         JsonNode respuesta;
         try {
             respuesta =
                     caja.publicar(RUTA, cuerpo, "emitir la orden " + peticion.referencia().texto());
+        } catch (ClienteHttpDeCaja.CajaRechaza rechazo) {
+            throw new OrdenesDeCobro.OrdenRechazada(rechazo.getMessage(), rechazo);
         } catch (ClienteHttpDeCaja.CajaInalcanzable noContesta) {
             // Se traduce al tipo del PUERTO, no al del transporte: quien emite ordenes no tiene
             // por que conocer las excepciones del cliente HTTP, y el dia que la caja se llame por
@@ -85,16 +82,5 @@ public class OrdenesDeCobroHttp implements OrdenesDeCobro {
                 ClienteHttpDeCaja.exigirTexto(
                         respuesta, "estado", "emitir la orden " + peticion.referencia().texto()),
                 respuesta.path("nueva").asBoolean(false));
-    }
-
-    /**
-     * Escapa lo que va dentro de una cadena JSON.
-     *
-     * <p>A mano y no con Jackson porque el cuerpo se compone como texto: lo que viaja tiene que ser
-     * exactamente lo que este metodo escribe, y un serializador configurable haria que un cambio de
-     * configuracion cambiara el contrato sin tocar esta clase.
-     */
-    private static String escapar(String texto) {
-        return texto.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

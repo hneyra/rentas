@@ -2,6 +2,8 @@ package kamayuk.rentas.tesoreria.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -308,20 +310,18 @@ public class CerrarConvenio {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(NumeroDeConvenio numero, MovimientoDeConvenio cierre) {
-        return "{\"numero\":\""
-                + numero.impreso()
-                + "\",\"tipo\":\""
-                + cierre.tipo()
-                + "\",\"motivo\":\""
-                + cierre.motivoDelCierre()
-                + "\",\"devuelto\":"
-                + cierre.importe().valor().toPlainString()
-                + ",\"asientos\":"
-                + cierre.asientos()
-                + ",\"fecha\":\""
-                + cierre.fecha()
-                + "\"}";
+    private static Map<String, Object> descripcion(
+            NumeroDeConvenio numero, MovimientoDeConvenio cierre) {
+        // Campos con nombre, no JSON a mano (#434): los escribe `JsonDeAuditoria`, que escapa el
+        // texto libre entero. Una comilla en el texto daba 500, y una clave inyectada se quedaba.
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", numero.impreso());
+        campos.put("tipo", cierre.tipo());
+        campos.put("motivo", cierre.motivoDelCierre());
+        campos.put("devuelto", cierre.importe().valor());
+        campos.put("asientos", cierre.asientos());
+        campos.put("fecha", cierre.fecha());
+        return campos;
     }
 
     /**

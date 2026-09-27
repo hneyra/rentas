@@ -75,7 +75,29 @@ public record RegistroDeAuditoria(
         return new RegistroDeAuditoria(tabla, clave, operacion, observacion, null, null);
     }
 
-    /** El mismo registro con el antes y el despues. */
+    /**
+     * El mismo registro con el antes y el despues como CAMPOS con nombre (#434): los escribe {@link
+     * JsonDeAuditoria}, que es el unico sitio donde se escapan. Es la forma que hay que usar.
+     */
+    public RegistroDeAuditoria con(
+            java.util.@Nullable Map<String, ?> antes, java.util.@Nullable Map<String, ?> despues) {
+        return new RegistroDeAuditoria(
+                tabla,
+                clave,
+                operacion,
+                observacion,
+                JsonDeAuditoria.de(antes),
+                JsonDeAuditoria.de(despues));
+    }
+
+    /**
+     * El mismo registro con el antes y el despues ya escritos como JSON.
+     *
+     * @deprecated desde #434: un JSON compuesto a mano no escapa el texto libre, y una comilla da
+     *     500 o inyecta una clave. Se usa {@link #con(java.util.Map, java.util.Map)}; esta se
+     *     retira cuando el barrido de los sitios que la llaman termine.
+     */
+    @Deprecated
     public RegistroDeAuditoria con(@Nullable String datosAnteriores, @Nullable String datosNuevos) {
         return new RegistroDeAuditoria(
                 tabla, clave, operacion, observacion, datosAnteriores, datosNuevos);

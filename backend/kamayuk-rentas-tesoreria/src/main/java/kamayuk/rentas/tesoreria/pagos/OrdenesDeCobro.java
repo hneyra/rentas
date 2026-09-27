@@ -84,4 +84,20 @@ public interface OrdenesDeCobro {
             super(mensaje, causa);
         }
     }
+
+    /**
+     * La caja contesto y RECHAZO la orden (un 4xx): reintentar no cambia nada (#434).
+     *
+     * <p>No es {@link CajaInalcanzable}: esa manda a revisar un despliegue e invita a reintentar, y
+     * hasta #434 un 422 de la caja salia asi —«la caja no contesta»— cuando la caja habia
+     * contestado exactamente por que. Es un defecto de este lado al componer la orden, y se dice
+     * con el motivo de la caja.
+     */
+    final class OrdenRechazada extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public OrdenRechazada(@Nullable String mensaje, @Nullable Throwable causa) {
+            super(mensaje, causa);
+        }
+    }
 }

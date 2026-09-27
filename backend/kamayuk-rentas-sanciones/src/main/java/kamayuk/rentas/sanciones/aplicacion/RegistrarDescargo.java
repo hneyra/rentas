@@ -2,6 +2,8 @@ package kamayuk.rentas.sanciones.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -170,16 +172,15 @@ public class RegistrarDescargo {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoría. */
-    private static String descripcion(Papeleta papeleta, Descargo descargo) {
-        return "{\"papeleta\":\""
-                + papeleta.numero()
-                + "\",\"expediente\":\""
-                + descargo.numeroExpediente()
-                + "\",\"recurso\":\""
-                + descargo.tipoRecurso()
-                + "\",\"enPlazo\":"
-                + descargo.enPlazo()
-                + "}";
+    private static Map<String, Object> descripcion(Papeleta papeleta, Descargo descargo) {
+        // Campos con nombre, no JSON a mano (#434): los escribe `JsonDeAuditoria`, que escapa el
+        // texto libre entero. Una comilla en el texto daba 500, y una clave inyectada se quedaba.
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("papeleta", papeleta.numero());
+        campos.put("expediente", descargo.numeroExpediente());
+        campos.put("recurso", descargo.tipoRecurso());
+        campos.put("enPlazo", descargo.enPlazo());
+        return campos;
     }
 
     /**
