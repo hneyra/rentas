@@ -1,6 +1,8 @@
 package kamayuk.rentas.fiscalizacion.aplicacion;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -163,8 +165,10 @@ public class AnularActaFiscalizacion {
                 acta, actas.loDeclaradoDeLasActas(java.util.Set.of(actaId)).get(actaId));
     }
 
-    private static String descripcion(ActaFiscalizacion acta) {
-        return "{\"estado\":\"" + acta.estado() + "\"}";
+    private static Map<String, Object> descripcion(ActaFiscalizacion acta) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("estado", acta.estado());
+        return campos;
     }
 
     /**
@@ -172,8 +176,12 @@ public class AnularActaFiscalizacion {
      * ejercicio de su particion —ni siquiera como fecha—; desde #398 la particion es la del dia en
      * que se registra, y el dia de la anulacion, que es un dato del acto, viaja aqui.
      */
-    private static String descripcionDeLaAnulacion(ActaFiscalizacion acta, LocalDate fecha) {
-        return "{\"estado\":\"" + acta.estado() + "\",\"fechaAnulacion\":\"" + fecha + "\"}";
+    private static Map<String, Object> descripcionDeLaAnulacion(
+            ActaFiscalizacion acta, LocalDate fecha) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("estado", acta.estado());
+        campos.put("fechaAnulacion", fecha);
+        return campos;
     }
 
     /**

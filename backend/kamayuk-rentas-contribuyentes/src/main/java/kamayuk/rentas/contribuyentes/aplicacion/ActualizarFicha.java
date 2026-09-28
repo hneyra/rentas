@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
-import kamayuk.rentas.auditoria.JsonDeAuditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.contribuyentes.dominio.Contacto;
@@ -78,8 +77,8 @@ public class ActualizarFicha {
                             previo.id(),
                             Operacion.MODIFICACION,
                             observacion,
-                            JsonDeAuditoria.objeto(descripcion(previo)),
-                            JsonDeAuditoria.objeto(descripcion(cerrado)));
+                            descripcion(previo),
+                            descripcion(cerrado));
                 });
 
         Domicilio guardado = repositorio.guardar(nuevo);
@@ -89,7 +88,7 @@ public class ActualizarFicha {
                 Operacion.ALTA,
                 observacion,
                 null,
-                JsonDeAuditoria.objeto(descripcion(guardado)));
+                descripcion(guardado));
 
         return guardado;
     }
@@ -190,7 +189,7 @@ public class ActualizarFicha {
                 Operacion.ALTA,
                 observacion,
                 null,
-                JsonDeAuditoria.objeto(descripcion(guardado)));
+                descripcion(guardado));
         return guardado;
     }
 
@@ -207,8 +206,8 @@ public class ActualizarFicha {
                 cerrado.id(),
                 Operacion.BAJA,
                 observacion,
-                JsonDeAuditoria.objeto(descripcion(responsable)),
-                JsonDeAuditoria.objeto(descripcion(cerrado)));
+                descripcion(responsable),
+                descripcion(cerrado));
         return cerrado;
     }
 
@@ -222,8 +221,8 @@ public class ActualizarFicha {
             @Nullable Long clave,
             Operacion operacion,
             Observacion observacion,
-            @Nullable String antes,
-            String despues) {
+            @Nullable Map<String, Object> antes,
+            Map<String, Object> despues) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
                                 tabla, String.valueOf(clave), operacion, observacion)

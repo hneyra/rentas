@@ -4,7 +4,9 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -166,15 +168,7 @@ public class AnularLicenciaDeEdificacion {
                                 String.valueOf(registrado.identificador()),
                                 Operacion.BAJA,
                                 observacion)
-                        .con(
-                                null,
-                                "{\"licencia\":\""
-                                        + numeroDeLicencia
-                                        + "\",\"expediente\":\""
-                                        + fue.expediente()
-                                        + "\",\"estado\":\"ANULADA\",\"fecha\":\""
-                                        + fecha
-                                        + "\"}"));
+                        .con(null, descripcion(numeroDeLicencia, fue, fecha)));
 
         return new Anulacion(fue, numeroDeLicencia, registrado, emision);
     }
@@ -256,5 +250,15 @@ public class AnularLicenciaDeEdificacion {
                             + " ya esta anulada: una segunda resolucion de anulacion sobre la"
                             + " misma licencia se contradice con la primera");
         }
+    }
+
+    private static Map<String, Object> descripcion(
+            String numeroDeLicencia, FueDeEdificacion fue, LocalDate fecha) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("licencia", numeroDeLicencia);
+        campos.put("expediente", fue.expediente());
+        campos.put("estado", "ANULADA");
+        campos.put("fecha", fecha);
+        return campos;
     }
 }

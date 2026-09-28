@@ -1,6 +1,8 @@
 package kamayuk.rentas.seguridad.aplicacion;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -90,13 +92,7 @@ public class SembradorDelCatalogo extends RepositorioJdbc {
         }
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe("acceso", "catalogo", Operacion.ALTA, porQue)
-                        .con(
-                                null,
-                                "{\"accesosCreados\":"
-                                        + creados
-                                        + ",\"opcionesDelCatalogo\":"
-                                        + opciones.size()
-                                        + "}"));
+                        .con(null, descripcion(creados, opciones.size())));
         return creados;
     }
 
@@ -129,5 +125,12 @@ public class SembradorDelCatalogo extends RepositorioJdbc {
                 .param("codigo", opcion.codigo())
                 .param("nombre", opcion.nombre())
                 .update();
+    }
+
+    private static Map<String, Object> descripcion(int accesosCreados, int opcionesDelCatalogo) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("accesosCreados", accesosCreados);
+        campos.put("opcionesDelCatalogo", opcionesDelCatalogo);
+        return campos;
     }
 }

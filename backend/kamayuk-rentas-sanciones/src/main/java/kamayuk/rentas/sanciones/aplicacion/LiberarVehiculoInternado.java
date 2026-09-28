@@ -3,7 +3,9 @@ package kamayuk.rentas.sanciones.aplicacion;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -229,17 +231,14 @@ public class LiberarVehiculoInternado {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoría. */
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             Internamiento internamiento, MovimientoDeInternamiento movimiento) {
-        return "{\"placa\":\""
-                + internamiento.placa()
-                + "\",\"tipo\":\""
-                + movimiento.tipo().name()
-                + "\",\"acta\":\""
-                + movimiento.acta()
-                + "\",\"dias\":"
-                + movimiento.diasCustodia()
-                + "}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("placa", internamiento.placa());
+        campos.put("tipo", movimiento.tipo().name());
+        campos.put("acta", movimiento.acta());
+        campos.put("dias", movimiento.diasCustodia());
+        return campos;
     }
 
     /**

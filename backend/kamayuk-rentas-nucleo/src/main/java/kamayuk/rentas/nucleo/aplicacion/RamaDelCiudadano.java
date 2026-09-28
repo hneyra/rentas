@@ -1,7 +1,9 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -146,15 +148,7 @@ public class RamaDelCiudadano {
                                                 + " (#57, ADR-0020)"))
                         // Solo cifras y la fecha: aqui no entra texto del usuario, asi que no hay
                         // comilla que pueda romper el cast a jsonb.
-                        .con(
-                                null,
-                                "{\"aLaFecha\":\""
-                                        + aLaFecha
-                                        + "\",\"obligaciones\":"
-                                        + obligaciones
-                                        + ",\"predios\":"
-                                        + predios
-                                        + "}"));
+                        .con(null, descripcion(aLaFecha, obligaciones, predios)));
     }
 
     /**
@@ -183,5 +177,14 @@ public class RamaDelCiudadano {
             obligaciones = List.copyOf(obligaciones);
             predios = List.copyOf(predios);
         }
+    }
+
+    private static Map<String, Object> descripcion(
+            LocalDate aLaFecha, int obligaciones, int predios) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("aLaFecha", aLaFecha);
+        campos.put("obligaciones", obligaciones);
+        campos.put("predios", predios);
+        return campos;
     }
 }

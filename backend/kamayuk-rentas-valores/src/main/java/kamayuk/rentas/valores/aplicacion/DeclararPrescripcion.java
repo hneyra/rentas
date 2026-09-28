@@ -3,7 +3,9 @@ package kamayuk.rentas.valores.aplicacion;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -365,38 +367,23 @@ public class DeclararPrescripcion {
      * que no marco porque formalizan deuda viva, que es lo que la administracion tiene que poder
      * encontrar despues. Un numero de valor no es un dato personal.
      */
-    private static String descripcion(PrescripcionDeclarada declarada) {
+    private static Map<String, Object> descripcion(PrescripcionDeclarada declarada) {
         Prescripcion prescripcion = declarada.prescripcion();
-        return "{\"tributo\":\""
-                + prescripcion.tributo()
-                + "\",\"desde\":"
-                + prescripcion.ejercicioDesde().valor()
-                + ",\"hasta\":"
-                + prescripcion.ejercicioHasta().valor()
-                + ",\"causal\":\""
-                + prescripcion.causal()
-                + "\",\"plazo\":\""
-                + prescripcion.plazo()
-                + "\",\"resultado\":\""
-                + prescripcion.resultado()
-                + "\",\"prescritos\":"
-                + prescripcion.ejerciciosPrescritos().size()
-                + ",\"valoresPrescritos\":"
-                + numerosDe(declarada.valoresPrescritos())
-                + ",\"valoresCubiertosEnParte\":"
-                + numerosDe(declarada.valoresCubiertosEnParte())
-                + "}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("tributo", prescripcion.tributo());
+        campos.put("desde", prescripcion.ejercicioDesde().valor());
+        campos.put("hasta", prescripcion.ejercicioHasta().valor());
+        campos.put("causal", prescripcion.causal());
+        campos.put("plazo", prescripcion.plazo());
+        campos.put("resultado", prescripcion.resultado());
+        campos.put("prescritos", prescripcion.ejerciciosPrescritos().size());
+        campos.put("valoresPrescritos", numerosDe(declarada.valoresPrescritos()));
+        campos.put("valoresCubiertosEnParte", numerosDe(declarada.valoresCubiertosEnParte()));
+        return campos;
     }
 
-    private static String numerosDe(List<Valor> valores) {
-        StringBuilder texto = new StringBuilder("[");
-        for (Valor valor : valores) {
-            if (texto.length() > 1) {
-                texto.append(',');
-            }
-            texto.append('"').append(valor.numero()).append('"');
-        }
-        return texto.append(']').toString();
+    private static List<String> numerosDe(List<Valor> valores) {
+        return valores.stream().map(Valor::numero).toList();
     }
 
     /**

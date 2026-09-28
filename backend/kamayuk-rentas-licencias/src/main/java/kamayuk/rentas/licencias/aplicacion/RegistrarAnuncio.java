@@ -3,6 +3,8 @@ package kamayuk.rentas.licencias.aplicacion;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -282,20 +284,16 @@ public class RegistrarAnuncio {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(Anuncio anuncio, Dinero tasa, String referencia) {
-        return "{\"numero\":\""
-                + anuncio.numero()
-                + "\",\"clase\":\""
-                + anuncio.clase()
-                + "\",\"area\":"
-                + anuncio.area().valor().toPlainString()
-                + ",\"lados\":"
-                + anuncio.lados()
-                + ",\"tasa\":"
-                + tasa.valor().toPlainString()
-                + ",\"referenciaDelCargo\":\""
-                + referencia
-                + "\"}";
+    private static Map<String, Object> descripcion(
+            Anuncio anuncio, Dinero tasa, String referencia) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", anuncio.numero());
+        campos.put("clase", anuncio.clase());
+        campos.put("area", anuncio.area().valor());
+        campos.put("lados", anuncio.lados());
+        campos.put("tasa", tasa.valor());
+        campos.put("referenciaDelCargo", referencia);
+        return campos;
     }
 
     // ------------------------------------------------------------------

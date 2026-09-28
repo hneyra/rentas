@@ -4,7 +4,9 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -304,24 +306,17 @@ public class GenerarMuestra {
      * sólo {@code "predios": N} la exclusión era muda también para quien audita meses después: no
      * había forma de saber sobre qué padrón se sorteó esa muestra.
      */
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             ProgramaFiscalizacion programa, ResultadoDelSorteo resultado) {
-        return "{\"programa\":\""
-                + programa.codigo()
-                + "\",\"criterio\":\""
-                + programa.criterio()
-                + "\",\"detectados\":"
-                + resultado.detectados()
-                + ",\"predios\":"
-                + resultado.sorteados()
-                + ",\"sinTitular\":"
-                + resultado.sorteadosSinTitular()
-                + ",\"excluidosPorOtroPrograma\":"
-                + resultado.excluidosPorOtroPrograma()
-                + ",\"excluidosPorActaDelEjercicio\":"
-                + resultado.excluidosPorActaDelEjercicio()
-                + ",\"fechaSorteo\":\""
-                + resultado.fechaSorteo()
-                + "\"}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("programa", programa.codigo());
+        campos.put("criterio", programa.criterio());
+        campos.put("detectados", resultado.detectados());
+        campos.put("predios", resultado.sorteados());
+        campos.put("sinTitular", resultado.sorteadosSinTitular());
+        campos.put("excluidosPorOtroPrograma", resultado.excluidosPorOtroPrograma());
+        campos.put("excluidosPorActaDelEjercicio", resultado.excluidosPorActaDelEjercicio());
+        campos.put("fechaSorteo", resultado.fechaSorteo());
+        return campos;
     }
 }

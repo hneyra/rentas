@@ -1,5 +1,7 @@
 package kamayuk.rentas.sanciones.aplicacion;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -51,9 +53,7 @@ public class CambiarNumeroDePapeleta {
                                 String.valueOf(anterior.id()),
                                 Operacion.MODIFICACION,
                                 observacion)
-                        .con(
-                                "{\"numero\":\"" + numeroActual + "\"}",
-                                "{\"numero\":\"" + actualizada.numero() + "\"}"));
+                        .con(soloElNumero(numeroActual), soloElNumero(actualizada.numero())));
 
         return actualizada;
     }
@@ -65,5 +65,11 @@ public class CambiarNumeroDePapeleta {
         PapeletaInexistente(String numero) {
             super("No hay ninguna papeleta con numero '" + numero + "' en esta municipalidad");
         }
+    }
+
+    private static Map<String, Object> soloElNumero(String numero) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", numero);
+        return campos;
     }
 }

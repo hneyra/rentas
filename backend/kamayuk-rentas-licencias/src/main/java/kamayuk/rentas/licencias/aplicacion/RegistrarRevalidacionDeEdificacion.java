@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -182,17 +183,7 @@ public class RegistrarRevalidacionDeEdificacion {
                                 String.valueOf(concedida.id()),
                                 Operacion.ALTA,
                                 observacion)
-                        .con(
-                                null,
-                                "{\"licencia\":\""
-                                        + numeroDeLicencia
-                                        + "\",\"expediente\":\""
-                                        + revalidacion.expediente()
-                                        + "\",\"tramo\":"
-                                        + concedida.orden()
-                                        + ",\"hasta\":\""
-                                        + concedida.hasta()
-                                        + "\"}"));
+                        .con(null, descripcion(numeroDeLicencia, revalidacion, concedida)));
 
         return new RevalidarLicenciaDeEdificacion.Revalidacion(
                 original, revalidacion, numeroDeLicencia, registrado, concedida, emision);
@@ -362,5 +353,17 @@ public class RegistrarRevalidacionDeEdificacion {
             Objects.requireNonNull(concepto, "concepto");
             Objects.requireNonNull(recibo, "recibo");
         }
+    }
+
+    private static Map<String, Object> descripcion(
+            String numeroDeLicencia,
+            FueDeEdificacion revalidacion,
+            VigenciaDeLaLicencia concedida) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("licencia", numeroDeLicencia);
+        campos.put("expediente", revalidacion.expediente());
+        campos.put("tramo", concedida.orden());
+        campos.put("hasta", concedida.hasta());
+        return campos;
     }
 }

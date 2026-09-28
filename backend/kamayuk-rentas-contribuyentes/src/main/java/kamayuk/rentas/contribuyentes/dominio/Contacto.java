@@ -1,5 +1,7 @@
 package kamayuk.rentas.contribuyentes.dominio;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
@@ -83,20 +85,15 @@ public record Contacto(
      * <p><b>Lleva datos personales</b> —un telefono, un correo, el nombre y el documento de un
      * tercero— con la misma restriccion de lectura que el contribuyente (RNF-090; DAT-02 §2.6).
      */
-    public String paraLaAuditoria() {
-        return "{\"tipo\":"
-                + JsonDeAuditoria.texto(tipo)
-                + ",\"valor\":"
-                + JsonDeAuditoria.texto(valor)
-                + ",\"nombre\":"
-                + JsonDeAuditoria.texto(nombre)
-                + ",\"documento\":"
-                + JsonDeAuditoria.texto(documento)
-                + ",\"nota\":"
-                + JsonDeAuditoria.texto(observacion)
-                + ",\"vigente\":"
-                + vigente
-                + "}";
+    public Map<String, Object> paraLaAuditoria() {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("tipo", tipo);
+        campos.put("valor", valor);
+        campos.put("nombre", nombre);
+        campos.put("documento", documento);
+        campos.put("nota", observacion);
+        campos.put("vigente", vigente);
+        return campos;
     }
 
     /** Deja de usarse. No se borra: aparece en notificaciones ya hechas. */

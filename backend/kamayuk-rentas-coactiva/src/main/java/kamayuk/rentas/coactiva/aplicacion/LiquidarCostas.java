@@ -3,8 +3,10 @@ package kamayuk.rentas.coactiva.aplicacion;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -311,23 +313,17 @@ public class LiquidarCostas {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             ExpedienteCoactivo expediente, LiquidacionDeCostas liquidacion) {
-        return "{\"expediente\":\""
-                + expediente.numero()
-                + "\",\"numero\":\""
-                + liquidacion.numero()
-                + "\",\"tributo\":\""
-                + liquidacion.tributo()
-                + "\",\"total\":"
-                + liquidacion.total().valor().toPlainString()
-                + ",\"lineas\":"
-                + liquidacion.costas().size()
-                + ",\"conjuntoId\":"
-                + liquidacion.conjuntoId()
-                + ",\"fecha\":\""
-                + liquidacion.fecha()
-                + "\"}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("expediente", expediente.numero());
+        campos.put("numero", liquidacion.numero());
+        campos.put("tributo", liquidacion.tributo());
+        campos.put("total", liquidacion.total().valor());
+        campos.put("lineas", liquidacion.costas().size());
+        campos.put("conjuntoId", liquidacion.conjuntoId());
+        campos.put("fecha", liquidacion.fecha());
+        return campos;
     }
 
     /**

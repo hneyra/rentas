@@ -3,6 +3,7 @@ package kamayuk.rentas.licencias.aplicacion;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -282,19 +283,16 @@ public class DuplicarLicencia {
                 duplicado.observacion());
     }
 
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             LicenciaDeFuncionamiento licencia,
             DuplicadoDeLicencia duplicado,
             EmitirDocumento.Emision resolucion) {
-        return "{\"licencia\":\""
-                + licencia.numero()
-                + "\",\"duplicado\":"
-                + duplicado.numero()
-                + ",\"resolucion\":\""
-                + resolucion.registro().numero()
-                + "\",\"reimpresion\":"
-                + duplicado.reimpresion()
-                + "}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("licencia", licencia.numero());
+        campos.put("duplicado", duplicado.numero());
+        campos.put("resolucion", resolucion.registro().numero());
+        campos.put("reimpresion", duplicado.reimpresion());
+        return campos;
     }
 
     // ------------------------------------------------------------------

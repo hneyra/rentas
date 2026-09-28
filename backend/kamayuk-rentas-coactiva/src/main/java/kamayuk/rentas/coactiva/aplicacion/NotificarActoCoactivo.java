@@ -1,6 +1,8 @@
 package kamayuk.rentas.coactiva.aplicacion;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -256,20 +258,15 @@ public class NotificarActoCoactivo {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(ActoCoactivo acto, NotificacionCoactiva diligencia) {
-        return "{\"acto\":\""
-                + acto.numero()
-                + "\",\"intento\":"
-                + diligencia.intento()
-                + ",\"modalidad\":\""
-                + diligencia.modalidad()
-                + "\",\"resultado\":\""
-                + diligencia.resultado()
-                + "\",\"exigibleDesde\":"
-                + (diligencia.exigibleDesde() == null
-                        ? "null"
-                        : "\"" + diligencia.exigibleDesde() + "\"")
-                + "}";
+    private static Map<String, Object> descripcion(
+            ActoCoactivo acto, NotificacionCoactiva diligencia) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("acto", acto.numero());
+        campos.put("intento", diligencia.intento());
+        campos.put("modalidad", diligencia.modalidad());
+        campos.put("resultado", diligencia.resultado());
+        campos.put("exigibleDesde", diligencia.exigibleDesde());
+        return campos;
     }
 
     /**

@@ -2,6 +2,7 @@ package kamayuk.rentas.nucleo.aplicacion;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -154,15 +155,7 @@ public class ConsultaDeTitulares {
                                                 + " ADR-0015 §2.4)"))
                         // Solo cifras y la fecha: aqui no entra texto del usuario, asi que no hay
                         // comilla que pueda romper el cast a jsonb.
-                        .con(
-                                null,
-                                "{\"predioId\":"
-                                        + predioId
-                                        + ",\"vigenteA\":\""
-                                        + vigenteA
-                                        + "\",\"titulares\":"
-                                        + cuantos
-                                        + "}"));
+                        .con(null, descripcion(predioId, vigenteA, cuantos)));
     }
 
     /**
@@ -205,5 +198,13 @@ public class ConsultaDeTitulares {
             Objects.requireNonNull(condicion, "La cuota necesita la condicion del titular");
             Objects.requireNonNull(porcentaje, "La cuota necesita su porcentaje");
         }
+    }
+
+    private static Map<String, Object> descripcion(long predioId, LocalDate vigenteA, int cuantos) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("predioId", predioId);
+        campos.put("vigenteA", vigenteA);
+        campos.put("titulares", cuantos);
+        return campos;
     }
 }

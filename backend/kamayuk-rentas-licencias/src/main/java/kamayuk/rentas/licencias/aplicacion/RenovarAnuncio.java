@@ -3,7 +3,9 @@ package kamayuk.rentas.licencias.aplicacion;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -183,17 +185,14 @@ public class RenovarAnuncio {
         return new Renovacion(anuncio, renovacion);
     }
 
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             Anuncio anuncio, Ejercicio ejercicio, Dinero tasa, String referencia) {
-        return "{\"numero\":\""
-                + anuncio.numero()
-                + "\",\"ejercicio\":"
-                + ejercicio.valor()
-                + ",\"tasa\":"
-                + tasa.valor().toPlainString()
-                + ",\"referenciaDelCargo\":\""
-                + referencia
-                + "\"}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", anuncio.numero());
+        campos.put("ejercicio", ejercicio.valor());
+        campos.put("tasa", tasa.valor());
+        campos.put("referenciaDelCargo", referencia);
+        return campos;
     }
 
     // ------------------------------------------------------------------

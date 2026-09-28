@@ -365,20 +365,16 @@ public class RegistrarDeterminacionVehicular {
                         .con(null, descripcion(guardada)));
     }
 
-    private static String descripcion(Determinacion determinacion) {
-        return "{\"tributo\":\"VEHICULAR\",\"vehiculoId\":"
-                + determinacion.vehiculoId()
-                + ",\"contribuyenteId\":"
-                + determinacion.contribuyenteId()
-                + ",\"ejercicio\":\""
-                + determinacion.ejercicio()
-                + "\",\"conjuntoId\":"
-                + determinacion.conjuntoId()
-                + ",\"baseImponible\":\""
-                + determinacion.baseImponible()
-                + "\",\"montoDeterminado\":\""
-                + determinacion.montoDeterminado()
-                + "\"}";
+    private static Map<String, Object> descripcion(Determinacion determinacion) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("tributo", "VEHICULAR");
+        campos.put("vehiculoId", determinacion.vehiculoId());
+        campos.put("contribuyenteId", determinacion.contribuyenteId());
+        campos.put("ejercicio", determinacion.ejercicio());
+        campos.put("conjuntoId", determinacion.conjuntoId());
+        campos.put("baseImponible", determinacion.baseImponible());
+        campos.put("montoDeterminado", determinacion.montoDeterminado());
+        return campos;
     }
 
     /** No hay ningún vehículo con ese identificador, o es de otra municipalidad. */

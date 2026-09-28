@@ -2,7 +2,9 @@ package kamayuk.rentas.fiscalizacion.aplicacion;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -327,20 +329,14 @@ public class LiquidarFiscalizacion {
                         .con(null, descripcion(guardada)));
     }
 
-    private static String descripcion(Liquidacion liquidacion) {
-        return "{\"numero\":\""
-                + liquidacion.numero()
-                + "\",\"actaId\":"
-                + liquidacion.actaId()
-                + ",\"version\":"
-                + liquidacion.version()
-                + ",\"periodo\":\""
-                + liquidacion.ejercicioDesde()
-                + "-"
-                + liquidacion.ejercicioHasta()
-                + "\",\"tipo\":\""
-                + liquidacion.tipo()
-                + "\"}";
+    private static Map<String, Object> descripcion(Liquidacion liquidacion) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", liquidacion.numero());
+        campos.put("actaId", liquidacion.actaId());
+        campos.put("version", liquidacion.version());
+        campos.put("periodo", liquidacion.ejercicioDesde() + "-" + liquidacion.ejercicioHasta());
+        campos.put("tipo", liquidacion.tipo());
+        return campos;
     }
 
     /** No hay ninguna acta de fiscalizacion con ese identificador, o es de otra municipalidad. */

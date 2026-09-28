@@ -2,7 +2,9 @@ package kamayuk.rentas.licencias.aplicacion;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -223,26 +225,18 @@ public class RegistrarLicenciaDeFuncionamiento {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             LicenciaDeFuncionamiento licencia,
             ReciboDeTramite recibo,
             List<GiroDeLaLicencia> giros) {
-        return "{\"numero\":\""
-                + licencia.numero()
-                + "\",\"tipo\":\""
-                + licencia.tipoLicencia()
-                + "\",\"recibo\":\""
-                + recibo.numero()
-                + "\",\"giros\":"
-                + giros.size()
-                + ",\"fichaEconomica\":"
-                + (licencia.fichaId() == null ? "null" : licencia.fichaId())
-                // La marca y no el texto (#418): el texto de la autorizacion lo escribe una
-                // persona y puede nombrar a otras, y esta columna va sin datos personales. El
-                // texto esta en la licencia, que es donde se impugna.
-                + ",\"porExcepcion\":"
-                + licencia.territorio().porExcepcion()
-                + "}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", licencia.numero());
+        campos.put("tipo", licencia.tipoLicencia());
+        campos.put("recibo", recibo.numero());
+        campos.put("giros", giros.size());
+        campos.put("fichaEconomica", licencia.fichaId() == null ? null : licencia.fichaId());
+        campos.put("porExcepcion", licencia.territorio().porExcepcion());
+        return campos;
     }
 
     /**

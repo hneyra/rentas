@@ -2,7 +2,9 @@ package kamayuk.rentas.coactiva.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -108,12 +110,12 @@ public class CambiarEstadoDelExpediente {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String json(ExpedienteCoactivo expediente, EstadoDelExpediente estado) {
-        return "{\"expediente\":\""
-                + expediente.numero()
-                + "\",\"estado\":\""
-                + estado.name()
-                + "\"}";
+    private static Map<String, Object> json(
+            ExpedienteCoactivo expediente, EstadoDelExpediente estado) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("expediente", expediente.numero());
+        campos.put("estado", estado.name());
+        return campos;
     }
 
     /** No hay ningun expediente con ese numero. */

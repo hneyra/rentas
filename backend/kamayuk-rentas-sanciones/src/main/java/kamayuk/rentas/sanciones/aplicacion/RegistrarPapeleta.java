@@ -2,6 +2,8 @@ package kamayuk.rentas.sanciones.aplicacion;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -239,16 +241,13 @@ public class RegistrarPapeleta {
         return ObligacionDeLaPapeleta.referenciaDe(papeleta);
     }
 
-    private static String descripcion(Papeleta papeleta) {
-        return "{\"numero\":\""
-                + papeleta.numero()
-                + "\",\"familia\":\""
-                + papeleta.familia()
-                + "\",\"importeAPagar\":"
-                + papeleta.importeAPagar().valor().toPlainString()
-                + ",\"estado\":\""
-                + papeleta.estado()
-                + "\"}";
+    private static Map<String, Object> descripcion(Papeleta papeleta) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", papeleta.numero());
+        campos.put("familia", papeleta.familia());
+        campos.put("importeAPagar", papeleta.importeAPagar().valor());
+        campos.put("estado", papeleta.estado());
+        return campos;
     }
 
     /** El código de infracción no existe, o no está vigente el día en que ocurrió. */

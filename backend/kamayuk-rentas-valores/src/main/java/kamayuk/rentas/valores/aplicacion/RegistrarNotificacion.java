@@ -2,6 +2,8 @@ package kamayuk.rentas.valores.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -211,20 +213,14 @@ public class RegistrarNotificacion {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(Valor valor, Notificacion notificacion) {
-        return "{\"valor\":\""
-                + valor.numero()
-                + "\",\"intento\":"
-                + notificacion.intento()
-                + ",\"modalidad\":\""
-                + notificacion.modalidad()
-                + "\",\"resultado\":\""
-                + notificacion.resultado()
-                + "\",\"exigibleDesde\":"
-                + (notificacion.exigibleDesde() == null
-                        ? "null"
-                        : "\"" + notificacion.exigibleDesde() + "\"")
-                + "}";
+    private static Map<String, Object> descripcion(Valor valor, Notificacion notificacion) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("valor", valor.numero());
+        campos.put("intento", notificacion.intento());
+        campos.put("modalidad", notificacion.modalidad());
+        campos.put("resultado", notificacion.resultado());
+        campos.put("exigibleDesde", notificacion.exigibleDesde());
+        return campos;
     }
 
     /** No hay ningun valor con ese numero. */

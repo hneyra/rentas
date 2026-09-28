@@ -2,6 +2,8 @@ package kamayuk.rentas.nucleo.aplicacion;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -314,7 +316,7 @@ public class RegistrarDeclaracionJurada {
             DeclaracionJurada guardada,
             Operacion operacion,
             Observacion observacion,
-            @Nullable String antes) {
+            @Nullable Map<String, Object> antes) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
                                 "declaracion_jurada",
@@ -332,20 +334,15 @@ public class RegistrarDeclaracionJurada {
      * en enero una DJ de marzo del año anterior es un acto de enero—, y la fecha en que el
      * contribuyente declaro se conserva aqui, donde quien lea la bitacora la encuentra.
      */
-    private static String descripcion(DeclaracionJurada declaracion) {
-        return "{\"contribuyenteId\":"
-                + declaracion.contribuyenteId()
-                + ",\"tipo\":\""
-                + declaracion.tipo()
-                + "\",\"numero\":\""
-                + declaracion.numero()
-                + "\",\"fechaPresentacion\":\""
-                + declaracion.fechaPresentacion()
-                + "\",\"estado\":\""
-                + declaracion.estado()
-                + "\",\"fueraDePlazo\":"
-                + declaracion.fueraDePlazo()
-                + "}";
+    private static Map<String, Object> descripcion(DeclaracionJurada declaracion) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("contribuyenteId", declaracion.contribuyenteId());
+        campos.put("tipo", declaracion.tipo());
+        campos.put("numero", declaracion.numero());
+        campos.put("fechaPresentacion", declaracion.fechaPresentacion());
+        campos.put("estado", declaracion.estado());
+        campos.put("fueraDePlazo", declaracion.fueraDePlazo());
+        return campos;
     }
 
     /** No hay ninguna DJ con ese numero en ese ejercicio, o es de otra municipalidad. */

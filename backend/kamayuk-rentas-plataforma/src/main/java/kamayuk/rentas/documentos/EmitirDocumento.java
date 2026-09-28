@@ -4,6 +4,8 @@ import java.io.OutputStream;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -222,16 +224,13 @@ public class EmitirDocumento {
                         .con(null, descripcion(documento)));
     }
 
-    private static String descripcion(DocumentoEmitido documento) {
-        return "{\"tipo\":\""
-                + documento.tipo()
-                + "\",\"numero\":\""
-                + documento.numero()
-                + "\",\"formato\":\""
-                + documento.formato()
-                + "\",\"reimpresiones\":"
-                + documento.reimpresiones()
-                + "}";
+    private static Map<String, Object> descripcion(DocumentoEmitido documento) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("tipo", documento.tipo());
+        campos.put("numero", documento.numero());
+        campos.put("formato", documento.formato());
+        campos.put("reimpresiones", documento.reimpresiones());
+        return campos;
     }
 
     /** Los bytes que se entregan y el registro que los respalda. */

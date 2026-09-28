@@ -2,7 +2,9 @@ package kamayuk.rentas.tesoreria.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -234,22 +236,16 @@ public class RegistrarPreconvenio {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(Convenio convenio) {
-        return "{\"numero\":\""
-                + convenio.numero().impreso()
-                + "\",\"tipo\":\""
-                + convenio.tipo()
-                + "\",\"montoTotal\":"
-                + convenio.montoTotal().valor().toPlainString()
-                + ",\"cuotaInicial\":"
-                + convenio.cuotaInicial().valor().toPlainString()
-                + ",\"cuotas\":"
-                + convenio.numeroDeCuotas()
-                + ",\"conjuntoId\":"
-                + convenio.condiciones().conjuntoId()
-                + ",\"fechaCorte\":\""
-                + convenio.fechaCorte()
-                + "\"}";
+    private static Map<String, Object> descripcion(Convenio convenio) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", convenio.numero().impreso());
+        campos.put("tipo", convenio.tipo());
+        campos.put("montoTotal", convenio.montoTotal().valor());
+        campos.put("cuotaInicial", convenio.cuotaInicial().valor());
+        campos.put("cuotas", convenio.numeroDeCuotas());
+        campos.put("conjuntoId", convenio.condiciones().conjuntoId());
+        campos.put("fechaCorte", convenio.fechaCorte());
+        return campos;
     }
 
     /**

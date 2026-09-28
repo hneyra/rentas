@@ -1,6 +1,8 @@
 package kamayuk.rentas.fiscalizacion.aplicacion;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -80,13 +82,11 @@ public class RegistrarPrograma {
         return guardado;
     }
 
-    private static String descripcion(ProgramaFiscalizacion programa) {
-        return "{\"codigo\":\""
-                + programa.codigo()
-                + "\",\"tipo\":\""
-                + programa.tipo()
-                + "\",\"estado\":\""
-                + programa.estado()
-                + "\"}";
+    private static Map<String, Object> descripcion(ProgramaFiscalizacion programa) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("codigo", programa.codigo());
+        campos.put("tipo", programa.tipo());
+        campos.put("estado", programa.estado());
+        return campos;
     }
 }

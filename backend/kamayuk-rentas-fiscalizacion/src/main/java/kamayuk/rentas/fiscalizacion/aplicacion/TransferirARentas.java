@@ -1,7 +1,9 @@
 package kamayuk.rentas.fiscalizacion.aplicacion;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -477,24 +479,19 @@ public class TransferirARentas {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             Liquidacion liquidacion,
             ResolucionDeDeterminacion resolucion,
             @Nullable VersionTransferida version,
             int asentados) {
-        return "{\"liquidacion\":\""
-                + liquidacion.numero()
-                + "\",\"resolucion\":\""
-                + resolucion.numero()
-                + "\",\"fichaAnterior\":"
-                + (version == null ? "null" : version.fichaAnteriorId())
-                + ",\"fichaNueva\":"
-                + (version == null ? "null" : version.fichaNuevaId())
-                + ",\"versionDeLaFicha\":"
-                + (version == null ? "null" : version.version())
-                + ",\"cargosAsentados\":"
-                + asentados
-                + "}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("liquidacion", liquidacion.numero());
+        campos.put("resolucion", resolucion.numero());
+        campos.put("fichaAnterior", version == null ? null : version.fichaAnteriorId());
+        campos.put("fichaNueva", version == null ? null : version.fichaNuevaId());
+        campos.put("versionDeLaFicha", version == null ? null : version.version());
+        campos.put("cargosAsentados", asentados);
+        return campos;
     }
 
     /**
