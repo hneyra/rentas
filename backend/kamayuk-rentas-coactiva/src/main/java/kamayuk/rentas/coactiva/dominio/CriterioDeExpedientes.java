@@ -1,6 +1,7 @@
 package kamayuk.rentas.coactiva.dominio;
 
 import java.util.Locale;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -29,7 +30,7 @@ public record CriterioDeExpedientes(
         @Nullable Integer ejercicio) {
 
     public CriterioDeExpedientes {
-        numero = mayusculas(numero);
+        numero = numeroSiViene(numero);
         ejecutor = mayusculas(ejecutor);
     }
 
@@ -38,6 +39,22 @@ public record CriterioDeExpedientes(
         return new CriterioDeExpedientes(null, null, null, null, null);
     }
 
+    /**
+     * El numero, con la regla de todo numero impreso (#515, anotado en #629): la misma forma con
+     * que se guarda y con que {@code porNumero} lo busca. Vacio es «sin filtro».
+     */
+    private static @Nullable String numeroSiViene(@Nullable String texto) {
+        if (texto == null) {
+            return null;
+        }
+        String forma = NumeroImpreso.formaDeBusqueda(texto);
+        return forma.isEmpty() ? null : forma;
+    }
+
+    /**
+     * El ejecutor, que <b>no</b> es un numero impreso sino un nombre: se compara contra {@code
+     * upper(e.ejecutor)}, y su forma va con esa expresion del SQL, no con la de los numeros.
+     */
     private static @Nullable String mayusculas(@Nullable String texto) {
         if (texto == null) {
             return null;

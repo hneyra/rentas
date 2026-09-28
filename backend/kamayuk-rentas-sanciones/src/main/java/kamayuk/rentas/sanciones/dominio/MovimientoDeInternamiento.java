@@ -2,8 +2,8 @@ package kamayuk.rentas.sanciones.dominio;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Locale;
 import java.util.Objects;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import org.jspecify.annotations.Nullable;
 
@@ -67,7 +67,7 @@ public record MovimientoDeInternamiento(
         Objects.requireNonNull(tipo, "El movimiento necesita su tipo");
         Objects.requireNonNull(fecha, "El movimiento necesita su fecha");
         Objects.requireNonNull(acta, "El acto se materializa en un acta");
-        acta = acta.strip().toUpperCase(Locale.ROOT);
+        acta = NumeroImpreso.formaDeBusqueda(acta);
         if (acta.isEmpty() || acta.length() > Internamiento.ACTA_MAXIMA) {
             throw new IllegalArgumentException(
                     "El acta va de 1 a "

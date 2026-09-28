@@ -21,6 +21,7 @@ import kamayuk.rentas.coactiva.dominio.ValorDelExpediente;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.NumeroImpreso;
 
 /**
  * Un {@link ExpedienteRepository} en memoria, para probar el transporte HTTP sin base de datos.
@@ -82,7 +83,7 @@ public final class ExpedientesEnMemoria implements ExpedienteRepository {
     @Override
     public Optional<ExpedienteCoactivo> porNumero(String numero) {
         return guardados.values().stream()
-                .filter(e -> e.numero().equals(numero.strip()))
+                .filter(e -> e.numero().equals(NumeroImpreso.formaDeBusqueda(numero)))
                 .findFirst();
     }
 

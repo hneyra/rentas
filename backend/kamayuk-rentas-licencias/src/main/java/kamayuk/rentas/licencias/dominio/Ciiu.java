@@ -3,6 +3,7 @@ package kamayuk.rentas.licencias.dominio;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import org.jspecify.annotations.Nullable;
 
@@ -70,7 +71,7 @@ public record Ciiu(
         Objects.requireNonNull(registradoEn, "El giro dice cuando se registro");
         Objects.requireNonNull(observacion, "Sin observacion no se guarda (regla 10, RNF-052)");
 
-        codigo = codigo.strip().toUpperCase(Locale.ROOT);
+        codigo = NumeroImpreso.formaDeBusqueda(codigo);
         descripcion = descripcion.strip();
         if (codigo.isEmpty() || codigo.length() > CODIGO_MAXIMO) {
             throw new IllegalArgumentException(

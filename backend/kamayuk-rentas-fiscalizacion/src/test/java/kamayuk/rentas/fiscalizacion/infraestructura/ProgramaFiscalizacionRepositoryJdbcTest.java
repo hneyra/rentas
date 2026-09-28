@@ -192,6 +192,25 @@ class ProgramaFiscalizacionRepositoryJdbcTest {
         assertThat(exacto.contenido().get(0).codigo()).isEqualTo("PF-920");
     }
 
+    @Test
+    @DisplayName(
+            "#515 — el codigo se guarda y se filtra recortado y en mayusculas, con la misma regla")
+    void elCodigoSeGuardaYSeFiltraComoSeTeclea() {
+        TenantContext.fijar(new MunicipalidadId(municipalidadA));
+        ProgramaFiscalizacion guardado =
+                insertar(
+                        "  pf-925 ",
+                        "Tecleado en minusculas",
+                        TipoDePrograma.PREDIAL,
+                        LocalDate.of(2026, 5, 1),
+                        null);
+
+        assertThat(guardado.codigo()).isEqualTo("PF-925");
+        assertThat(consultar(new CriterioDeProgramas(" Pf-925  ", null)).contenido())
+                .extracting(ProgramaFiscalizacion::codigo)
+                .containsExactly("PF-925");
+    }
+
     /**
      * El «Ejercicio» de la pantalla es la <b>vigencia</b>, no el año de inicio.
      *
