@@ -171,7 +171,7 @@ public interface AsientoRepository {
      * Lo que sigue pendiente en el ejercicio <b>a la fecha de corte</b>, agrupado por tributo
      * (#639, RF-130).
      *
-     * <h2>Es la misma definicion que {@code consulta_deuda}, sumada</h2>
+     * <h4>Es la misma definicion que {@code consulta_deuda}, sumada</h4>
      *
      * <p>Netea {@link Concepto#INSOLUTO} —cargos menos abonos— <b>de los asientos cuya fecha valor
      * no pasa del corte</b>, agrupando por obligacion. Eso es exactamente lo que hace {@link

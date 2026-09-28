@@ -230,7 +230,7 @@ public class ContribuyenteController {
      * decidir que dos filas eran la misma persona, y eso es otro acto —con otro expediente— que
      * este endpoint no finge hacer.
      *
-     * <h2>Lo que el expediente puede corregir aqui, y lo que no (#552)</h2>
+     * <h4>Lo que el expediente puede corregir aqui, y lo que no (#552)</h4>
      *
      * <p>El expediente del contribuyente dibuja del orden de cincuenta campos y esta escritura
      * admitia <b>tres</b>. Los que faltaban no eran todos del mismo tipo, y por eso no entran

@@ -18,6 +18,7 @@ import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Medida;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.licencias.dominio.CriterioDeFue;
 import kamayuk.rentas.licencias.dominio.EstadoALaFecha;
@@ -184,7 +185,7 @@ public class FueRepositoryJdbc extends RepositorioJdbc implements FueRepository 
                                 + " FROM licencia_edificacion WHERE expediente = :expediente")
                 .param(
                         "expediente",
-                        expediente == null ? "" : expediente.strip().toUpperCase(Locale.ROOT))
+                        expediente == null ? "" : NumeroImpreso.formaDeBusqueda(expediente))
                 .query(FueRepositoryJdbc::mapear)
                 .optional();
     }
@@ -214,7 +215,11 @@ public class FueRepositoryJdbc extends RepositorioJdbc implements FueRepository 
                                 + "                WHERE m.municipalidad_id = e.municipalidad_id"
                                 + "                  AND m.fue_id = e.id"
                                 + "                  AND m.numero_licencia = :numero)")
-                .param("numero", numeroDeLicencia == null ? "" : numeroDeLicencia.strip())
+                .param(
+                        "numero",
+                        numeroDeLicencia == null
+                                ? ""
+                                : NumeroImpreso.formaDeBusqueda(numeroDeLicencia))
                 .query(FueRepositoryJdbc::mapear)
                 .optional();
     }
@@ -285,14 +290,15 @@ public class FueRepositoryJdbc extends RepositorioJdbc implements FueRepository 
 
         if (criterio.expediente() != null) {
             donde.append(" AND expediente = :expediente");
-            parametros.put("expediente", criterio.expediente().toUpperCase(Locale.ROOT));
+            parametros.put("expediente", NumeroImpreso.formaDeBusqueda(criterio.expediente()));
         }
         if (criterio.numeroLicencia() != null) {
             donde.append(
                     " AND EXISTS (SELECT 1 FROM edificacion_movimiento m"
                             + " WHERE m.municipalidad_id = e.municipalidad_id AND m.fue_id = e.id"
                             + " AND m.numero_licencia = :numeroLicencia)");
-            parametros.put("numeroLicencia", criterio.numeroLicencia());
+            parametros.put(
+                    "numeroLicencia", NumeroImpreso.formaDeBusqueda(criterio.numeroLicencia()));
         }
         if (criterio.tipoTramite() != null) {
             donde.append(" AND tipo_tramite = :tramite");

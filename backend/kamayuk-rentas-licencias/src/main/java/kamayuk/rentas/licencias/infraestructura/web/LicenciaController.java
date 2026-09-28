@@ -145,7 +145,7 @@ public class LicenciaController {
      * que la pantalla dibuja al abrir una licencia. Sin el, la fila es la que la grilla pinta y
      * nada mas —una pagina de veinte no puede costar veinte lecturas de detalle—.
      *
-     * <h2>El filtro del domicilio se llama {@code direccionDelEstablecimiento} (#226)</h2>
+     * <h4>El filtro del domicilio se llama {@code direccionDelEstablecimiento} (#226)</h4>
      *
      * <p>Se llamaba {@code direccion}, que era tambien el nombre del <b>sentido del orden</b> en
      * {@link ParametrosDePaginacion}, que {@code GuardiaDeParametros} admite en toda operacion.

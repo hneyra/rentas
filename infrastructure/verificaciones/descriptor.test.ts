@@ -185,12 +185,12 @@ describe("el descriptor de rentas", () => {
   });
 
   /** Y el perfil `batch` sigue existiendo donde le toca: en un Job y en sus CronJob. */
-  it("el perfil `batch` corre donde hay trabajo: la implantacion, el ingestor, el consumidor y las corridas", () => {
+  it("el perfil `batch` corre donde hay trabajo: la implantacion, el ingestor, el consumidor, las corridas y la conciliacion", () => {
     const enPerfilBatch = [...rentas.implantacion(ENTORNO), ...rentas.lotes(ENTORNO)];
     const perfiles = contenedoresDe(enPerfilBatch).map(
       (c) => (c.env ?? []).find((v) => v.name === "SPRING_PROFILES_ACTIVE")?.value,
     );
-    expect(perfiles).toEqual(["batch", "batch", "batch", "batch"]);
+    expect(perfiles).toEqual(["batch", "batch", "batch", "batch", "batch"]);
   });
 });
 
@@ -353,6 +353,7 @@ describe("C-14 §3 — el ingestor de catastro, declarado entero y CORRIENDO (#2
       "kamayuk-rentas-ingestor",
       "kamayuk-rentas-consumidor-de-identidad",
       "kamayuk-rentas-corridas",
+      "kamayuk-rentas-conciliacion-del-saldo",
     ]);
     const cron = crones.find((m) => m.metadata.name === "kamayuk-rentas-ingestor")!;
     // `undefined` es lo que Kubernetes lee como «no suspendido». Se afirma que NO es `true` y no
@@ -747,6 +748,76 @@ describe("#400 — las corridas de la generacion masiva tienen quien las corra",
     expect(otras.length).toBeGreaterThan(0);
     for (const c of otras) {
       expect(declara(c, "KAMAYUK_RENTAS_CORRIDAS_GENERAR"), c.name).toBe(false);
+    }
+  });
+});
+
+describe("#630 — la conciliacion del saldo contra el libro tiene quien la corra", () => {
+  const cronDeLaConciliacion = () =>
+    rentas
+      .lotes(ENTORNO)
+      .filter((m) => m.kind === "CronJob")
+      .find((m) => m.metadata.name === "kamayuk-rentas-conciliacion-del-saldo")!;
+
+  /**
+   * Hasta #630 `ReconstruirSaldo#conciliar` y `ReconstruirPadron#reconstruir` —la red de seguridad
+   * de ADR-0006— estaban escritos desde #23 y ningun proceso los corria: ni ruta, ni runner, ni
+   * `CronJob`. Sin `suspend` y sin solaparse; DESPUES de la ventana de lote, para conciliar lo que
+   * esa noche escribieron las corridas y el ingestor, y sin reintento, porque su rojo es un
+   * hallazgo y no un fallo transitorio.
+   */
+  it("despues de la ventana de lote, sin solaparse, sin reintento y NO nace suspendido", () => {
+    const cron = cronDeLaConciliacion();
+    expect(cron, "no hay CronJob que concilie el saldo: la red de ADR-0006 vuelve a no correr").toBeDefined();
+    expect(cron.spec.schedule).toBe("0 9 * * *");
+    expect(cron.spec.concurrencyPolicy).toBe("Forbid");
+    expect(cron.spec.jobTemplate.spec.backoffLimit).toBe(0);
+    expect(cron.spec.suspend).not.toBe(true);
+  });
+
+  /**
+   * `KAMAYUK_RENTAS_SALDOS_CONCILIAR` es la propiedad que el `@ConditionalOnProperty` de
+   * `CorrerLaConciliacionDelSaldo` pide (`kamayuk.rentas.saldos.conciliar`). Sin ella el runner **no
+   * se registra**, el proceso arranca en `batch`, no concilia nada y sale con 0: el `CronJob` en
+   * verde y la red sin correr, que es el defecto de #630 con horario.
+   *
+   * Y NO lleva `KAMAYUK_RENTAS_SALDOS_RECONSTRUIR`: la conciliacion no repara, a proposito. Reparar
+   * lo pide quien lee el informe, relanzando el `Job` con esa variable puesta.
+   */
+  it("enciende el runner en `batch`, con `kamayuk_app`, y NO repara por su cuenta", () => {
+    const c = cronDeLaConciliacion().spec.jobTemplate.spec.template.spec.containers[0]!;
+    expect(c.image).toBe(ENTORNO.imagenDe("rentas"));
+    expect(valorDe(c, "SPRING_PROFILES_ACTIVE")).toBe("batch");
+    expect(valorDe(c, "KAMAYUK_RENTAS_SALDOS_CONCILIAR")).toBe("true");
+    expect(valorDe(c, "KAMAYUK_DB_USUARIO")).toBe("kamayuk_app");
+    expect(
+      declara(c, "KAMAYUK_RENTAS_SALDOS_RECONSTRUIR"),
+      "la conciliacion programada repararia sola: una proyeccion que se autocorrige en silencio esconde el defecto que la desalineo",
+    ).toBe(false);
+    // Recorre TODAS las municipalidades del registro (ADR-0020): no lleva la de ninguna.
+    expect(declara(c, "KAMAYUK_RENTAS_INGESTOR_MUNICIPALIDAD")).toBe(false);
+    expect(declara(c, "KAMAYUK_IMPLANTACION_UBIGEO")).toBe(false);
+  });
+
+  /**
+   * Y las dos propiedades SOLO en su sitio. Las demas cargas corren la misma imagen en el mismo
+   * perfil: si la implantacion o el consumidor de `identidad` —cada cinco minutos— encendieran la
+   * conciliacion, leerian el padron entero fuera de su hora y su rojo pondria en rojo un trabajo que
+   * no es el suyo; y ninguna carga programada repara.
+   */
+  it("ninguna otra carga enciende la conciliacion, y ninguna repara", () => {
+    const otras = contenedoresDe([
+      ...rentas.despliegue(ENTORNO),
+      ...rentas.migracion(ENTORNO),
+      ...rentas.implantacion(ENTORNO),
+      ...rentas
+        .lotes(ENTORNO)
+        .filter((m) => m.metadata.name !== "kamayuk-rentas-conciliacion-del-saldo"),
+    ]);
+    expect(otras.length).toBeGreaterThan(0);
+    for (const c of otras) {
+      expect(declara(c, "KAMAYUK_RENTAS_SALDOS_CONCILIAR"), c.name).toBe(false);
+      expect(declara(c, "KAMAYUK_RENTAS_SALDOS_RECONSTRUIR"), c.name).toBe(false);
     }
   });
 });

@@ -2,7 +2,9 @@ package kamayuk.rentas.cuentacorriente.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -174,28 +176,17 @@ public class RegistrarAsiento {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(Asiento asiento) {
-        return "{\"contribuyenteId\":"
-                + asiento.contribuyenteId()
-                + ",\"tributo\":\""
-                + asiento.tributo()
-                + "\",\"concepto\":\""
-                + asiento.concepto()
-                + "\",\"tipo\":\""
-                + asiento.tipo()
-                + "\",\"fase\":\""
-                + asiento.fase()
-                + "\",\"monto\":"
-                + asiento.monto().valor().toPlainString()
-                + ",\"asientoReversadoId\":"
-                + asiento.asientoReversadoId()
-                // La declaracion de #653 viaja tambien a la bitacora: sin ella, la fila de un alta
-                // sobre la unidad de otro —declarada a proposito— es indistinguible de la de un
-                // alta sobre la unidad propia, y lo que separa el acto legitimo del error es
-                // precisamente que alguien lo dijera.
-                + ",\"unidadDeTitularAnterior\":"
-                + asiento.unidadDeTitularAnterior()
-                + "}";
+    private static Map<String, Object> descripcion(Asiento asiento) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("contribuyenteId", asiento.contribuyenteId());
+        campos.put("tributo", asiento.tributo());
+        campos.put("concepto", asiento.concepto());
+        campos.put("tipo", asiento.tipo());
+        campos.put("fase", asiento.fase());
+        campos.put("monto", asiento.monto().valor());
+        campos.put("asientoReversadoId", asiento.asientoReversadoId());
+        campos.put("unidadDeTitularAnterior", asiento.unidadDeTitularAnterior());
+        return campos;
     }
 
     /** No hay ningun asiento con ese identificador, o es de otra municipalidad. */

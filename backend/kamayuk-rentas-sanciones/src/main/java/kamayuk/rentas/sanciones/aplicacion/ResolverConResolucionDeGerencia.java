@@ -3,7 +3,9 @@ package kamayuk.rentas.sanciones.aplicacion;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -452,19 +454,15 @@ public class ResolverConResolucionDeGerencia {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoría. */
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             Papeleta papeleta, ResolucionDeGerencia resolucion, @Nullable MovimientoAsentado baja) {
-        return "{\"papeleta\":\""
-                + papeleta.numero()
-                + "\",\"tipo\":\""
-                + resolucion.tipo().name()
-                + "\",\"numero\":\""
-                + resolucion.numero()
-                + "\",\"sentido\":"
-                + (resolucion.sentido() == null ? "null" : "\"" + resolucion.sentido() + "\"")
-                + ",\"asientosDeBaja\":"
-                + (baja == null ? 0 : baja.asientos())
-                + "}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("papeleta", papeleta.numero());
+        campos.put("tipo", resolucion.tipo().name());
+        campos.put("numero", resolucion.numero());
+        campos.put("sentido", resolucion.sentido());
+        campos.put("asientosDeBaja", baja == null ? 0 : baja.asientos());
+        return campos;
     }
 
     /** La diligencia que sustenta la sancionadora y el día desde el que se puede dictar. */

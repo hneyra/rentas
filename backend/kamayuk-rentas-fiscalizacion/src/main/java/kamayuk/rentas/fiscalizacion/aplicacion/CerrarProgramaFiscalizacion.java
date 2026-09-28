@@ -2,6 +2,8 @@ package kamayuk.rentas.fiscalizacion.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -98,8 +100,10 @@ public class CerrarProgramaFiscalizacion {
         return cerrado;
     }
 
-    private static String descripcion(ProgramaFiscalizacion programa) {
-        return "{\"estado\":\"" + programa.estado() + "\"}";
+    private static Map<String, Object> descripcion(ProgramaFiscalizacion programa) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("estado", programa.estado());
+        return campos;
     }
 
     /**
@@ -107,8 +111,12 @@ public class CerrarProgramaFiscalizacion {
      * fecha_fin} es el plazo programado y no se toca—, así que el dato del acto viaja aquí, como
      * {@code fechaAnulacion} en la anulación del acta.
      */
-    private static String descripcionDelCierre(ProgramaFiscalizacion programa, LocalDate fecha) {
-        return "{\"estado\":\"" + programa.estado() + "\",\"fechaCierre\":\"" + fecha + "\"}";
+    private static Map<String, Object> descripcionDelCierre(
+            ProgramaFiscalizacion programa, LocalDate fecha) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("estado", programa.estado());
+        campos.put("fechaCierre", fecha);
+        return campos;
     }
 
     /** No hay ningún programa con ese identificador en esta municipalidad. */

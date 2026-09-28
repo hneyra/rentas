@@ -2,7 +2,9 @@ package kamayuk.rentas.sanciones.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -204,14 +206,12 @@ public class EmitirConstanciaLibre {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoría. */
-    private static String descripcion(ConstanciaLibre constancia) {
-        return "{\"numero\":\""
-                + constancia.numero()
-                + "\",\"placa\":\""
-                + constancia.placa()
-                + "\",\"verificadaAl\":\""
-                + constancia.verificadaAl()
-                + "\"}";
+    private static Map<String, Object> descripcion(ConstanciaLibre constancia) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", constancia.numero());
+        campos.put("placa", constancia.placa());
+        campos.put("verificadaAl", constancia.verificadaAl());
+        return campos;
     }
 
     /**

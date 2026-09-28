@@ -77,9 +77,12 @@ import {
 /**
  * Las piezas que dibujan: las de la libreria, las del interprete y las de la costura.
  *
- * `src/preferencias` entra con #111. Es la unica pieza que este repositorio dibuja fuera del
- * interprete, y llego escribiendo clases que ninguna otra usa —`accent-azul` entre ellas—: dejarla
- * fuera de esta lista seria dejar sin vigilar justo la unica que estrena utilidades.
+ * `src/preferencias` entro con #111 y **salio con `kamayuk-lib`#53**: era el mando de los temas, la
+ * unica pieza que este repositorio dibujaba fuera del interprete, y llego escribiendo clases que
+ * ninguna otra usa —`accent-azul` entre ellas—. Hoy vive en `@kamayuk/ui`
+ * (`paquetes/ui/temas/MandoDeTema.tsx`) y entra por `RAIZ_DE_UI`, que recorre la libreria entera:
+ * sus clases se siguen compilando aqui sin nombrarla. Dejar su linea habria reventado la RECOLECCION
+ * con `ENOENT … scandir 'src/preferencias'` —medido al borrarla—, que es el rojo que pide el issue.
  *
  * `src/piezas` entra con #288, por lo mismo y con mas motivo: son las piezas del consumidor que el
  * interprete monta, y la primera —el grafico— estrena `fill-*` y una utilidad arbitraria para el
@@ -107,7 +110,6 @@ const RAICES: readonly { readonly raiz: string; readonly que: string }[] = [
   { raiz: RAIZ_DE_UI, que: 'las piezas de `@kamayuk/ui`' },
   { raiz: join(RAIZ, 'src', 'pantallas'), que: 'el interprete y la costura de este arbol' },
   { raiz: join(RAIZ, 'src', 'piezas'), que: 'las piezas del consumidor (#288)' },
-  { raiz: join(RAIZ, 'src', 'preferencias'), que: 'el mando de los temas (#111)' },
 ];
 const FUENTES = RAICES.flatMap((r) => fuentesDe(r.raiz));
 const CLASES = [...new Set(FUENTES.flatMap((f) => clasesDe(readFileSync(f, 'utf8'))))].sort();
@@ -141,7 +143,8 @@ describe('Tailwind emite lo que las piezas piden', () => {
     // uno de los tres directorios de aqui**. O sea que las tres de este arbol podian quedarse a cero a la vez y
     // 40 >= 15 seguiria en verde — justo las tres que estrenan utilidades que ninguna otra usa:
     // `accent-azul` de `src/preferencias` (#111) y los `fill-*` del grafico de `src/piezas`
-    // (#288). Preguntando raiz por raiz, la que se quede vacia sale nombrada.
+    // (#288). Preguntando raiz por raiz, la que se quede vacia sale nombrada. Desde
+    // `kamayuk-lib`#53 las de aqui son dos: el mando se fue a la libreria, con su `accent-azul`.
     //
     // Lo que NO se hace es escribir los nombres, y no por pereza: casi todos viven en
     // `kamayuk-lib`, que este repositorio no gobierna. Medido sobre su `git log` el 2026-09-20:

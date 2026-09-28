@@ -1,9 +1,10 @@
 package kamayuk.rentas.web;
 
 import java.math.BigDecimal;
+import kamayuk.rentas.compartido.CifraTecleada;
 
 /**
- * La unica lectura de un importe o un area TECLEADOS (#395).
+ * La lectura de un importe o un area TECLEADOS en un parametro del borde (#395).
  *
  * <p>Un importe o un area que entra por el borde lleva, como mucho, <b>dos decimales</b>: es la
  * escala de {@code dinero numeric(15,2)} y {@code area_m2 numeric(12,2)} (V1), y la del esquema
@@ -12,18 +13,16 @@ import java.math.BigDecimal;
  * recalculo daban cifras distintas —un alta de {@code "33.333"} en cuatro cuotas dejaba 133,32 en
  * el libro y «Total: 133.332» en el papel—.
  *
- * <p>Se <b>rechaza</b> con 422, no se redondea: redondear lo tecleado seria decidir por quien lo
- * tecleo, y lo que se redondea con su politica sellada son los importes que produce el CALCULO
- * (ADR-0018), no los de entrada. {@code "10.500"} no se rechaza: los ceros de la derecha no son un
- * decimal mas.
- *
- * <p>{@code Dinero} y {@code AreaM2} siguen sin escala a proposito: transportan intermedios. La
- * regla es del borde, y por eso vive aqui y no en el objeto de valor.
+ * <p>Se <b>rechaza</b> con 422, no se redondea. <b>La regla no vive aqui</b> (#629): es {@link
+ * CifraTecleada}, del dominio compartido, porque la aplican tambien el importador de archivos —que
+ * es de {@code aplicacion} y no puede depender del borde— y el deserializador del cuerpo JSON. Lo
+ * que esta clase anade es la traduccion a {@link ProblemaDeNegocio}: 422 {@code VALIDACION} con la
+ * misma frase.
  */
 public final class EntradaNumerica {
 
-    /** Los decimales que admite un importe o un area tecleados (ADR-0018). */
-    public static final int DECIMALES = 2;
+    /** Los decimales que admite un importe o un area tecleados: los de {@link CifraTecleada}. */
+    public static final int DECIMALES = CifraTecleada.DECIMALES;
 
     private EntradaNumerica() {}
 
@@ -37,27 +36,12 @@ public final class EntradaNumerica {
      *     decimales
      */
     public static BigDecimal leer(String texto, String campo, String siNoEsCifra) {
-        BigDecimal cifra;
         try {
-            cifra = new BigDecimal(texto.strip());
-        } catch (NumberFormatException noEsCifra) {
+            return CifraTecleada.leer(texto, campo, siNoEsCifra);
+        } catch (CifraTecleada.DecimalesDeMas deMas) {
+            throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, deMas.motivo());
+        } catch (IllegalArgumentException noEsCifra) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, siNoEsCifra);
         }
-        int decimales = Math.max(0, cifra.stripTrailingZeros().scale());
-        if (decimales > DECIMALES) {
-            throw new ProblemaDeNegocio(
-                    CodigoDeError.VALIDACION,
-                    "El campo '"
-                            + campo
-                            + "' lleva "
-                            + decimales
-                            + " decimales ('"
-                            + texto.strip()
-                            + "'): un importe o un area se teclea con "
-                            + DECIMALES
-                            + " como mucho, que es lo que se guarda. Redondearlo aqui seria"
-                            + " decidir por quien lo tecleo");
-        }
-        return cifra;
     }
 }

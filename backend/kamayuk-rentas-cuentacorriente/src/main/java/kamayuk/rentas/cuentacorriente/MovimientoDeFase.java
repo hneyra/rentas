@@ -28,9 +28,27 @@ public interface MovimientoDeFase {
      * obligacion debe en fase ordinaria a {@code fechaValor}, <b>cuota por cuota</b> (#448).
      *
      * <p>Por cada cuota que a esa fecha esta en ORDINARIA y debe algo, un abono en ordinaria y un
-     * cargo en valor por <b>lo que esa cuota debe</b> y con <b>su</b> periodo, atomicamente: el
-     * total que debe el contribuyente no cambia, solo la fase en la que el libro lo cuenta. Una
-     * cuota que a esa fecha no vencio, que ya se pago o que esta en otra fase no se toca.
+     * cargo en valor por <b>lo que esa cuota tiene en ORDINARIA</b> y con <b>su</b> periodo,
+     * atomicamente: el total que debe el contribuyente no cambia, solo la fase en la que el libro
+     * lo cuenta. Una cuota que a esa fecha no vencio, que ya se pago o que esta en otra fase no se
+     * toca.
+     *
+     * <p><b>Lo que tiene en ORDINARIA, y no lo que debe (#510).</b> Es el espejo de {@link
+     * #moverACoactiva}, y por lo mismo: hasta #510 cada cuota pasaba lo que debia en todas sus
+     * fases, y con una parte ya formalizada eso sacaba de ORDINARIA deuda que no estaba ahi. Una
+     * rectificacion asentada despues de la OP deja el ultimo asiento de la cuota en ORDINARIA, y la
+     * RD que la formaliza movia los 600 —los 500 de la OP y los 100 de la rectificacion— y dejaba
+     * ORDINARIA en -500 y VALOR en 1 100; con la deuda ya importada, lo que estaba en COACTIVA
+     * volvia a contarse. Leido aqui, lo que se mueve es:
+     *
+     * <ul>
+     *   <li>el neto de la cuota en ORDINARIA a {@code fechaValor} —cargos menos abonos, todos los
+     *       conceptos—, porque eso es lo que la fase tiene; un segundo valor sobre la misma deuda
+     *       ya no encuentra nada, salvo lo que un cargo posterior al primero dejo alli;
+     *   <li>y nunca mas de lo que la cuota debe a esa fecha, porque un abono que el libro asento en
+     *       otra fase deja en ORDINARIA mas de lo que se debe, y el pase no formaliza deuda que no
+     *       existe.
+     * </ul>
      *
      * <p>Hasta #448 quien llamaba pasaba el periodo y el monto, y no los podia saber: {@code
      * valores} tiene la obligacion agregada, asi que pasaba periodo nulo y el total, y el par caia
@@ -49,8 +67,9 @@ public interface MovimientoDeFase {
      * @param fechaValor fecha a la que se imputan los asientos, y a la que se mide lo que se debe
      * @param documentoOrigen el numero del valor que origina el movimiento
      * @param observacion por que se mueve (regla 10)
-     * @return lo que se paso a VALOR, la suma de las cuotas; quien llama lo compara con lo que
-     *     congelo, y si no coincide el libro no es el que leyo
+     * @return lo que se paso a VALOR, la suma de las cuotas; cero si ninguna tenia nada en
+     *     ORDINARIA, y entonces no se asienta ningun par. Quien formaliza la obligacion por primera
+     *     vez lo compara con lo que congelo, y si no coincide el libro no es el que leyo
      */
     Dinero moverAValor(
             long contribuyenteId,
@@ -65,8 +84,9 @@ public interface MovimientoDeFase {
      * obligacion tiene en la fase {@link kamayuk.rentas.cuentacorriente.dominio.Fase#VALOR} (#407).
      *
      * <p>Es el espejo de {@link #moverAValor} en el par —un abono en fase valor y un cargo por el
-     * mismo importe en fase coactiva, atomicamente—, y el total que debe el contribuyente no
-     * cambia. Un convenio coactivo que se quiebre la devuelve a COACTIVA y no a VALOR.
+     * mismo importe en fase coactiva, atomicamente— y en el monto —lo que la fase de salida tiene,
+     * acotado por lo que se debe (#510)—, y el total que debe el contribuyente no cambia. Un
+     * convenio coactivo que se quiebre la devuelve a COACTIVA y no a VALOR.
      *
      * <p><b>Pero el monto no lo decide quien llama, y es a proposito.</b> Lo que entra en coactiva
      * es lo que la OP o la RD formalizaron y sigue en VALOR, y eso solo lo sabe el libro. La

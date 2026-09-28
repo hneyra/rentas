@@ -15,7 +15,7 @@ import kamayuk.rentas.dominio.Porcentaje;
  *
  * <p><b>Que aqui haya un {@code contribuyenteId} no contradice a {@link FichaDelPadron}</b>, que
  * publica el nombre del titular y no su identificador. Son dos fronteras distintas y la decision de
- * ADR-0015 §2.4 las separa: el identificador puede cruzar hacia otro <b>contexto</b> —{@link
+ * ADR-0015 §2.4 las separa: el identificador puede cruzar hacia otro <b>contexto</b> —{@code
  * PredioDelPadron} ya lo hacia para la deteccion de omisos (#49)—, y lo que no puede es salir por
  * HTTP en un <b>listado</b>, que convertiria la consulta de fichas en un extractor de la
  * correlacion predio→persona de todo el padron. Quien resuelve este identificador a un codigo de

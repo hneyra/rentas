@@ -4,12 +4,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeProgramas;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDePrograma;
@@ -165,7 +165,7 @@ public class ProgramaFiscalizacionRepositoryJdbc extends RepositorioJdbc
 
         if (criterio.codigo() != null) {
             donde.append(" AND codigo = :codigo");
-            parametros.put("codigo", criterio.codigo().strip().toUpperCase(Locale.ROOT));
+            parametros.put("codigo", NumeroImpreso.formaDeBusqueda(criterio.codigo()));
         }
         if (criterio.ejercicio() != null) {
             donde.append(

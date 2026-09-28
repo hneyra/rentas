@@ -82,10 +82,15 @@ class ValoresControllerTest {
                     Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
 
     /**
-     * La referencia de cada par AJUSTE que {@code RegistrarValor} pidio: #366 cuenta cuantos, y el
-     * doble anterior los tiraba.
+     * La referencia de cada par AJUSTE que el libro asento: #366 cuenta cuantos, y el doble
+     * anterior los tiraba. Desde #510 {@code RegistrarValor} pide el pase siempre, y el par solo
+     * existe si la obligacion tenia algo en ORDINARIA.
      */
     private final List<String> paresDeAjuste = new ArrayList<>();
+
+    /** Lo que ya paso a VALOR, por obligacion: lo que el libro ya no tiene en ORDINARIA (#510). */
+    private final java.util.Map<kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica, Dinero>
+            enValor = new java.util.HashMap<>();
 
     private final RegistrarValor registrar =
             new RegistrarValor(
@@ -100,14 +105,23 @@ class ValoresControllerTest {
                                 LocalDate fechaValor,
                                 String documentoOrigen,
                                 Observacion observacion) {
+                            // El libro mueve lo que la obligacion tiene en ORDINARIA (#448,
+                            // #510): lo que la consulta de deuda publica menos lo que ya paso.
+                            Dinero enOrdinaria =
+                                    deuda.pendientesDe(contribuyenteId, fechaValor).stream()
+                                            .filter(una -> una.clave().equals(obligacion))
+                                            .map(
+                                                    kamayuk.rentas.cuentacorriente.ObligacionPublica
+                                                            ::total)
+                                            .findFirst()
+                                            .orElse(Dinero.CERO)
+                                            .menos(enValor.getOrDefault(obligacion, Dinero.CERO));
+                            if (!enOrdinaria.esPositivo()) {
+                                return Dinero.CERO;
+                            }
+                            enValor.merge(obligacion, enOrdinaria, Dinero::mas);
                             paresDeAjuste.add(referenciaExterna);
-                            // El libro mueve lo que la obligacion debe (#448): lo que la consulta
-                            // de deuda publica.
-                            return deuda.pendientesDe(contribuyenteId, fechaValor).stream()
-                                    .filter(una -> una.clave().equals(obligacion))
-                                    .map(kamayuk.rentas.cuentacorriente.ObligacionPublica::total)
-                                    .findFirst()
-                                    .orElse(Dinero.CERO);
+                            return enOrdinaria;
                         }
 
                         @Override

@@ -104,9 +104,9 @@ public final class PoliticasDeRedondeoSelladas {
      * nombra el punto y nada mas; quien si lo sabe es quien acaba de leer el conjunto, y es aqui.
      *
      * <p>Con eso, esa ausencia entra en el mismo contrato que sus cuatro hermanas ({@link
-     * ParametroSinPublicar}) y sale con el mismo miembro {@code parametroQueFalta} del cuerpo
-     * (#604): sin el, un 422 que nadie puede arreglar desde la pantalla seria indistinguible de uno
-     * que si —«corrige el formulario» dicho de una fila que hay que publicar—.
+     * CifraSinPublicar}) y sale con el mismo miembro {@code parametroQueFalta} del cuerpo (#604):
+     * sin el, un 422 que nadie puede arreglar desde la pantalla seria indistinguible de uno que si
+     * —«corrige el formulario» dicho de una fila que hay que publicar—.
      *
      * @throws PuntoSinObservar si el conjunto observa puntos pero no <b>este</b>
      * @throws SinPuntosObservados si el conjunto no observa ninguno
@@ -195,10 +195,10 @@ public final class PoliticasDeRedondeoSelladas {
     /**
      * El conjunto sellado no parametriza ningun punto de redondeo.
      *
-     * <p>Su llave es el {@code TIPO} solo, sin clave ({@link ParametroSinPublicar}): lo que falta
-     * no es una fila sino <b>todas</b>, y quien lee las politicas no sabe cual de los trece puntos
-     * queria el que llamo. Nombrar {@code REDONDEO:CUOTA} porque es el que el convenio usa seria
-     * una afirmacion verosimil y equivocada dicha desde el lector generico.
+     * <p>Su llave es el {@code TIPO} solo, sin clave ({@link CifraSinPublicar}): lo que falta no es
+     * una fila sino <b>todas</b>, y quien lee las politicas no sabe cual de los trece puntos queria
+     * el que llamo. Nombrar {@code REDONDEO:CUOTA} porque es el que el convenio usa seria una
+     * afirmacion verosimil y equivocada dicha desde el lector generico.
      */
     public static final class SinPuntosObservados extends CifraSinPublicar {
 

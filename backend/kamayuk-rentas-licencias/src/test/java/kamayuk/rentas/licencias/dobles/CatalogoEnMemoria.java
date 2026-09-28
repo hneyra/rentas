@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.licencias.dominio.Ciiu;
 import kamayuk.rentas.licencias.dominio.CiiuRepository;
 import kamayuk.rentas.licencias.dominio.CriterioDeCiiu;
@@ -55,7 +56,7 @@ public final class CatalogoEnMemoria implements CiiuRepository {
 
     @Override
     public Optional<Ciiu> porCodigo(String codigo) {
-        String buscado = codigo.strip().toUpperCase(Locale.ROOT);
+        String buscado = NumeroImpreso.formaDeBusqueda(codigo);
         return giros.stream().filter(giro -> giro.codigo().equals(buscado)).findFirst();
     }
 

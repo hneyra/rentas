@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.Set;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.licencias.dominio.Ciiu;
 import kamayuk.rentas.licencias.dominio.CiiuRepository;
@@ -106,7 +107,7 @@ public class CiiuRepositoryJdbc extends RepositorioJdbc implements CiiuRepositor
     @Override
     public Optional<Ciiu> porCodigo(String codigo) {
         return jdbc().sql("SELECT " + COLUMNAS + " FROM ciiu WHERE codigo = :codigo")
-                .param("codigo", codigo.strip().toUpperCase(Locale.ROOT))
+                .param("codigo", NumeroImpreso.formaDeBusqueda(codigo))
                 .query(CiiuRepositoryJdbc::mapear)
                 .optional();
     }
@@ -129,7 +130,11 @@ public class CiiuRepositoryJdbc extends RepositorioJdbc implements CiiuRepositor
 
         if (criterio.codigo() != null) {
             RangoDePrefijo.condicion(
-                    donde, parametros, "codigo", criterio.codigo().toUpperCase(Locale.ROOT), "cod");
+                    donde,
+                    parametros,
+                    "codigo",
+                    NumeroImpreso.formaDeBusqueda(criterio.codigo()),
+                    "cod");
         }
         if (criterio.descripcion() != null) {
             RangoDePrefijo.condicion(

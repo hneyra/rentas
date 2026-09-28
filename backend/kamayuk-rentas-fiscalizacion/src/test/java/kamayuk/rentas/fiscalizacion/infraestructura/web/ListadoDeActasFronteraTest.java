@@ -13,23 +13,35 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
+import kamayuk.rentas.catastro.prueba.FichasDelEscenario;
 import kamayuk.rentas.compartido.TenantContext;
+import kamayuk.rentas.dominio.AreaM2;
+import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.MunicipalidadId;
+import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.esquema.ProyeccionDeCatastro;
 import kamayuk.rentas.fiscalizacion.aplicacion.AnularActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeActas;
+import kamayuk.rentas.fiscalizacion.aplicacion.LiquidarFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dobles.ContribuyentesDeMentira;
+import kamayuk.rentas.fiscalizacion.dobles.ParametrosDeMentira;
+import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
+import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
+import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
 import kamayuk.rentas.fiscalizacion.infraestructura.ActaFiscalizacionRepositoryJdbc;
 import kamayuk.rentas.fiscalizacion.infraestructura.LiquidacionRepositoryJdbc;
 import kamayuk.rentas.fiscalizacion.infraestructura.MovimientoDeLiquidacionRepositoryJdbc;
 import kamayuk.rentas.fiscalizacion.infraestructura.ResolucionDeDeterminacionRepositoryJdbc;
+import kamayuk.rentas.nucleo.aplicacion.DeclaracionesDelEjercicioRentas;
+import kamayuk.rentas.nucleo.infraestructura.DeclaracionJuradaRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.GuardiaDeParametros;
@@ -54,6 +66,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -115,6 +128,9 @@ class ListadoDeActasFronteraTest {
     private static ContribuyentesDeMentira padron;
 
     private static PlatformTransactionManager gestorDeTransacciones;
+
+    /** El conjunto sellado de 2026 de la tercera municipalidad, que la liquidacion copia. */
+    private static long conjuntoSelladoDeC;
 
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
@@ -184,6 +200,18 @@ class ListadoDeActasFronteraTest {
         long programaC = crearPrograma(municipalidadC, "PF-C-01", "PREDIAL", EJERCICIO);
         sembrarElAmpliadoPorCatastro(municipalidadC, programaC, titularC, "C. UNO");
         sembrarElOmisoConFicha(municipalidadC, programaC, titularC, "C. DOS");
+        // Y el que distingue la tercera asercion (#344, anotada en #629): dos declaraciones del
+        // mismo dia sobre dos versiones de ficha. Lo declarado es la mas reciente, y la
+        // liquidacion que sale del acta tiene que leer la misma.
+        sembrarDosDeclaracionesDelMismoDia(municipalidadC, programaC, titularC, "C. TRES");
+        conjuntoSelladoDeC =
+                ejecutarComoApp(
+                        municipalidadC,
+                        "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio,"
+                                + " version, estado, fecha_sellado, usuario_sellado)"
+                                + " VALUES (?, ?, 1, 'SELLADO', now(), 'siembra') RETURNING id",
+                        municipalidadC,
+                        (short) EJERCICIO);
 
         // El paso que en produccion dispara un evento de `catastro`: sin el, `ficha_ref` esta
         // vacia y el lado declarado del contraste sale nulo aunque el escenario tenga fichas.
@@ -416,6 +444,39 @@ class ListadoDeActasFronteraTest {
                     .contains("\"diferenciaDeArea\":null");
         }
 
+        /**
+         * La tercera asercion de #344, que #629 anoto: el acta publica un lado declarado, y la
+         * liquidacion que sale de esa misma acta determina sobre el suyo. Si los dos no leen la
+         * misma declaracion, la pantalla dice una diferencia y el papel otra.
+         *
+         * <p>La liquidacion se arma como en produccion salvo lo que vive fuera de esta base: la
+         * version de ficha la lee {@link FichasDelEscenario} del escenario sembrado, y el uso no se
+         * compara —lo da catastro por HTTP y aqui no hay catastro—.
+         */
+        @Test
+        @DisplayName(
+                "#344 — y la liquidacion que sale del acta determina lo mismo que el acta publica")
+        void laLiquidacionDeterminaLoQueElActaPublica() throws Exception {
+            TenantContext.fijar(new MunicipalidadId(municipalidadC));
+            for (String fiscalizador : List.of("C. UNO", "C. DOS", "C. TRES")) {
+                String acta = actaDe(fiscalizador);
+                LineaDeLiquidacion linea = lineaDeLaLiquidacionDe(fiscalizador);
+
+                assertThat(area(acta, "areaDeclarada"))
+                        .as(
+                                "%s: lo declarado del acta es lo que su liquidacion compara"
+                                        + " —acta %s—",
+                                fiscalizador, acta)
+                        .isEqualTo(linea.areaDeclarada());
+                assertThat(area(acta, "diferenciaDeArea"))
+                        .as(
+                                "%s: la diferencia que el acta publica es la que su liquidacion"
+                                        + " determina",
+                                fiscalizador)
+                        .isEqualTo(linea.diferenciaDeArea());
+            }
+        }
+
         /** El objeto JSON de esa acta, recortado del arreglo por su fiscalizador. */
         private String actaDe(String fiscalizador) throws Exception {
             String cuerpo = actas(null, null).getResponse().getContentAsString();
@@ -628,6 +689,57 @@ class ListadoDeActasFronteraTest {
         }
     }
 
+    /**
+     * Liquida el acta de ese fiscalizador en la municipalidad del contexto y devuelve la linea de
+     * su ejercicio: el caso de uso envuelto como en el contenedor, con los repositorios de verdad y
+     * la declaracion leida por el puerto de {@code rentas}.
+     */
+    private static LineaDeLiquidacion lineaDeLaLiquidacionDe(String fiscalizador) {
+        long municipalidad = TenantContext.actual().valor();
+        long actaId =
+                ejecutarComoApp(
+                        municipalidad,
+                        "SELECT id FROM acta_fiscalizacion WHERE fiscalizador = ?",
+                        fiscalizador);
+        LiquidarFiscalizacion liquidar =
+                envolver(
+                        new LiquidarFiscalizacion(
+                                new ActaFiscalizacionRepositoryJdbc(jdbc),
+                                new LiquidacionRepositoryJdbc(jdbc),
+                                new MovimientoDeLiquidacionRepositoryJdbc(jdbc),
+                                new ParametrosDeMentira().sellar(EJERCICIO, conjuntoSelladoDeC, 1),
+                                (predioId, fecha) -> Optional.empty(),
+                                new FichasDelEscenario(jdbc),
+                                new DeclaracionesDelEjercicioRentas(
+                                        new DeclaracionJuradaRepositoryJdbc(jdbc)),
+                                registro -> {}),
+                        gestorDeTransacciones);
+        Liquidacion liquidacion =
+                liquidar.liquidar(
+                        actaId,
+                        new Ejercicio(EJERCICIO),
+                        new Ejercicio(EJERCICIO),
+                        TipoDeFiscalizacion.CIERTA,
+                        "Programa de fiscalizacion predial",
+                        VISITA.plusDays(10),
+                        Observacion.de("Se liquida el acta de la prueba"));
+        List<LineaDeLiquidacion> lineas =
+                new TransactionTemplate(gestorDeTransacciones)
+                        .execute(
+                                estado ->
+                                        new LiquidacionRepositoryJdbc(jdbc)
+                                                .lineasDe(liquidacion.identificador()));
+        assertThat(lineas).as("un ejercicio, una linea").hasSize(1);
+        return lineas.getFirst();
+    }
+
+    /** Un area del objeto JSON de un acta: nula si el campo sale {@code null}. */
+    private static @Nullable AreaM2 area(String acta, String campo) {
+        Matcher valor = Pattern.compile("\"" + campo + "\":(null|\"([^\"]*)\")").matcher(acta);
+        assertThat(valor.find()).as("el acta publica %s: %s", campo, acta).isTrue();
+        return valor.group(2) == null ? null : AreaM2.de(valor.group(2));
+    }
+
     private static long idDelActa(String fiscalizador) {
         return consultarComoApp(
                 "SELECT id FROM acta_fiscalizacion WHERE fiscalizador = '" + fiscalizador + "'");
@@ -798,6 +910,41 @@ class ListadoDeActasFronteraTest {
                 predioId,
                 inscrita,
                 "OMISO",
+                null,
+                fiscalizador,
+                "260.00");
+    }
+
+    /**
+     * Dos DJ 2026 vigentes del mismo predio, presentadas el MISMO dia: la primera sobre la v1 (200
+     * m2); la segunda —la mas reciente, la de identificador mayor— sobre la v2 (260 m2), que
+     * catastro inscribio ese dia. La visita midio 260. Lo declarado es lo de la mas reciente: 260,
+     * y la diferencia cero (#344, anotado en #629). Con la misma fecha, «la mas reciente» la decide
+     * el identificador, que es el desempate de {@code LaDeclaracionDelEjercicio}.
+     */
+    private static void sembrarDosDeclaracionesDelMismoDia(
+            long municipalidadId, long programaId, long contribuyenteId, String fiscalizador) {
+        long predioId = crearPredio(municipalidadId);
+        long primera =
+                crearVersion(
+                        municipalidadId,
+                        predioId,
+                        1,
+                        "200.00",
+                        LocalDate.of(2025, 1, 1),
+                        LocalDate.of(2026, 1, 14));
+        long segunda =
+                crearVersion(
+                        municipalidadId, predioId, 2, "260.00", LocalDate.of(2026, 1, 15), null);
+        crearDeclaracion(municipalidadId, contribuyenteId, predioId, primera);
+        crearDeclaracion(municipalidadId, contribuyenteId, predioId, segunda);
+        insertarActaPredial(
+                municipalidadId,
+                programaId,
+                contribuyenteId,
+                predioId,
+                segunda,
+                "CONFORME",
                 null,
                 fiscalizador,
                 "260.00");

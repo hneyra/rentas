@@ -134,6 +134,12 @@ function urlDeLaBase(e: EntornoDelDescriptor): string {
 const VENTANA_DE_LOTE = "0 7 * * *";
 
 /**
+ * La conciliacion del saldo proyectado contra el libro (#630): 04:00 hora de Peru, o sea 09:00
+ * UTC, **dos horas despues de la ventana de lote**. Ver el comentario del CronJob en `lotes()`.
+ */
+const VENTANA_DE_LA_CONCILIACION = "0 9 * * *";
+
+/**
  * Cada cinco minutos: la ventana de inconsistencia de la copia local de la autorizacion
  * (ADR-0039, etapa 4). Ver el comentario del CronJob en `lotes()`.
  */
@@ -804,7 +810,8 @@ export const rentas: DescriptorDeSistema = {
    * (#400): la generacion masiva de valores y la de papeletas SI tenian trabajo de lote —sus
    * etapas escritas y reanudables, y sus rutas contestando 201— y ningun runner las invocaba.
    * Desde #400 lo tienen, `CorrerLasCorridasDeValores` y `CorrerLasCorridasDePapeletas`, y su
-   * `CronJob` es el tercero de `lotes()`.
+   * `CronJob` es el tercero de `lotes()`. El cuarto es de #630, por el mismo hueco: la
+   * conciliacion del saldo contra el libro estaba escrita y nadie la corria.
    *
    * ## Lo que costaba tenerlo, que es mas que un pod en rojo
    *
@@ -952,6 +959,9 @@ export const rentas: DescriptorDeSistema = {
    *
    * **Y las corridas de la generacion masiva** (#400), que es el tercero: el runner de las de
    * valores y el de las de papeletas, en el mismo proceso. Ver su comentario abajo.
+   *
+   * **Y la conciliacion del saldo proyectado contra el libro** (#630), que es el cuarto: la red de
+   * seguridad de ADR-0006, que hasta #630 estaba escrita y no la corria nadie. Ver su comentario.
    */
   lotes(e): Manifiesto[] {
     const nombre = `kamayuk-${SISTEMA}-ingestor`;
@@ -1154,7 +1164,68 @@ export const rentas: DescriptorDeSistema = {
         },
       },
     };
-    return [ingestor, consumidor, deLasCorridas];
+    // La conciliacion del saldo proyectado contra el libro (#630): `CorrerLaConciliacionDelSaldo`,
+    // la red de seguridad de ADR-0006 —«el saldo es cache, no verdad; si discrepa del libro, el
+    // libro gana»—. Hasta #630 estaba escrita desde #23 y ningun proceso la corria: un saldo que se
+    // desviara del libro se quedaba desviado, y el estado de cuenta decia una cifra que el libro no
+    // respalda.
+    //
+    // En SU ventana y no en la de lote, y a proposito DESPUES de ella: lo que se concilia es lo que
+    // esa noche escribieron las corridas y el ingestor, entero y no a medias, y antes de que abra la
+    // ventanilla. La conciliacion lee cada contribuyente en una sola instantanea (`REPEATABLE READ`),
+    // asi que un escritor concurrente no le fabrica divergencias; lo que evita la hora es la carga.
+    //
+    // Solo CONCILIA: informa cada divergencia con nivel ERROR y sale con 1 mientras quede alguna,
+    // porque una divergencia del saldo no se cura sola. REPARAR no se programa: lo pide quien lee el
+    // informe, relanzando este mismo `Job` con `KAMAYUK_RENTAS_SALDOS_RECONSTRUIR=true`, despues de
+    // buscar que escritura lo desvio. Por eso esa variable no esta aqui.
+    //
+    // `backoffLimit: 0` y no 1, al reves que los otros tres: un rojo de la conciliacion es un
+    // hallazgo, no un fallo transitorio, y reintentarlo esa misma noche volveria a leer el padron
+    // entero de cada municipalidad para decir lo mismo. Recorre TODAS las municipalidades activas
+    // (ADR-0020), asi que no lleva la de la implantacion.
+    //
+    // Lo que cuesta en el nodo: un `RECURSOS_DE_ARRANQUE` mas en el pico —50m / 256Mi—, que
+    // `infrastructure` cuenta aunque su ventana no sea la de los demas. Las cifras que eso mueve
+    // alli se remiden alli, despues de mezclar este.
+    const conciliacion = `kamayuk-${SISTEMA}-conciliacion-del-saldo`;
+    const deLaConciliacion: CronJob = {
+      apiVersion: "batch/v1",
+      kind: "CronJob",
+      metadata: { name: conciliacion, namespace: e.namespace, labels: etiquetas },
+      spec: {
+        schedule: VENTANA_DE_LA_CONCILIACION,
+        concurrencyPolicy: "Forbid",
+        successfulJobsHistoryLimit: 3,
+        failedJobsHistoryLimit: 3,
+        jobTemplate: {
+          spec: {
+            backoffLimit: 0,
+            template: {
+              metadata: { labels: { ...etiquetas, app: conciliacion } },
+              spec: {
+                restartPolicy: "Never",
+                priorityClassName: e.prioridadDe("lote"),
+                containers: [
+                  {
+                    name: "conciliacion-del-saldo",
+                    image: e.imagenDe(SISTEMA),
+                    env: [
+                      { name: "SPRING_PROFILES_ACTIVE", value: "batch" },
+                      ...credencialesDeLaAplicacion(e),
+                      { name: "KAMAYUK_RENTAS_SALDOS_CONCILIAR", value: "true" },
+                    ],
+                    resources: RECURSOS_DE_ARRANQUE,
+                    securityContext: SEGURIDAD,
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    };
+    return [ingestor, consumidor, deLasCorridas, deLaConciliacion];
   },
 
   /**

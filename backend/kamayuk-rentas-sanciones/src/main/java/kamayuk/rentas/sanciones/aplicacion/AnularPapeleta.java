@@ -2,6 +2,8 @@ package kamayuk.rentas.sanciones.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -272,8 +274,10 @@ public class AnularPapeleta {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoría. */
-    private static String descripcion(Papeleta papeleta) {
-        return "{\"estado\":\"" + papeleta.estado() + "\"}";
+    private static Map<String, Object> descripcion(Papeleta papeleta) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("estado", papeleta.estado());
+        return campos;
     }
 
     /**

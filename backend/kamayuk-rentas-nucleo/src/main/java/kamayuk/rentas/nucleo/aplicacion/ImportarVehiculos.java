@@ -9,6 +9,7 @@ import kamayuk.rentas.carga.InformeDeImportacion;
 import kamayuk.rentas.carga.InformeDeImportacion.FilaRechazada;
 import kamayuk.rentas.carga.LectorDeFilasCsv;
 import kamayuk.rentas.carga.LectorDeFilasCsv.FilaCsv;
+import kamayuk.rentas.compartido.CifraTecleada;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
@@ -31,7 +32,7 @@ import org.springframework.stereotype.Service;
  *
  * <h2>Rechazo por fila, no por archivo</h2>
  *
- * <p>Mismo reparto transaccional que {@link ImportarVias}, y por el mismo motivo: este metodo
+ * <p>Mismo reparto transaccional que {@code ImportarVias}, y por el mismo motivo: este metodo
  * <b>no</b> lleva {@code @Transactional}, asi que cada fila abre la suya al llamar a {@link
  * RegistrarVehiculo}, que es un {@code @Service} distinto. Una placa repetida revienta {@code
  * vehiculo_placa_uq} y aborta <b>esa</b> transaccion; la fila siguiente entra con normalidad.
@@ -136,14 +137,17 @@ public class ImportarVehiculos {
                 fechaAdquisicion.isEmpty() ? null : fecha(fechaAdquisicion));
     }
 
+    /**
+     * El valor de adquisicion, con la regla de todo importe tecleado (#395, #629): dos decimales
+     * como mucho. Un tercero rechaza la fila; aceptarlo dejaba que {@code dinero numeric(15,2)} lo
+     * redondeara al guardar, y la base del impuesto vehicular salia de otra cifra.
+     */
     private static Dinero importe(String texto) {
-        try {
-            return Dinero.de(texto);
-        } catch (NumberFormatException noEsImporte) {
-            throw new IllegalArgumentException(
-                    "El valor de adquisicion no es un importe en soles: '" + texto + "'",
-                    noEsImporte);
-        }
+        return new Dinero(
+                CifraTecleada.leer(
+                        texto,
+                        "valorAdquisicion",
+                        "El valor de adquisicion no es un importe en soles: '" + texto + "'"));
     }
 
     private static LocalDate fecha(String texto) {

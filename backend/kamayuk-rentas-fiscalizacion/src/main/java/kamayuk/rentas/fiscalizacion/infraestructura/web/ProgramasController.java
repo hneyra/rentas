@@ -220,7 +220,7 @@ public class ProgramasController {
      * <p>Los cuatro últimos son los parámetros con los que el programa sortea su muestra ({@code
      * V60}). Son opcionales en el cuerpo y no en el acto: un programa sin ellos se registra —los
      * anteriores a {@code V60} están así en la base— pero no puede generar muestra, y {@link
-     * GenerarMuestra} falla nombrando el que falte.
+     * kamayuk.rentas.fiscalizacion.aplicacion.GenerarMuestra} falla nombrando el que falte.
      */
     public record PeticionDePrograma(
             @Nullable String observacion,

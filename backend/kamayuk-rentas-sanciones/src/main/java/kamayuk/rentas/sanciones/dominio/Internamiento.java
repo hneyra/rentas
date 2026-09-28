@@ -3,6 +3,7 @@ package kamayuk.rentas.sanciones.dominio;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Placa;
 import org.jspecify.annotations.Nullable;
@@ -77,7 +78,7 @@ public record Internamiento(
         }
         Objects.requireNonNull(fechaIngreso, "El internamiento necesita su fecha de ingreso");
         Objects.requireNonNull(acta, "Un vehiculo internado sin acta es un vehiculo retenido");
-        acta = acta.strip().toUpperCase(Locale.ROOT);
+        acta = NumeroImpreso.formaDeBusqueda(acta);
         if (acta.isEmpty() || acta.length() > ACTA_MAXIMA) {
             throw new IllegalArgumentException(
                     "El acta va de 1 a " + ACTA_MAXIMA + " caracteres: '" + acta + "'");

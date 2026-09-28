@@ -50,9 +50,10 @@ public class ConsultaDelEmbudo {
      * Por qué campo se recorre el padrón al contar los detectados, y <b>es el nombre que la fila
      * publica</b>.
      *
-     * <p>El mismo que {@link GenerarMuestra}, y por el mismo motivo: {@code predio_id} salió de la
-     * lista blanca en #546 y pedirlo devuelve <b>422 {@code ORDEN_NO_ADMITIDO}</b>. Que aquí sólo
-     * se lea el sobre no exime: la paginación exige siempre un {@code ORDER BY} válido.
+     * <p>{@code predio_id} salió de la lista blanca en #546 y pedirlo devuelve <b>422 {@code
+     * ORDEN_NO_ADMITIDO}</b>. Que aquí sólo se lea el sobre no exime: la paginación exige siempre
+     * un {@code ORDER BY} válido. {@link GenerarMuestra} ya no pide ninguno: recorre el padrón por
+     * su clave (#346, anotado en #629), y esta lectura no recorre nada, cuenta.
      */
     private static final String ORDEN_DEL_RECORRIDO = "codRefCatastral";
 

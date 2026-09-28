@@ -8,7 +8,6 @@ import java.util.Objects;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.parametros.CifraSinPublicar;
-import kamayuk.rentas.parametros.ParametroSinPublicar;
 
 /**
  * El cuadro de valores unitarios de edificacion tal como la valorizacion del FUE lo consulta (#48
@@ -156,21 +155,21 @@ public final class TablaDeValoresUnitarios {
      * #233), y una valorizacion de cero soles es indistinguible de una correcta cuando llega al
      * papel que el administrado se lleva.
      *
-     * <h2>Por que declara {@link ParametroSinPublicar} si hoy no la traduce nadie (#723)</h2>
+     * <h2>Por que es una {@link CifraSinPublicar} si hoy no la traduce nadie (#723)</h2>
      *
-     * <p>Tenia {@code llave()} desde #48 y <b>no</b> declaraba la interfaz, asi que la guarda de
+     * <p>Tenia {@code llave()} desde #48 y <b>no</b> declaraba la familia, asi que la guarda de
      * #691 no la contaba dentro de su familia. Hoy eso no rompe nada porque ningun {@code catch} la
      * convierte en una respuesta HTTP: {@code ValorizacionDelFue} la caza y devuelve un {@code
      * Resultado.noDisponible}, que es un valor y no un problema. El dia que alguien la traduzca —y
      * la valorizacion del FUE es justo lo que espera a que D-02a firme el cuadro— la guarda no la
-     * veria, porque su familia se computa de quien declara la interfaz. Es una trampa que solo
-     * salta cuando se pisa, y declararla ahora no cambia ni una respuesta.
+     * veria, porque su familia se computa de quien la declara. Es una trampa que solo salta cuando
+     * se pisa, y declararla ahora no cambia ni una respuesta.
      *
      * <h2>La llave que se publica y la celda que se lee no son la misma cadena</h2>
      *
      * <p>{@link #celda()} es {@code MUROS:C}, que es lo que {@code FueResource.llaveQueFalta} lleva
-     * a la pantalla desde #48 y sigue igual byte a byte. {@link #llave()} —la de la interfaz— es
-     * {@code VALOR_UNITARIO:MUROS:C}, porque el contrato de {@link ParametroSinPublicar} es {@code
+     * a la pantalla desde #48 y sigue igual byte a byte. {@link #llave()} —la de la familia— es
+     * {@code VALOR_UNITARIO:MUROS:C}, porque el contrato de {@link CifraSinPublicar} es {@code
      * TIPO:CLAVE} y sin el tipo la cadena no dice <b>que cuadro</b> hay que publicar; {@code MUROS}
      * no es ningun tipo de parametro. No divergen: la segunda se compone de la primera.
      */

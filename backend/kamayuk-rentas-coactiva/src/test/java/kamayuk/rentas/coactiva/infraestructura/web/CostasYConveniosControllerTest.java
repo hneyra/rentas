@@ -1163,9 +1163,9 @@ class CostasYConveniosControllerTest {
          * Una excepcion de mentira que publica lo que falta, como las de verdad (#691).
          *
          * <p>{@code CondicionesSinPublicar} copia el ejercicio y la llave de su causa, y su
-         * constructor exige {@code RuntimeException & ParametroSinPublicar}: un doble que lanzara
-         * un {@code IllegalStateException} pelado ya no compila, que es exactamente lo que ese
-         * limite existe para conseguir.
+         * constructor exige una {@code CifraSinPublicar}: un doble que lanzara un {@code
+         * IllegalStateException} pelado ya no compila, que es exactamente lo que ese limite existe
+         * para conseguir.
          */
         private static final class FaltaDeMentira
                 extends kamayuk.rentas.parametros.CifraSinPublicar {

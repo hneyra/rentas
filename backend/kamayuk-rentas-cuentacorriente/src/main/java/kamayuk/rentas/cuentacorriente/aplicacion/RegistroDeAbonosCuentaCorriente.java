@@ -208,7 +208,7 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
      * <p>{@link RegistrarAsiento#reversar} reproyecta el saldo de cada obligacion tocada, en esta
      * misma transaccion. O vuelven la deuda y su proyeccion, o no vuelve ninguna de las dos.
      *
-     * <h2>Y antes, el devengo de lo que vuelve a deberse (#365)</h2>
+     * <h4>Y antes, el devengo de lo que vuelve a deberse (#365)</h4>
      *
      * <p>Los reversos se asientan con la fecha de la anulacion, y esa fecha pasa a ser el ultimo
      * movimiento de la cuota: desde ahi acumula {@link CalculoDeDeuda#deudaActualizadaA}. Si no se

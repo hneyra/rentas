@@ -1,6 +1,8 @@
 package kamayuk.rentas.sanciones.aplicacion;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -100,11 +102,10 @@ public class RegistrarNotificacionAdministrativa {
         }
     }
 
-    private static String descripcion(NotificacionAdministrativa notificacion) {
-        return "{\"numero\":\""
-                + notificacion.numero()
-                + "\",\"estado\":\""
-                + notificacion.estado()
-                + "\"}";
+    private static Map<String, Object> descripcion(NotificacionAdministrativa notificacion) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", notificacion.numero());
+        campos.put("estado", notificacion.estado());
+        return campos;
     }
 }

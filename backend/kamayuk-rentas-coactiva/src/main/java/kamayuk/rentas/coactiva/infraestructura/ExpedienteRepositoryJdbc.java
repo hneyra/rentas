@@ -22,6 +22,7 @@ import kamayuk.rentas.coactiva.dominio.ValorDelExpediente;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
@@ -155,7 +156,7 @@ public class ExpedienteRepositoryJdbc extends RepositorioJdbc implements Expedie
     @Override
     public Optional<ExpedienteCoactivo> porNumero(String numero) {
         return jdbc().sql("SELECT " + COLUMNAS + " FROM expediente_coactivo WHERE numero = :numero")
-                .param("numero", numero.strip())
+                .param("numero", NumeroImpreso.formaDeBusqueda(numero))
                 .query(ExpedienteRepositoryJdbc::mapear)
                 .optional();
     }

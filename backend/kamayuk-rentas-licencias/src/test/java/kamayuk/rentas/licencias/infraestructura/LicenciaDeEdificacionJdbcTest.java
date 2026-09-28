@@ -1820,6 +1820,74 @@ class LicenciaDeEdificacionJdbcTest {
             assertThat(suyos.totalElementos()).isZero();
         }
 
+        /**
+         * #515 dejo fuera, anotada, la copia de la normalizacion del expediente; y el numero de la
+         * licencia, en la ficha y en la grilla, <b>solo se recortaba</b>: «le-2026-000001» tecleado
+         * como se lee no existia, tampoco como licencia anterior de un FUE nuevo (#629).
+         */
+        @Test
+        @DisplayName(
+                "#515 — el expediente y el numero de licencia se buscan como se teclean: recortados"
+                        + " y en minusculas")
+        void seBuscanComoSeTeclean() {
+            String expediente = expedienteCompleto(HOY);
+            String licencia = emitirLicencia(expediente, HOY).numeroDeLicencia();
+            String expedienteTecleado = "  " + expediente.toLowerCase(Locale.ROOT) + " ";
+            String licenciaTecleada = " " + licencia.toLowerCase(Locale.ROOT) + "  ";
+
+            assertThat(enContexto(() -> consulta.porExpediente(expedienteTecleado, HOY)))
+                    .as("la ficha por expediente")
+                    .isPresent();
+            assertThat(enContexto(() -> consulta.porNumeroDeLicencia(licenciaTecleada, HOY)))
+                    .as(
+                            "la ficha por numero de licencia: solo recortaba, y en minusculas no estaba")
+                    .isPresent();
+            assertThat(
+                            enContexto(
+                                            () ->
+                                                    consulta.buscar(
+                                                            new CriterioDeFue(
+                                                                    expedienteTecleado,
+                                                                    null,
+                                                                    null,
+                                                                    null,
+                                                                    null,
+                                                                    null,
+                                                                    null,
+                                                                    null,
+                                                                    null),
+                                                            null,
+                                                            null,
+                                                            HOY,
+                                                            Paginacion.de(0, 20, "expediente")))
+                                    .contenido())
+                    .as("la grilla por expediente")
+                    .extracting(fila -> fila.fue().expediente())
+                    .containsExactly(expediente);
+            assertThat(
+                            enContexto(
+                                            () ->
+                                                    consulta.buscar(
+                                                            new CriterioDeFue(
+                                                                    null,
+                                                                    licenciaTecleada,
+                                                                    null,
+                                                                    null,
+                                                                    null,
+                                                                    null,
+                                                                    null,
+                                                                    null,
+                                                                    null),
+                                                            null,
+                                                            null,
+                                                            HOY,
+                                                            Paginacion.de(0, 20, "expediente")))
+                                    .contenido())
+                    .as("y la grilla por numero de licencia")
+                    .extracting(fila -> fila.fue().expediente())
+                    .containsExactly(expediente);
+        }
+
         @Test
         @DisplayName("desde otra municipalidad, el expediente no existe")
         void rlsAisla() {

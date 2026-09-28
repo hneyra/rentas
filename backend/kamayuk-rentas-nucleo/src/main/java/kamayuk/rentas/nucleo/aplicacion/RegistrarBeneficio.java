@@ -1,7 +1,9 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -86,22 +88,15 @@ public class RegistrarBeneficio {
         }
     }
 
-    private static String descripcion(Beneficio beneficio) {
-        return "{\"contribuyenteId\":"
-                + beneficio.contribuyenteId()
-                + ",\"tipo\":\""
-                + beneficio.tipo()
-                + "\",\"clase\":\""
-                + beneficio.clase()
-                + "\",\"tributo\":\""
-                + beneficio.tributo()
-                + "\",\"vigenciaDesde\":\""
-                + beneficio.vigenciaDesde()
-                + "\",\"vigenciaHasta\":"
-                + (beneficio.vigenciaHasta() == null
-                        ? "null"
-                        : "\"" + beneficio.vigenciaHasta() + "\"")
-                + "}";
+    private static Map<String, Object> descripcion(Beneficio beneficio) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("contribuyenteId", beneficio.contribuyenteId());
+        campos.put("tipo", beneficio.tipo());
+        campos.put("clase", beneficio.clase());
+        campos.put("tributo", beneficio.tributo());
+        campos.put("vigenciaDesde", beneficio.vigenciaDesde());
+        campos.put("vigenciaHasta", beneficio.vigenciaHasta());
+        return campos;
     }
 
     /** Ya hay un beneficio del mismo tipo vigente en ese rango para el contribuyente. */

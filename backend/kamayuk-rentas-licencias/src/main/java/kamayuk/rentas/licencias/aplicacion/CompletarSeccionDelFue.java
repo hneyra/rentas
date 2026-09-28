@@ -4,7 +4,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -266,15 +268,7 @@ public class CompletarSeccionDelFue {
                                 // datos anteriores estan enteros en su propia fila.
                                 Operacion.ALTA,
                                 observacion)
-                        .con(
-                                null,
-                                "{\"expediente\":\""
-                                        + fue.expediente()
-                                        + "\",\"seccion\":\""
-                                        + seccion.name()
-                                        + "\",\"version\":"
-                                        + version
-                                        + "}"));
+                        .con(null, descripcion(fue, seccion, version)));
     }
 
     // ------------------------------------------------------------------
@@ -373,5 +367,14 @@ public class CompletarSeccionDelFue {
                             + tipo.etiqueta().toLowerCase(java.util.Locale.ROOT)
                             + ": con dos, ninguna consulta puede decir cual responde por la obra");
         }
+    }
+
+    private static Map<String, Object> descripcion(
+            FueDeEdificacion fue, SeccionDelFue seccion, int version) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("expediente", fue.expediente());
+        campos.put("seccion", seccion.name());
+        campos.put("version", version);
+        return campos;
     }
 }

@@ -61,16 +61,13 @@ public interface EmisionDeValoresDeMultas {
      * <p>El tipo es siempre {@code RM} —resolucion de multa—: es lo que formaliza una sancion, y
      * dejarlo elegir desde fuera abriria la puerta a emitir una orden de pago por una papeleta.
      *
-     * @param contribuyenteId el obligado de la papeleta; ya resuelto por quien llama
-     * @param tributo el tributo con que la multa se asento en el libro
-     * @param ejercicio el ejercicio de la obligacion
-     * @param predioId la unidad, en una multa administrativa que cuelga de un predio
-     *     <p>Y desde #371 formaliza la obligacion <b>solo si es de esa multa</b>. La clave del
-     *     libro no distingue la papeleta: todas las multas del obligado en ese tributo, ejercicio y
-     *     unidad se suman en una obligacion, y una RM sobre ella formalizaba tambien la de otra
-     *     papeleta sin ningun acto que ordenara su cobranza —y el item de esa otra emitia una
-     *     segunda RM por la misma deuda—. Por eso se rechaza la obligacion compartida y la que ya
-     *     no esta en {@code ORDINARIA}.
+     * <p>Y desde #371 formaliza la obligacion <b>solo si es de esa multa</b>. La clave del libro no
+     * distingue la papeleta: todas las multas del obligado en ese tributo, ejercicio y unidad se
+     * suman en una obligacion, y una RM sobre ella formalizaba tambien la de otra papeleta sin
+     * ningun acto que ordenara su cobranza —y el item de esa otra emitia una segunda RM por la
+     * misma deuda—. Por eso se rechaza la obligacion compartida y la que ya no esta en {@code
+     * ORDINARIA}.
+     *
      * @param contribuyenteId el obligado de la papeleta; ya resuelto por quien llama
      * @param tributo el tributo con que la multa se asento en el libro
      * @param ejercicio el ejercicio de la obligacion

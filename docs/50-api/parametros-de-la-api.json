@@ -660,6 +660,13 @@
     "enElCuerpo": [],
     "orden": { "porOmision": "fechaEmision", "admitidos": ["ejercicio", "fechaEmision", "fecha_emision", "montoTotal", "monto_total", "numero"] }
   },
+  "GET /valores/masivo/{id}/impresion": {
+    "obligatorios": ["formato"],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
   "PATCH /coactiva/expedientes/{numero}/direccion-referencial": {
     "obligatorios": [],
     "algunoDeEstos": [],
@@ -1138,6 +1145,13 @@
     "enElCuerpo": []
   },
   "POST /transito/descargos/{nDeExpediente}/resolucion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /transito/descargos/{nDeExpediente}/resolucion/notificacion": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],

@@ -8,7 +8,7 @@ import kamayuk.rentas.compartido.Paginacion;
  * La grilla de fichas del padron, publicada para otros contextos acotados (ADR-0015 §2, #344).
  *
  * <p>Es la quinta API publica de este modulo, despues de {@link LectorDeFichas}, {@link
- * PrediosDelContribuyente}, {@link LectorDeCaracteristicas} y {@link PadronDePredios}. Vive en el
+ * PrediosDelContribuyente}, {@link LectorDeCaracteristicas} y {@code PadronDePredios}. Vive en el
  * paquete raiz por lo mismo que las otras cuatro: Spring Modulith trata como interno todo lo que
  * esta en un subpaquete.
  *

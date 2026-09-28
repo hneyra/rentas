@@ -13,7 +13,7 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.dominio.ValorNormativo;
-import kamayuk.rentas.parametros.ParametroSinPublicar;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -203,7 +203,7 @@ class FueYValorizacionTest {
         @Test
         @DisplayName("#723 — la celda que falta dice, por programa, QUE hay que publicar")
         void laCeldaQueFaltaDeclaraLaInterfaz() {
-            // Tenia llave() desde #48 y no declaraba ParametroSinPublicar, asi que la guarda de
+            // Tenia llave() desde #48 y no era una CifraSinPublicar, asi que la guarda de
             // #691 no la contaba dentro de su familia. Hoy no la traduce nadie a una respuesta
             // —ValorizacionDelFue la caza y devuelve un Resultado—, y por eso la trampa solo
             // saltaba al pisarla: el dia que alguien la tradujera, la guarda no la habria visto.
@@ -212,10 +212,10 @@ class FueYValorizacionTest {
                             List.of(celda("MUROS", 'A', "100.000000")), EJERCICIO, 2026);
 
             assertThatThrownBy(() -> tabla.valorPorM2(PartidaDeEdificacion.TECHOS, 'D'))
-                    .isInstanceOf(ParametroSinPublicar.class)
+                    .isInstanceOf(CifraSinPublicar.class)
                     .satisfies(
                             fallo -> {
-                                ParametroSinPublicar falta = (ParametroSinPublicar) fallo;
+                                CifraSinPublicar falta = (CifraSinPublicar) fallo;
                                 assertThat(falta.ejercicio())
                                         .as(
                                                 "el del conjunto sellado del que salio el cuadro,"
@@ -249,10 +249,10 @@ class FueYValorizacionTest {
             assertThat(tabla.anioDeConstruccion()).isEqualTo(1995);
             assertThat(tabla.ejercicio()).isEqualTo(EJERCICIO);
             assertThatThrownBy(() -> tabla.valorPorM2(PartidaDeEdificacion.TECHOS, 'D'))
-                    .isInstanceOf(ParametroSinPublicar.class)
+                    .isInstanceOf(CifraSinPublicar.class)
                     .satisfies(
                             fallo ->
-                                    assertThat(((ParametroSinPublicar) fallo).ejercicio())
+                                    assertThat(((CifraSinPublicar) fallo).ejercicio())
                                             .as(
                                                     "la obra es de 1995 y el cuadro es del conjunto"
                                                             + " sellado de 2026")

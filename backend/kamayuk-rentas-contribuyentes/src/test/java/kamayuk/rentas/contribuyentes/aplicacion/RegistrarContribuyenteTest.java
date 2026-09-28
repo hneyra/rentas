@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.ArrayList;
 import java.util.List;
 import kamayuk.rentas.auditoria.Auditoria;
+import kamayuk.rentas.auditoria.JsonDeAuditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.contribuyentes.dominio.CondicionEspecial;
@@ -77,7 +78,7 @@ class RegistrarContribuyenteTest {
         RegistroDeAuditoria asiento = asientos.getLast();
         assertThat(asiento.operacion()).isEqualTo(Operacion.MODIFICACION);
         assertThat(asiento.datosAnteriores())
-                .isEqualTo(antes.paraLaAuditoria())
+                .isEqualTo(JsonDeAuditoria.objeto(antes.paraLaAuditoria()))
                 .contains("\"condicionEspecial\":null");
         assertThat(asiento.datosNuevos()).contains("\"condicionEspecial\":\"PENSIONISTA\"");
     }

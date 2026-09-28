@@ -36,9 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Dos pares, y un solo motor: ORDINARIA→VALOR al emitir un valor (#37) y VALOR→COACTIVA al
  * importarlo a un expediente (#407). Son la misma operacion con otras fases, y escribirlas por
- * separado dejaria dos copias del par que la primera modificacion volveria asimetricas. Lo que
- * difiere es <b>cuanto</b>: el paso a VALOR asienta, cuota por cuota, lo que cada cuota ordinaria
- * debe (#448), y el paso a COACTIVA el que el libro tiene en VALOR (ver {@link
+ * separado dejaria dos copias del par que la primera modificacion volveria asimetricas. El monto lo
+ * decide el libro en los dos, y con la misma regla: lo que la obligacion tiene en la fase de salida
+ * —{@code netoEn}—, nunca mas de lo que se debe (#407, #510). Lo que difiere es <b>donde</b>: el
+ * paso a VALOR asienta cuota por cuota (#448), y el paso a COACTIVA en la fila anual (ver {@link
  * MovimientoDeFase#moverACoactiva}).
  *
  * <p>Las dos escrituras van en la misma transaccion: si la segunda fallara, la primera se revierte
@@ -103,7 +104,8 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
      *
      * <p>Cuota por cuota —las del libro, no las de la proyeccion—, y con la fase de cada una <b>a
      * la fecha</b> ({@link FaseDeLaObligacion}, la regla que tambien corta la consulta): una
-     * corrida masiva emite a su fecha de criterio, y la proyeccion es de hoy.
+     * corrida masiva emite a su fecha de criterio, y la proyeccion es de hoy. Y de cada cuota, lo
+     * que tiene en ORDINARIA a esa fecha, acotado por lo que debe (#510).
      */
     @Override
     @Transactional
@@ -132,8 +134,24 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
             if (FaseDeLaObligacion.a(deLaCuota, fechaValor) != Fase.ORDINARIA) {
                 continue;
             }
+            // Lo que la cuota tiene en ORDINARIA, y no lo que debe en todas sus fases (#510): tras
+            // la OP, una rectificacion deja el ultimo asiento en ORDINARIA, y lo que se debe
+            // incluye lo que la OP ya llevo a VALOR o la importacion a COACTIVA. Acotado por lo
+            // que se debe, como el paso a coactiva: el pase no formaliza deuda que no existe.
+            Dinero enOrdinaria = netoEn(Fase.ORDINARIA, hastaLaFecha(deLaCuota, fechaValor));
+            // Y si la cuota ya salio alguna vez de ORDINARIA, tampoco mas de lo que ORDINARIA
+            // tiene HOY (revision del PR #635): un pase con fecha anterior a la del primero no ve
+            // su par, ve la cuota en ORDINARIA con todo dentro y la volvia a sacar —ORDINARIA en
+            // -500, VALOR en 1 000 sobre una deuda de 500—. Solo si ya salio: en la primera
+            // formalizacion lo de despues de la fecha es la pregunta abierta de #636, y acotarla
+            // aqui haria que la corrida se cortara con LoMovidoNoEsLoCongelado.
+            if (yaSalioDeOrdinaria(deLaCuota)) {
+                Dinero hoy = netoEn(Fase.ORDINARIA, deLaCuota);
+                enOrdinaria = enOrdinaria.esMayorQue(hoy) ? hoy : enOrdinaria;
+            }
             Dinero debe = calculo.deudaActualizadaA(deLaCuota, fechaValor, redondeo).total();
-            if (!debe.esPositivo()) {
+            Dinero monto = enOrdinaria.esMayorQue(debe) ? debe : enOrdinaria;
+            if (!monto.esPositivo()) {
                 continue;
             }
             mover(
@@ -146,11 +164,11 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
                     obligacion.predioId(),
                     obligacion.vehiculoId(),
                     referenciaExterna,
-                    debe,
+                    monto,
                     fechaValor,
                     documentoOrigen,
                     observacion);
-            movido = movido.mas(debe);
+            movido = movido.mas(monto);
         }
         return movido;
     }
@@ -218,6 +236,22 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
                             : neto.menos(asiento.monto());
         }
         return neto;
+    }
+
+    /**
+     * Los asientos con fecha valor hasta {@code fecha}: lo que el libro tenia ese dia. El pase a
+     * VALOR mide la fase y la deuda de cada cuota a su fecha —una corrida masiva emite a su fecha
+     * de criterio aunque corra dias despues—, y lo que tiene en ORDINARIA se mide igual (#510): con
+     * un pago posterior dentro, el pase moveria menos de lo que el valor congela a esa fecha, y
+     * {@code RegistrarValor} lo rechazaria con {@code LoMovidoNoEsLoCongelado}.
+     */
+    /** Si algun asiento de la cuota ya esta en VALOR o en COACTIVA: la formalizo alguien. */
+    private static boolean yaSalioDeOrdinaria(List<Asiento> deLaCuota) {
+        return deLaCuota.stream().anyMatch(asiento -> asiento.fase() != Fase.ORDINARIA);
+    }
+
+    private static List<Asiento> hastaLaFecha(List<Asiento> deLaCuota, LocalDate fecha) {
+        return deLaCuota.stream().filter(asiento -> !asiento.fechaValor().isAfter(fecha)).toList();
     }
 
     // ------------------------------------------------------------------

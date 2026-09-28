@@ -2,7 +2,6 @@ package kamayuk.rentas.nucleo.aplicacion;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -11,6 +10,7 @@ import kamayuk.rentas.carga.InformeDeImportacion;
 import kamayuk.rentas.carga.InformeDeImportacion.FilaRechazada;
 import kamayuk.rentas.carga.LectorDeFilasCsv;
 import kamayuk.rentas.carga.LectorDeFilasCsv.FilaCsv;
+import kamayuk.rentas.compartido.CifraTecleada;
 import kamayuk.rentas.cuentacorriente.GeneradorDeCargos;
 import kamayuk.rentas.cuentacorriente.TributoDelLibro;
 import kamayuk.rentas.dominio.Dinero;
@@ -53,7 +53,7 @@ import org.springframework.stereotype.Service;
  *
  * <h2>Rechazo por fila, no por archivo</h2>
  *
- * <p>Mismo reparto transaccional que {@link ImportarVias}: sin {@code @Transactional} aqui, con el
+ * <p>Mismo reparto transaccional que {@code ImportarVias}: sin {@code @Transactional} aqui, con el
  * suyo en cada cargo. Una fila cuyo ejercicio no tenga particion declarada en el libro se rechaza
  * sola —«no partition of relation found»— y no se lleva por delante a las que la siguen.
  */
@@ -249,13 +249,15 @@ public class ImportarDeudaDeDemostracion {
         return valor == 0 ? null : valor;
     }
 
+    /**
+     * El monto, con la regla de todo importe tecleado (#395, #629): dos decimales como mucho. Un
+     * tercero rechaza la fila; aceptarlo dejaba que {@code dinero numeric(15,2)} lo redondeara al
+     * asentar, y el libro guardaba otra cifra que la del archivo.
+     */
     private static Dinero dinero(String texto) {
-        try {
-            return new Dinero(new BigDecimal(texto.strip()));
-        } catch (NumberFormatException noEsNumero) {
-            throw new IllegalArgumentException(
-                    "El monto no es un importe valido: '" + texto + "'", noEsNumero);
-        }
+        return new Dinero(
+                CifraTecleada.leer(
+                        texto, "monto", "El monto no es un importe valido: '" + texto + "'"));
     }
 
     private static LocalDate fecha(String texto) {

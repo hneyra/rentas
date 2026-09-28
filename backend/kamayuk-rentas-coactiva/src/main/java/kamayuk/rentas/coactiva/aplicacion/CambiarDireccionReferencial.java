@@ -2,6 +2,8 @@ package kamayuk.rentas.coactiva.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -106,14 +108,8 @@ public class CambiarDireccionReferencial {
                         // auditoria guarda que paso, no donde vive el obligado. La direccion queda
                         // en la fila del movimiento, que es donde el expediente la necesita.
                         .con(
-                                "{\"expediente\":\""
-                                        + expediente.numero()
-                                        + "\",\"teniaDireccion\":"
-                                        + (vigente != null)
-                                        + "}",
-                                "{\"expediente\":\""
-                                        + expediente.numero()
-                                        + "\",\"teniaDireccion\":true}"));
+                                descripcion(expediente, vigente != null),
+                                descripcion(expediente, true)));
 
         return registrado;
     }
@@ -144,5 +140,13 @@ public class CambiarDireccionReferencial {
                             + " ya notifica en esa direccion: registrar el mismo cambio dos veces"
                             + " llenaria la traza de movimientos que no cambian nada");
         }
+    }
+
+    private static Map<String, Object> descripcion(
+            ExpedienteCoactivo expediente, boolean teniaDireccion) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("expediente", expediente.numero());
+        campos.put("teniaDireccion", teniaDireccion);
+        return campos;
     }
 }

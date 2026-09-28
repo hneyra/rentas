@@ -28,7 +28,7 @@ import { catalogoDeClaves } from '../src/i18n/catalogo-de-claves.ts';
  *
  * <h2>Y por que el locale se REGENERA en vez de escribirse</h2>
  *
- * Porque son `MEDIDO: 986 entradas de es.json`, y salen del dato: a mano se quedan viejas a la
+ * Porque son `MEDIDO: 1014 entradas de es.json`, y salen del dato: a mano se quedan viejas a la
  * primera pantalla nueva. `KAMAYUK_REGENERAR=1 yarn vitest run verificaciones/el-locale-esta-completo` lo
  * vuelve a escribir, que es el mismo trato que `kamayuk-lib` da a su archivo de temas.
  */
@@ -66,6 +66,9 @@ const LITERALES = [
   'No se pudo saber quien ha entrado',
   'Mi perfil',
   'Cambiar la contrasena',
+  // La OPCION del menu de sesion, escrita como `t('…')` en `aplicacion.tsx`. La misma palabra es el
+  // titulo del cajon, que entra derivado de `FRASES_DEL_MANDO_DE_TEMA` (`kamayuk-lib`#53); esta
+  // se queda porque la opcion es otra llamada, y dejaria de estar si el titulo cambiara.
   'Preferencias',
   'Cerrar sesion',
   'Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas.',
@@ -98,22 +101,12 @@ const LITERALES = [
   'Volver a identificarse',
   'Lo que dijo el emisor: «{{texto}}»',
   'No se pudo salir hacia el emisor de identidad. El navegador dijo: «{{motivo}}».',
-  // Las doce del mando de preferencias (#111). Los rotulos de las cuatro identidades y de los tres
-  // modos se leen por variable —`t(ROTULO_DE_LA_IDENTIDAD[identidad])`—, asi que `i18next-cli`
-  // no los ve: son de la misma familia que las de las definiciones, y por eso estan aqui.
-  'Se guarda en este navegador y solo aqui: no viaja al servidor ni cambia lo que ven las demas personas.',
-  'Identidad visual',
-  'La paleta con que se dibuja este servicio.',
-  'Apariencia',
-  'Sin elegir, se sigue lo que el equipo tenga puesto.',
-  'Institucional',
-  'Alto contraste',
-  'Sepia',
-  // La cuarta identidad, `clasico`, que publica `@kamayuk/ui` desde kamayuk-lib#56.
-  'Clásico',
-  'Claro',
-  'Oscuro',
-  'El del sistema',
+  // Las doce del mando de preferencias (#111) —trece desde `clasico`, kamayuk-lib#56— SALIERON de
+  // aqui con kamayuk-lib#53. Estaban escritas a mano porque seis se leian por variable
+  // —`t(ROTULO_DE_LA_IDENTIDAD[identidad])`— y `i18next-cli` no las veia. El mando subio a
+  // `@kamayuk/ui` y recibe sus palabras por `textos`: hoy son `FRASES_DEL_MANDO_DE_TEMA`,
+  // `ROTULOS_DE_LAS_IDENTIDADES` y `ROTULOS_DE_LOS_MODOS` de `textosDelMarco.ts`, y entran DERIVADAS
+  // por `delMarco()`. Son las mismas trece: `es.json` no gano ni perdio ninguna.
   // Las del mando del ejercicio de la barra (#391), escritas como `t('…')`; y el NOMBRE de la
   // opcion que falta, que se lee por variable —`t(CAMBIAR_EL_EJERCICIO.nombre)`— como los dos de
   // #311, y por eso `i18next-cli` no lo ve.

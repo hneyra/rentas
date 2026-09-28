@@ -1,5 +1,6 @@
 package kamayuk.rentas.fiscalizacion.dominio;
 
+import java.util.List;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 
@@ -62,4 +63,24 @@ public interface DeteccionRepository {
      * que nadie reclama es exactamente el que hay que fiscalizar.
      */
     Pagina<FilaDeOmisos> detectar(CriterioDeDeteccion criterio, Paginacion paginacion);
+
+    /**
+     * El mismo conjunto, <b>recorrido por su clave</b>: las {@code cuantas} filas siguientes a
+     * {@code despuesDe}, en orden de {@code predio_id} (#346, anotado en #629).
+     *
+     * <p>Es el recorrido del sorteo, que examina el padrón entero y no una página que alguien mira.
+     * Por eso no pasa por la lista blanca de orden ni cuenta el total: el orden es la clave, y se
+     * acaba cuando una vuelta trae menos de las que pidió.
+     *
+     * <p><b>Por qué no {@code OFFSET}.</b> Cada vuelta es una sentencia con su propia foto, y con
+     * {@code OFFSET} la siguiente se cuenta desde el principio del padrón <i>de ese momento</i>: un
+     * alta que ordena antes de la ventana repite el último predio de la vuelta anterior —y el alta
+     * no se examina—, y una baja se salta el primero de la siguiente. Con la clave, cada vuelta
+     * empieza después del último predio leído, pase lo que pase antes de él.
+     *
+     * @param despuesDe el {@code predio_id} de la última fila de la vuelta anterior; {@code 0} para
+     *     empezar —las claves del padrón son positivas—
+     * @param cuantas cuántas filas como mucho
+     */
+    List<FilaDeOmisos> siguientes(CriterioDeDeteccion criterio, long despuesDe, int cuantas);
 }

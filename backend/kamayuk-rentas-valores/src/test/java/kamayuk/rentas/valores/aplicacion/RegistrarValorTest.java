@@ -2,6 +2,7 @@ package kamayuk.rentas.valores.aplicacion;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -311,6 +312,11 @@ class RegistrarValorTest {
                 new SelectorDeObligacion("PREDIAL", EJERCICIO_DEUDA, 55L, null);
         Valor primera = servicio.emitir(TipoValor.ORDEN_DE_PAGO, 7L, List.of(predial), OBSERVACION);
         repositorio.anular(primera);
+        // Y lo que haria en el libro: devolver la deuda a ORDINARIA. Sin eso no hay nada que la
+        // segunda OP pueda formalizar, y el libro lo dice con LoMovidoNoEsLoCongelado (#448, #510).
+        movimiento.devolverAOrdinaria(
+                new kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica(
+                        "PREDIAL", EJERCICIO_DEUDA, 55L, null));
 
         Valor segunda = servicio.emitir(TipoValor.ORDEN_DE_PAGO, 7L, List.of(predial), OBSERVACION);
 
@@ -346,6 +352,45 @@ class RegistrarValorTest {
                                 + " formalizaba, si se mueve con la RD")
                 .extracting(MovimientoDeMentira.Movimiento::documentoOrigen)
                 .containsExactly("OP-2026-000001", rd.numero());
+    }
+
+    /**
+     * #510 — La siembra que distingue: la deuda repartida entre VALOR y ORDINARIA. La OP lleva los
+     * 500 a VALOR; una rectificacion de 100 queda en ORDINARIA; la RD congela los 600 que se deben.
+     *
+     * <p>Hasta #510 la RD no pedia el pase porque ya habia un valor vivo, y los 100 que formaliza
+     * se quedaban en ORDINARIA. Pedirlo con la comparacion de #448 tampoco sirve: el libro mueve
+     * 100 y la RD congela 600, y el valor no se emitiria nunca.
+     */
+    @Test
+    @DisplayName(
+            "#510 — una RD tras una OP pasa a VALOR lo que la rectificacion dejo en ORDINARIA, y se"
+                    + " emite por lo que se debe")
+    void unaRdTrasUnaOpMueveLaRectificacion() {
+        deuda.con(obligacionSimple("PREDIAL", EJERCICIO_DEUDA, 55L, null, Dinero.de(500)));
+        SelectorDeObligacion predial =
+                new SelectorDeObligacion("PREDIAL", EJERCICIO_DEUDA, 55L, null);
+        servicio.emitir(TipoValor.ORDEN_DE_PAGO, 7L, List.of(predial), OBSERVACION);
+        // La rectificacion: 100 mas, asentados en ORDINARIA despues de la OP.
+        deuda.rectificada(obligacionSimple("PREDIAL", EJERCICIO_DEUDA, 55L, null, Dinero.de(600)));
+
+        Valor rd =
+                servicio.emitir(
+                        TipoValor.RESOLUCION_DE_DETERMINACION, 7L, List.of(predial), OBSERVACION);
+
+        assertThat(rd.total())
+                .as("la RD exige lo que se debe, no lo que movio")
+                .isEqualTo(Dinero.de(600));
+        assertThat(movimiento.movimientos)
+                .as(
+                        "la OP movio los 500; la RD, los 100 que seguian en ORDINARIA, y no se"
+                                + " rechaza por no mover los 600 que congela")
+                .extracting(
+                        MovimientoDeMentira.Movimiento::documentoOrigen,
+                        MovimientoDeMentira.Movimiento::monto)
+                .containsExactly(
+                        tuple("OP-2026-000001", Dinero.de(500)),
+                        tuple(rd.numero(), Dinero.de(100)));
     }
 
     @Test
@@ -565,6 +610,12 @@ class RegistrarValorTest {
             obligaciones.add(obligacion);
         }
 
+        /** La misma obligacion con otra deuda: un cargo asentado despues de leerla (#510). */
+        void rectificada(ObligacionPublica obligacion) {
+            obligaciones.removeIf(una -> una.clave().equals(obligacion.clave()));
+            obligaciones.add(obligacion);
+        }
+
         @Override
         public List<ObligacionPublica> todasDe(long contribuyenteId, LocalDate fecha) {
             return List.copyOf(obligaciones);
@@ -572,17 +623,29 @@ class RegistrarValorTest {
     }
 
     /**
-     * El libro que mueve a VALOR lo que la obligacion debe (#448): el total que la consulta de
-     * deuda publica para esa clave, salvo que la prueba le diga que el libro tiene otra cosa.
+     * El libro que mueve a VALOR lo que la obligacion tiene en ORDINARIA (#448, #510): el total que
+     * la consulta de deuda publica para esa clave menos lo que ya paso a VALOR, salvo que la prueba
+     * le diga que el libro tiene otra cosa. Sin nada en ORDINARIA no asienta ningun par.
      */
     private static final class MovimientoDeMentira implements MovimientoDeFase {
 
         private final DeudaDeMentira deuda;
         private final List<Movimiento> movimientos = new ArrayList<>();
+        private final Map<kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica, Dinero> enValor =
+                new HashMap<>();
         private @Nullable Dinero loQueTieneElLibro;
 
         MovimientoDeMentira(DeudaDeMentira deuda) {
             this.deuda = deuda;
+        }
+
+        /**
+         * Como si un contraasiento hubiera devuelto a ORDINARIA lo que la obligacion tenia en
+         * VALOR.
+         */
+        void devolverAOrdinaria(
+                kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica obligacion) {
+            enValor.remove(obligacion);
         }
 
         /** Como si en ORDINARIA hubiera otra cifra que la que la consulta publico. */
@@ -605,7 +668,12 @@ class RegistrarValorTest {
                                     .filter(una -> una.clave().equals(obligacion))
                                     .map(ObligacionPublica::total)
                                     .findFirst()
-                                    .orElse(Dinero.CERO);
+                                    .orElse(Dinero.CERO)
+                                    .menos(enValor.getOrDefault(obligacion, Dinero.CERO));
+            if (!monto.esPositivo()) {
+                return Dinero.CERO;
+            }
+            enValor.merge(obligacion, monto, Dinero::mas);
             movimientos.add(new Movimiento(referenciaExterna, monto, documentoOrigen));
             return monto;
         }

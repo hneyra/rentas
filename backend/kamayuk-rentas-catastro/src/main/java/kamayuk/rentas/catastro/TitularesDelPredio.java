@@ -62,7 +62,7 @@ public interface TitularesDelPredio {
     /**
      * Si ese identificador es una fila del padron de predios de esta municipalidad (#680).
      *
-     * <h2>Por que vive aqui y no en un puerto propio</h2>
+     * <h4>Por que vive aqui y no en un puerto propio</h4>
      *
      * <p>Aunque «¿de quien es?» y «¿existe?» sean dos preguntas —y este modulo prefiera puertos
      * pequenos, uno por pregunta—, esta <b>solo existe para interpretar la respuesta vacia de
@@ -71,7 +71,7 @@ public interface TitularesDelPredio {
      * existe» a la vez—, que es exactamente la respuesta incoherente que #680 existe para hacer
      * imposible.
      *
-     * <h2>Lo que no distingue, a proposito</h2>
+     * <h4>Lo que no distingue, a proposito</h4>
      *
      * <p>Un identificador inventado y el de un predio de otra municipalidad contestan lo mismo:
      * {@code false}. Bajo RLS el segundo no es una fila de este padron, y contestar distinto seria

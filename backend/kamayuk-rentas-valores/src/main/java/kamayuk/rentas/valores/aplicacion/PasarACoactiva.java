@@ -2,6 +2,8 @@ package kamayuk.rentas.valores.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -172,14 +174,12 @@ public class PasarACoactiva {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(Valor valor, MovimientoDeValor pase) {
-        return "{\"valor\":\""
-                + valor.numero()
-                + "\",\"tipo\":\""
-                + pase.tipo()
-                + "\",\"exigibleDesde\":\""
-                + pase.exigibleDesde()
-                + "\"}";
+    private static Map<String, Object> descripcion(Valor valor, MovimientoDeValor pase) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("valor", valor.numero());
+        campos.put("tipo", pase.tipo());
+        campos.put("exigibleDesde", pase.exigibleDesde());
+        return campos;
     }
 
     /** No hay ningun valor con ese numero. */

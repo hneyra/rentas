@@ -2,7 +2,6 @@ package kamayuk.rentas.nucleo.aplicacion;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -12,6 +11,7 @@ import kamayuk.rentas.carga.InformeDeImportacion;
 import kamayuk.rentas.carga.InformeDeImportacion.FilaRechazada;
 import kamayuk.rentas.carga.LectorDeFilasCsv;
 import kamayuk.rentas.carga.LectorDeFilasCsv.FilaCsv;
+import kamayuk.rentas.compartido.CifraTecleada;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Placa;
@@ -49,7 +49,7 @@ import org.springframework.stereotype.Service;
  *
  * <h2>Rechazo por fila, no por archivo</h2>
  *
- * <p>Mismo reparto transaccional que {@link ImportarVias}: sin {@code @Transactional} aqui, con el
+ * <p>Mismo reparto transaccional que {@code ImportarVias}: sin {@code @Transactional} aqui, con el
  * suyo en cada llamada a {@link RegistrarTransferencia}. Una fila cuyo transferente no tenga
  * titularidad vigente se rechaza sola y no arrastra a la siguiente.
  */
@@ -265,14 +265,17 @@ public class ImportarTransferencias {
         }
     }
 
+    /**
+     * El valor, con la regla de todo importe tecleado (#395, #629): dos decimales como mucho. Un
+     * tercero rechaza la fila; aceptarlo dejaba que {@code dinero numeric(15,2)} lo redondeara al
+     * guardar la transferencia.
+     */
     private static Dinero dinero(String texto) {
-        try {
-            return new Dinero(new BigDecimal(texto.strip()));
-        } catch (NumberFormatException noEsNumero) {
-            throw new IllegalArgumentException(
-                    "El valor de transferencia no es un importe valido: '" + texto + "'",
-                    noEsNumero);
-        }
+        return new Dinero(
+                CifraTecleada.leer(
+                        texto,
+                        "valorTransferencia",
+                        "El valor de transferencia no es un importe valido: '" + texto + "'"));
     }
 
     private static Porcentaje porcentaje(String texto) {

@@ -5,7 +5,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -411,17 +413,14 @@ public class RegistrarActoCoactivo {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             ExpedienteCoactivo expediente, ActoCoactivo acto, EstadoDelExpediente estado) {
-        return "{\"expediente\":\""
-                + expediente.numero()
-                + "\",\"acto\":\""
-                + acto.tipo().name()
-                + "\",\"numero\":\""
-                + acto.numero()
-                + "\",\"estado\":\""
-                + estado.name()
-                + "\"}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("expediente", expediente.numero());
+        campos.put("acto", acto.tipo().name());
+        campos.put("numero", acto.numero());
+        campos.put("estado", estado.name());
+        return campos;
     }
 
     /** La diligencia que sustenta la REC-2 y el dia desde el que se puede dictar. */

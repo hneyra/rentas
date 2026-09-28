@@ -2,9 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Armazon, useHoja, type AccionesDelSistema } from '@kamayuk/shell';
-import { Alerta, Boton, Icono, ProveedorDeTema, type ConfiguracionDeTema } from '@kamayuk/ui';
+import { Alerta, Boton, Icono, MandoDeTema, ProveedorDeTema, type ConfiguracionDeTema } from '@kamayuk/ui';
 
-import { MandoDeTema } from './preferencias/MandoDeTema.tsx';
 import { MandoDelEjercicio } from './sesion/MandoDelEjercicio.tsx';
 import { useCabeceraDeLaSesion } from './datos/useCabeceraDeLaSesion.ts';
 import { useCatalogoPermitido, type CatalogoDeLaSesion } from './datos/useCatalogoPermitido.ts';
@@ -13,11 +12,12 @@ import { PantallaDeRentas } from './pantallas/PantallaDeRentas.tsx';
 import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
 import { alNoPoderDibujarla, useDatosDeLaHoja } from './datos/useDatosDeLaHoja.ts';
+import { conLoQueHace, useActosDeLaHoja } from './datos/actos.ts';
 import { FronteraDeLaHoja } from './pantallas/FronteraDeLaHoja.tsx';
 import type { FallaDeLaPuerta, VueltaFallida } from './api/identidad.ts';
 import { abrirLaCuenta, salir } from './api/identidad.ts';
 import { fallaDeLaPuerta, vueltaFallida } from './arranque.ts';
-import { useTextosDelMarco } from './i18n/textosDelMarco.ts';
+import { useTextosDelMandoDeTema, useTextosDelMarco } from './i18n/textosDelMarco.ts';
 
 /**
  * **`rentas-web`, sobre el artboard V8** (#90).
@@ -59,7 +59,8 @@ import { useTextosDelMarco } from './i18n/textosDelMarco.ts';
  *
  *     Mi perfil               -> la consola de cuenta del EMISOR, en otra pestana
  *     Cambiar la contrasena   -> la misma consola, en su pagina de credenciales
- *     Preferencias            -> el cajon de los temas (#111)
+ *     Preferencias            -> el cajon de los temas (#111), que es `MandoDeTema` de `@kamayuk/ui`
+ *                                desde `kamayuk-lib`#53: aqui solo se abre y se le dan sus palabras
  *     Cerrar sesion           -> `salir()`
  *
  * Las dos primeras **no se resuelven aqui a proposito**, y no por falta de backend: la
@@ -162,13 +163,19 @@ function CuerpoDeLaPantalla({ clave }: { readonly clave: ClaveDeHoja }) {
   // nada (`MandosDeLaTabla.tsx` de `@kamayuk/ui`), asi que quien pide tiene que leerla. Con solo
   // el sujeto, pulsar «Siguiente» movia la direccion y nadie volvia a pedir.
   const hoja = useHoja();
+  const datos = useDatosDeLaHoja(clave, hoja.ruta);
+  // **Y lo que la hoja HACE** (#629): los manejadores de sus actos, si la cuenta puede cada uno y
+  // el rechazo del ultimo envio. Se SUMAN a lo que la hoja lee —`nombrados` y `lecturas` son de
+  // los dos— sin pisarlo: una hoja sin actos recibe mapas vacios y no cambia en nada.
+  const hace = useActosDeLaHoja(clave);
   return (
     // `hoja` es ademas lo que el interprete necesita para ESCRIBIR ahi: sin ella, la tabla guarda
     // la pagina en su propio estado —no sobrevive a recargar y, peor, no llega al conector—.
     <PantallaDeRentas
       definicion={pantallaDe(clave)}
-      datos={useDatosDeLaHoja(clave, hoja.ruta)}
+      datos={conLoQueHace(datos, hace)}
       hoja={hoja}
+      actos={hace.actos}
     />
   );
 }
@@ -240,6 +247,9 @@ function ArmazonDelSistema({ vuelta }: { readonly vuelta: VueltaFallida | null }
   // Sin esto el armazon usa las suyas por omision y la pantalla sale a medias: el cuerpo
   // traducido y el marco en castellano. Ver `i18n/textosDelMarco.ts`.
   const textos = useTextosDelMarco();
+  // Y las trece del mando de los temas, que desde `kamayuk-lib`#53 es de la libreria y las recibe
+  // igual que el armazon: por `textos`, ya pasadas por `t()`.
+  const textosDelMando = useTextosDelMandoDeTema();
   const sesion = useCatalogoPermitido();
   // Quien ha entrado y de que municipalidad (#356). Se pide aqui, junto al catalogo y no despues:
   // son lecturas independientes, y encadenarlas retrasaria la barra una ida mas.
@@ -358,6 +368,7 @@ function ArmazonDelSistema({ vuelta }: { readonly vuelta: VueltaFallida | null }
         alCerrar={() => {
           setPreferencias(false);
         }}
+        textos={textosDelMando}
       />
     </>
   );

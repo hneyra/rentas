@@ -285,6 +285,9 @@ class ContratoDeApiTest {
                     "POST /valores",
                     "GET /valores",
                     "POST /valores/masivo",
+                    // #631 — la tercera etapa de RF-091: la impresion del lote que la corrida
+                    // genero. `ImprimirCorridaMasiva` existia desde #38 y ninguna ruta la llamaba.
+                    "GET /valores/masivo/{id}/impresion",
                     "POST /valores/{nro}/notificacion",
                     "POST /coactiva/prescripcion",
                     // #674: la relacion de prescripciones declaradas. La decision de ese
@@ -355,6 +358,8 @@ class ContratoDeApiTest {
                     "POST /transito/descargos",
                     // #412 — resolver un recurso con su propia resolucion: la accion «Resolver».
                     "POST /transito/descargos/{nDeExpediente}/resolucion",
+                    // #629 — y su notificacion, que #412 dejo sin ruta.
+                    "POST /transito/descargos/{nDeExpediente}/resolucion/notificacion",
                     "GET /transito/internamientos",
                     "POST /transito/internamientos",
                     "POST /transito/internamientos/{placa}/liberacion",

@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -35,6 +36,7 @@ import kamayuk.rentas.coactiva.aplicacion.ImportarValoresACoactiva;
 import kamayuk.rentas.coactiva.dominio.CriterioDeExpedientes;
 import kamayuk.rentas.coactiva.dominio.DeudaDelExpediente;
 import kamayuk.rentas.coactiva.dominio.EstadoDelExpediente;
+import kamayuk.rentas.coactiva.dominio.ExpedienteCoactivo;
 import kamayuk.rentas.coactiva.dominio.InformeDeImportacion;
 import kamayuk.rentas.coactiva.dominio.MotivoDeRechazo;
 import kamayuk.rentas.coactiva.dominio.MovimientoDelExpediente;
@@ -1036,6 +1038,40 @@ class ExpedienteCoactivoJdbcTest {
                                                             unaPagina()))
                                     .totalElementos())
                     .isZero();
+        }
+
+        /**
+         * #515 dejo fuera, anotados, el filtro de la grilla —que copiaba la regla— y {@code
+         * porNumero}, que <b>solo recortaba</b>: el expediente «EXP-2026-000007» tecleado como se
+         * lee no existia (#629).
+         */
+        @Test
+        @DisplayName(
+                "#515 — el numero se busca como se teclea: recortado y en minusculas, en la ficha y"
+                        + " en la grilla")
+        void elNumeroSeBuscaComoSeTeclea() {
+            long contribuyente = contribuyenteConDeuda("G-0515");
+            Valor valor = emitir(contribuyente, "OP-2026-G00515");
+            pasarACoactiva(valor);
+            String numero =
+                    importarTodo(contribuyente, "R. MENDOZA CRUZ").expedienteAbierto().numero();
+            String tecleado = "  " + numero.toLowerCase(Locale.ROOT) + " ";
+
+            assertThat(enTransaccion(() -> expedientes.porNumero(tecleado)))
+                    .as("porNumero recortaba y comparaba en crudo: en minusculas no lo encontraba")
+                    .map(ExpedienteCoactivo::numero)
+                    .contains(numero);
+            assertThat(
+                            numerosDe(
+                                    enTransaccion(
+                                            () ->
+                                                    consulta.buscar(
+                                                            new CriterioDeExpedientes(
+                                                                    tecleado, null, null, null,
+                                                                    null),
+                                                            IMPORTACION,
+                                                            unaPagina()))))
+                    .containsExactly(numero);
         }
     }
 

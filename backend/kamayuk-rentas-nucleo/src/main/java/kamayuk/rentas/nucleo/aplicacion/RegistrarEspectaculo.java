@@ -1,7 +1,9 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -196,17 +198,14 @@ public class RegistrarEspectaculo {
                         .con(null, descripcion(guardada)));
     }
 
-    private static String descripcion(Determinacion determinacion) {
-        return "{\"tributo\":\"ESPECTACULOS\",\"contribuyenteId\":"
-                + determinacion.contribuyenteId()
-                + ",\"ejercicio\":\""
-                + determinacion.ejercicio()
-                + "\",\"conjuntoId\":"
-                + determinacion.conjuntoId()
-                + ",\"baseImponible\":\""
-                + determinacion.baseImponible()
-                + "\",\"montoDeterminado\":\""
-                + determinacion.montoDeterminado()
-                + "\"}";
+    private static Map<String, Object> descripcion(Determinacion determinacion) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("tributo", "ESPECTACULOS");
+        campos.put("contribuyenteId", determinacion.contribuyenteId());
+        campos.put("ejercicio", determinacion.ejercicio());
+        campos.put("conjuntoId", determinacion.conjuntoId());
+        campos.put("baseImponible", determinacion.baseImponible());
+        campos.put("montoDeterminado", determinacion.montoDeterminado());
+        return campos;
     }
 }

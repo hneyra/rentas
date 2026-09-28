@@ -1,6 +1,7 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -29,6 +30,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DeclaracionesDelEjercicioRentas implements DeclaracionesDelEjercicio {
 
+    /**
+     * «La mas reciente»: la de fecha de presentacion mayor y, el mismo dia, la de identificador
+     * mayor —la que se registro despues— (#344, anotado en #629).
+     *
+     * <p>Es el mismo orden con que {@code fiscalizacion.LaDeclaracionDelEjercicio} elige en SQL la
+     * declaracion del acta y de la deteccion ({@code ORDER BY d.fecha_presentacion DESC, d.id
+     * DESC}). Hasta #629 aqui solo se miraba la fecha, y con dos declaraciones del mismo dia se
+     * quedaba la primera que devolvia una consulta sin {@code ORDER BY}: el acta publicaba lo
+     * declarado en la mas reciente y la liquidacion que sale de ella comparaba contra la otra.
+     */
+    private static final Comparator<DeclaracionDelEjercicio> MAS_RECIENTE =
+            Comparator.comparing(DeclaracionDelEjercicio::fechaPresentacion)
+                    .thenComparingLong(DeclaracionDelEjercicio::declaracionId);
+
     private final DeclaracionJuradaRepository declaraciones;
 
     public DeclaracionesDelEjercicioRentas(DeclaracionJuradaRepository declaraciones) {
@@ -54,8 +69,7 @@ public class DeclaracionesDelEjercicioRentas implements DeclaracionesDelEjercici
             // comparar contra la vieja acusaria de subvaluacion a quien ya corrigio.
             DeclaracionDelEjercicio candidata = proyectar(declaracion);
             DeclaracionDelEjercicio previa = porPredio.get(predioId);
-            if (previa == null
-                    || previa.fechaPresentacion().isBefore(candidata.fechaPresentacion())) {
+            if (previa == null || MAS_RECIENTE.compare(candidata, previa) > 0) {
                 porPredio.put(predioId, candidata);
             }
         }

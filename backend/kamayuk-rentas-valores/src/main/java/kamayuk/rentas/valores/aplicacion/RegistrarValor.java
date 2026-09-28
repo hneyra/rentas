@@ -4,9 +4,11 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -66,9 +68,18 @@ import org.springframework.transaction.annotation.Transactional;
  *       orden de cobro, el convenio y el registro de abonos;
  *   <li>la regla {@link ObligacionYaFormalizada}, evaluada <b>despues</b> de {@link
  *       ValorRepository#bloquearLasObligaciones}, rechaza con {@link YaFormalizada} el segundo
- *       valor vivo del mismo tipo, y deja emitir uno de otro tipo —una RD tras una OP— sin volver a
- *       mover una fase que ya esta en VALOR.
+ *       valor vivo del mismo tipo, y deja emitir uno de otro tipo —una RD tras una OP—.
  * </ul>
+ *
+ * <h2>Lo que el segundo valor mueve lo decide el libro (#510)</h2>
+ *
+ * <p>Una RD tras una OP congela lo que se debe —la deuda que la OP formalizo y lo que se haya
+ * asentado despues—, pero el libro solo tiene que mover lo que sigue en ORDINARIA. Hasta #510 este
+ * servicio decidia no mover nada si habia un valor vivo, y una rectificacion asentada entre la OP y
+ * la RD se quedaba en ORDINARIA aunque la RD la exigiera: la importacion a coactiva, que lleva lo
+ * que hay en VALOR, se la dejaba fuera. Ahora el pase se pide siempre, y es {@link
+ * MovimientoDeFase#moverAValor} quien mueve lo que cada cuota tiene en ORDINARIA: nada, si la deuda
+ * ya salio con el primer valor; la rectificacion, si la hay.
  */
 @Service
 public class RegistrarValor {
@@ -225,26 +236,27 @@ public class RegistrarValor {
         for (int i = 0; i < obligaciones.size(); i++) {
             SelectorDeObligacion selector = obligaciones.get(i);
             ObligacionPublica obligacion = aMover.get(i);
-            // Con un valor vivo de otro tipo la deuda ya salio de ORDINARIA: moverla otra vez
-            // dejaria en el libro dos salidas por una sola deuda. Que haya algo que mover ya no se
-            // pregunta aqui: solo llega lo que `pendientesDe` devolvio (#401).
-            if (!formalizaciones.get(i).yaEstaEnFaseValor()) {
-                // Cuota por cuota, y las decide el libro (#448): aqui solo se sabe la obligacion
-                // agregada, y pasar periodo nulo con el total dejaba las cuotas en ORDINARIA.
-                Dinero movido =
-                        movimiento.moverAValor(
-                                contribuyenteId,
-                                obligacion.clave(),
-                                "VALOR-" + guardado.numero(),
-                                hoy,
-                                guardado.numero(),
-                                observacion);
-                // Lo que el libro movio tiene que ser lo que el valor congelo: si no, el libro no
-                // es el que se leyo —una cuota en otra fase, un asiento entre leer y mover— y el
-                // titulo diria una deuda que la fase VALOR no tiene. Se deshace todo.
-                if (movido.compareTo(obligacion.total()) != 0) {
-                    throw new LoMovidoNoEsLoCongelado(selector, obligacion.total(), movido);
-                }
+            // Cuota por cuota, y las decide el libro (#448): aqui solo se sabe la obligacion
+            // agregada, y pasar periodo nulo con el total dejaba las cuotas en ORDINARIA. Y el
+            // monto tambien (#510): lo que cada cuota tiene en ORDINARIA, asi que se pide siempre,
+            // haya o no un valor vivo. Con uno de otro tipo, lo que ese valor formalizo ya no esta
+            // en ORDINARIA y no sale dos veces; lo que un cargo posterior dejo alli —la
+            // rectificacion que esta RD formaliza— si sale.
+            Dinero movido =
+                    movimiento.moverAValor(
+                            contribuyenteId,
+                            obligacion.clave(),
+                            "VALOR-" + guardado.numero(),
+                            hoy,
+                            guardado.numero(),
+                            observacion);
+            // La primera vez que se formaliza, lo que el libro movio tiene que ser lo que el valor
+            // congelo: si no, el libro no es el que se leyo —una cuota en otra fase, un asiento
+            // entre leer y mover— y el titulo diria una deuda que la fase VALOR no tiene. Se
+            // deshace todo. Con un valor vivo, lo que no esta en ORDINARIA lo explica ese valor.
+            if (!formalizaciones.get(i).yaEstaEnFaseValor()
+                    && movido.compareTo(obligacion.total()) != 0) {
+                throw new LoMovidoNoEsLoCongelado(selector, obligacion.total(), movido);
             }
         }
 
@@ -276,16 +288,13 @@ public class RegistrarValor {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(Valor valor) {
-        return "{\"tipo\":\""
-                + valor.tipo()
-                + "\",\"numero\":\""
-                + valor.numero()
-                + "\",\"ejercicio\":"
-                + valor.ejercicio().valor()
-                + ",\"total\":"
-                + valor.total().valor().toPlainString()
-                + "}";
+    private static Map<String, Object> descripcion(Valor valor) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("tipo", valor.tipo());
+        campos.put("numero", valor.numero());
+        campos.put("ejercicio", valor.ejercicio().valor());
+        campos.put("total", valor.total().valor());
+        return campos;
     }
 
     /** Un valor sin ninguna obligacion no formaliza nada. */
@@ -391,9 +400,11 @@ public class RegistrarValor {
      * El libro paso a VALOR otra cifra que la que el valor congelo (#448).
      *
      * <p>El valor congela la obligacion agregada que {@code pendientesDe} devolvio, y el libro
-     * mueve cuota por cuota lo que cada una debe en ORDINARIA. Si no coinciden, alguna cuota estaba
-     * en otra fase o el libro cambio entre leer y mover: emitir igual dejaria un titulo por una
-     * deuda que la fase VALOR no cuenta. No se emite, y la transaccion se deshace entera.
+     * mueve cuota por cuota lo que cada una tiene en ORDINARIA (#510). La primera vez que la
+     * obligacion se formaliza las dos cifras tienen que coincidir; si no, alguna cuota estaba en
+     * otra fase o el libro cambio entre leer y mover: emitir igual dejaria un titulo por una deuda
+     * que la fase VALOR no cuenta. No se emite, y la transaccion se deshace entera. Con un valor
+     * vivo no se compara: lo que falta en ORDINARIA lo formalizo ese valor.
      */
     public static final class LoMovidoNoEsLoCongelado extends RuntimeException {
 

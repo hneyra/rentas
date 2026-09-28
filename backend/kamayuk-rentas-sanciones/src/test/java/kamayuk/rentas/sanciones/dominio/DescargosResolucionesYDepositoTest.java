@@ -278,6 +278,37 @@ class DescargosResolucionesYDepositoTest {
         }
 
         @Test
+        @DisplayName(
+                "#515 — el acta se guarda como se imprime: recortada y en mayusculas, en el"
+                        + " internamiento y en sus movimientos")
+        void elActaSeGuardaComoSeImprime() {
+            Internamiento internamiento =
+                    Internamiento.nuevo(
+                            7L,
+                            null,
+                            "T2G-418",
+                            "DEPOSITO SULLANA NORTE",
+                            AHORA,
+                            "  acta-2026-000123 ",
+                            9L,
+                            "CUSTODIA",
+                            AHORA,
+                            PORQUE);
+            MovimientoDeInternamiento abandono =
+                    MovimientoDeInternamiento.abandono(
+                            7L,
+                            LocalDate.of(2026, 6, 1),
+                            " acta_abandono-2026-000001  ",
+                            9L,
+                            89,
+                            AHORA,
+                            PORQUE);
+
+            assertThat(internamiento.acta()).isEqualTo("ACTA-2026-000123");
+            assertThat(abandono.acta()).isEqualTo("ACTA_ABANDONO-2026-000001");
+        }
+
+        @Test
         @DisplayName("un internamiento sin acta no se construye: el conductor se va sin papel")
         void sinActaNoSeConstruye() {
             assertThatThrownBy(

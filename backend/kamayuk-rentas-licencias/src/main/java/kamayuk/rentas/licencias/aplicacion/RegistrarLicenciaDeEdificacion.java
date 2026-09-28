@@ -3,6 +3,7 @@ package kamayuk.rentas.licencias.aplicacion;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -267,20 +268,17 @@ public class RegistrarLicenciaDeEdificacion {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             FueDeEdificacion fue,
             String numero,
             ReciboDeTramite recibo,
             ValorizacionDelFue.Resultado valorizacion) {
-        return "{\"expediente\":\""
-                + fue.expediente()
-                + "\",\"licencia\":\""
-                + numero
-                + "\",\"recibo\":\""
-                + recibo.numero()
-                + "\",\"valorizada\":"
-                + valorizacion.estaDisponible()
-                + "}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("expediente", fue.expediente());
+        campos.put("licencia", numero);
+        campos.put("recibo", recibo.numero());
+        campos.put("valorizada", valorizacion.estaDisponible());
+        return campos;
     }
 
     // ------------------------------------------------------------------

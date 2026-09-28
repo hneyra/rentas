@@ -2,13 +2,20 @@ package kamayuk.rentas.verificaciones;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tngtech.archunit.core.domain.AccessTarget.CodeUnitAccessTarget;
+import com.tngtech.archunit.core.domain.JavaAnnotation;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaCodeUnit;
+import com.tngtech.archunit.core.domain.JavaConstructor;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaModifier;
+import com.tngtech.archunit.core.domain.JavaStaticInitializer;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,11 +49,14 @@ import org.springframework.stereotype.Service;
  * traves de una interfaz que el caso de uso implementa cuenta: el receptor es la interfaz, y el
  * caso de uso es su implementacion.
  *
- * <h2>El paso mas pequeno, dicho</h2>
+ * <h2>Un llamador VIVO, marcado desde las raices (#629)</h2>
  *
- * <p>Exige un llamador desde OTRA clase de {@code src/main}, no que ese llamador sea alcanzable
- * desde un punto de entrada. El marcado desde raices —controladores, {@code ApplicationRunner}— es
- * el paso siguiente que #394 describe; este ya saca rojo lo que hoy esta muerto y no lo dice.
+ * <p>Hasta #629 bastaba un llamador desde OTRA clase de {@code src/main}, estuviera vivo o no: un
+ * caso de uso que solo llamaba otro muerto pasaba por vivo. Ahora el llamador tiene que ser
+ * <b>alcanzable</b>: se marca vivo lo que el marco llama por su cuenta —las {@link #esRaiz raices}—
+ * y se propaga por las llamadas y las referencias a metodo del bytecode, con el despacho virtual
+ * incluido (llamar a un metodo de una interfaz marca vivas sus implementaciones). Un caso de uso
+ * esta vivo si lo llama, desde otra clase, un metodo que este marcado.
  *
  * <h2>La lista solo baja</h2>
  *
@@ -69,8 +79,8 @@ class CasosDeUsoSinLlamadorTest {
                 "FormalizarConvenio#cuotaInicialDe(NumeroDeConvenio)",
                 "La leia `CobrarDeuda` para cobrar la cuota inicial en ventanilla, y se fue a `caja` en P5D (#430)");
         SIN_LLAMADOR_CON_MOTIVO.put(
-                "ImprimirCorridaMasiva#imprimir(long, FormatoDeDocumento, Function)",
-                "#400 cerro el PROCESAMIENTO de la generacion masiva, no su impresion: no hay ruta ni proceso que imprima la corrida (#631)");
+                "AcogimientoAConvenioCuentaCorriente#acoger(long, List, LocalDate, String, Observacion)",
+                "Solo lo llama `FormalizarConvenio#formalizar`, que esta en esta lista por `caja` (#430): hasta #629 ese llamador muerto lo hacia pasar por vivo");
         SIN_LLAMADOR_CON_MOTIVO.put(
                 "RegistrarBeneficio#registrar(Beneficio, Observacion)",
                 "El alta de un beneficio no se publica todavia: `BeneficioController` es de solo lectura y el contrato no declara POST (NEG-03)");
@@ -95,12 +105,6 @@ class CasosDeUsoSinLlamadorTest {
         SIN_LLAMADOR_CON_MOTIVO.put(
                 "MantenerCatalogoDeInfracciones#registrar(CodigoInfraccion, Observacion)",
                 "Por lo mismo que modificar (#632)");
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "ReconstruirPadron#reconstruir(long)",
-                "La red de seguridad de ADR-0006 no tiene proceso que la corra (#630)");
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "ReconstruirSaldo#conciliar(long)",
-                "La conciliacion del saldo contra el libro no tiene proceso que la corra (#630)");
     }
 
     @Test
@@ -142,11 +146,15 @@ class CasosDeUsoSinLlamadorTest {
 
         assertThat(sinLlamador(muestra))
                 .as(
-                        "el caso de uso huerfano; ni el que llama un controlador, ni el que se llama"
-                                + " por su interfaz, ni el que se llama solo a si mismo cuenta como"
-                                + " vivo por eso")
+                        "el huerfano, el que se llama solo a si mismo, y el que solo llama un muerto"
+                                + " (#629); ni el del controlador, ni el que este llama, ni el de"
+                                + " la interfaz, ni el de la corrida, ni el de la lambda")
                 .containsExactlyInAnyOrder(
-                        "Huerfano#hacer()", "SeLlamaASiMismo#hacer()", "SeLlamaASiMismo#otraVez()");
+                        "Huerfano#hacer()",
+                        "SeLlamaASiMismo#hacer()",
+                        "SeLlamaASiMismo#otraVez()",
+                        "MuertoQueLlama#hacer()",
+                        "LlamadoSoloPorUnMuerto#hacer()");
     }
 
     @Test
@@ -188,13 +196,130 @@ class CasosDeUsoSinLlamadorTest {
                 .filter(metodo -> !metodo.getModifiers().contains(JavaModifier.BRIDGE));
     }
 
-    /** {@code Clase#metodo} de cada caso de uso sin un llamador de otra clase. */
+    /** {@code Clase#metodo} de cada caso de uso sin un llamador vivo de otra clase. */
     static Set<String> sinLlamador(JavaClasses clases) {
+        Set<JavaCodeUnit> vivos = vivos(clases);
         Set<String> sinLlamador = new TreeSet<>();
         metodosCandidatos(clases)
-                .filter(metodo -> !tieneLlamadorDeFuera(metodo))
+                .filter(metodo -> !esRaiz(metodo) && !tieneLlamadorDeFuera(metodo, vivos))
                 .forEach(metodo -> sinLlamador.add(clave(metodo)));
         return sinLlamador;
+    }
+
+    /** Lo que el marco llama por su cuenta, sin que ninguna llamada suya quede en el bytecode. */
+    private static final Set<String> ANOTACIONES_DE_ENTRADA =
+            Set.of(
+                    "org.springframework.context.annotation.Bean",
+                    "org.springframework.scheduling.annotation.Scheduled",
+                    "org.springframework.context.event.EventListener",
+                    "org.springframework.transaction.event.TransactionalEventListener",
+                    "org.springframework.modulith.events.ApplicationModuleListener",
+                    "jakarta.annotation.PostConstruct",
+                    "jakarta.annotation.PreDestroy");
+
+    /**
+     * Una raiz: lo que se ejecuta sin que otro metodo de {@code kamayuk.rentas} lo llame.
+     *
+     * <ul>
+     *   <li>los manejadores de Spring MVC: todo metodo con una anotacion de {@code
+     *       org.springframework.web.bind.annotation} —{@code @GetMapping}, {@code @PostMapping},
+     *       {@code @ExceptionHandler}…—, que es lo que publica una ruta;
+     *   <li>lo anotado con {@link #ANOTACIONES_DE_ENTRADA}: {@code @Bean}, {@code @Scheduled}, los
+     *       oyentes y el ciclo de vida;
+     *   <li>lo que implementa o sobrescribe un metodo de un tipo de <b>fuera</b> de {@code
+     *       kamayuk.rentas}: {@code ApplicationRunner#run} —las corridas del perfil {@code batch},
+     *       las cargas y la implantacion—, los filtros, los conversores, {@code toString}… Lo llama
+     *       el marco o el JDK, y desde aqui no se ve quien;
+     *   <li>{@code main}, los inicializadores estaticos y los constructores de lo que Spring
+     *       instancia (un {@code @Component} o lo que lo lleve como meta-anotacion).
+     * </ul>
+     *
+     * <p>El tercer punto es conservador a proposito: un {@code Runnable} anonimo dentro de un
+     * metodo muerto cuenta como raiz. Es preferible a acusar de muerto lo que llama el marco.
+     */
+    static boolean esRaiz(JavaCodeUnit unidad) {
+        if (unidad instanceof JavaStaticInitializer) {
+            return true;
+        }
+        if (unidad instanceof JavaConstructor) {
+            return esDeSpring(unidad.getOwner());
+        }
+        if (unidad.getModifiers().contains(JavaModifier.STATIC)) {
+            return unidad.getName().equals("main");
+        }
+        return unidad.getAnnotations().stream().anyMatch(CasosDeUsoSinLlamadorTest::esDeEntrada)
+                || sobrescribeUnoDeFuera((JavaMethod) unidad);
+    }
+
+    private static boolean esDeEntrada(JavaAnnotation<?> anotacion) {
+        String tipo = anotacion.getRawType().getName();
+        return tipo.startsWith("org.springframework.web.bind.annotation.")
+                || ANOTACIONES_DE_ENTRADA.contains(tipo);
+    }
+
+    private static boolean esDeSpring(JavaClass clase) {
+        return clase.isMetaAnnotatedWith("org.springframework.stereotype.Component")
+                || clase.isAnnotatedWith("org.springframework.stereotype.Component");
+    }
+
+    private static boolean sobrescribeUnoDeFuera(JavaMethod metodo) {
+        return conLosQueImplementa(metodo)
+                .skip(1)
+                .anyMatch(otro -> !otro.getOwner().getPackageName().startsWith("kamayuk.rentas"));
+    }
+
+    /**
+     * Lo alcanzable desde las raices, por llamadas y referencias a metodo o constructor. Llamar a
+     * un metodo marca vivo el metodo que resuelve y todo lo que lo sobrescribe en los subtipos del
+     * receptor: es el despacho virtual, y es por donde un controlador llega a un caso de uso a
+     * traves de su interfaz. Una lambda no hace falta seguirla: ArchUnit atribuye lo que llama al
+     * metodo que la escribe.
+     */
+    static Set<JavaCodeUnit> vivos(JavaClasses clases) {
+        Set<JavaCodeUnit> vivos = new HashSet<>();
+        Deque<JavaCodeUnit> pendientes = new ArrayDeque<>();
+        clases.stream()
+                .flatMap(clase -> clase.getCodeUnits().stream())
+                .filter(CasosDeUsoSinLlamadorTest::esRaiz)
+                .forEach(
+                        raiz -> {
+                            vivos.add(raiz);
+                            pendientes.add(raiz);
+                        });
+        while (!pendientes.isEmpty()) {
+            JavaCodeUnit unidad = pendientes.poll();
+            Stream.concat(
+                            unidad.getCallsFromSelf().stream().map(llamada -> llamada.getTarget()),
+                            unidad.getCodeUnitReferencesFromSelf().stream()
+                                    .map(referencia -> referencia.getTarget()))
+                    .flatMap(CasosDeUsoSinLlamadorTest::conSusSobrescrituras)
+                    .filter(vivos::add)
+                    .forEach(pendientes::add);
+        }
+        return vivos;
+    }
+
+    /** El metodo o constructor al que resuelve la llamada, y lo que lo sobrescribe debajo. */
+    private static Stream<JavaCodeUnit> conSusSobrescrituras(CodeUnitAccessTarget destino) {
+        Stream<JavaCodeUnit> resuelto =
+                destino.resolveMember().stream().map(JavaCodeUnit.class::cast);
+        if (destino.getName().equals(JavaConstructor.CONSTRUCTOR_NAME)) {
+            return resuelto;
+        }
+        List<String> parametros =
+                destino.getRawParameterTypes().stream().map(JavaClass::getName).toList();
+        Stream<JavaCodeUnit> debajo =
+                destino.getOwner().getAllSubclasses().stream()
+                        .flatMap(subtipo -> subtipo.getMethods().stream())
+                        .filter(otro -> otro.getName().equals(destino.getName()))
+                        .filter(
+                                otro ->
+                                        otro.getRawParameterTypes().stream()
+                                                .map(JavaClass::getName)
+                                                .toList()
+                                                .equals(parametros))
+                        .map(JavaCodeUnit.class::cast);
+        return Stream.concat(resuelto, debajo);
     }
 
     /**
@@ -215,11 +340,11 @@ class CasosDeUsoSinLlamadorTest {
     }
 
     /**
-     * Si alguna clase distinta de la suya lo llama o lo referencia, directamente o por un metodo
-     * que el suyo implementa —la interfaz o la superclase con el mismo nombre y los mismos
-     * parametros—.
+     * Si un metodo vivo de una clase distinta de la suya lo llama o lo referencia, directamente o
+     * por un metodo que el suyo implementa —la interfaz o la superclase con el mismo nombre y los
+     * mismos parametros—.
      */
-    private static boolean tieneLlamadorDeFuera(JavaMethod metodo) {
+    private static boolean tieneLlamadorDeFuera(JavaMethod metodo, Set<JavaCodeUnit> vivos) {
         JavaClass suya = metodo.getOwner();
         return conLosQueImplementa(metodo)
                 .anyMatch(
@@ -229,6 +354,7 @@ class CasosDeUsoSinLlamadorTest {
                                                         .map(llamada -> llamada.getOrigin()),
                                                 destino.getReferencesToSelf().stream()
                                                         .map(referencia -> referencia.getOrigin()))
+                                        .filter(vivos::contains)
                                         .map(JavaCodeUnit::getOwner)
                                         .anyMatch(origen -> !esLaMisma(origen, suya)));
     }

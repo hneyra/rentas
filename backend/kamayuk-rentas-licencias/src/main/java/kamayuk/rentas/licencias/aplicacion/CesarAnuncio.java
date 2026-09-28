@@ -5,7 +5,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -207,14 +209,13 @@ public class CesarAnuncio {
                 previos);
     }
 
-    private static String descripcion(Anuncio anuncio, MovimientoDeAnuncio movimiento) {
-        return "{\"numero\":\""
-                + anuncio.numero()
-                + "\",\"acto\":\""
-                + movimiento.tipo()
-                + "\",\"fecha\":\""
-                + movimiento.fecha()
-                + "\"}";
+    private static Map<String, Object> descripcion(
+            Anuncio anuncio, MovimientoDeAnuncio movimiento) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", anuncio.numero());
+        campos.put("acto", movimiento.tipo());
+        campos.put("fecha", movimiento.fecha());
+        return campos;
     }
 
     // ------------------------------------------------------------------
