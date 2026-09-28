@@ -6,8 +6,11 @@ import {
   TEXTOS_DE_LA_UI,
   TEXTOS_DE_LAS_PIEZAS,
   TEXTOS_DEL_INTERPRETE,
+  type Identidad,
+  type Modo,
   type TextosDeLasPiezas,
   type TextosDelInterprete,
+  type TextosDelMandoDeTema,
 } from '@kamayuk/ui';
 
 import { AVISOS_DE_V8 } from '../pantallas/avisos.ts';
@@ -381,6 +384,54 @@ export const FRASES_DEL_GRAFICO = {
 } as const;
 
 /**
+ * **Las trece palabras del mando de los temas** (`kamayuk-lib`#53).
+ *
+ * <h2>De donde vienen</h2>
+ *
+ * El mando vivio aqui —en `src/preferencias/`, desde #111— con sus palabras escritas
+ * dentro de cada `t()`, y seis de ellas **por variable** (`t(ROTULO_DE_LA_IDENTIDAD[identidad])`):
+ * `i18next-cli` no las veia y estaban listadas a mano en `LITERALES` de
+ * `verificaciones/el-locale-esta-completo.test.ts`. Con `kamayuk-lib`#53 la pieza sube a
+ * `@kamayuk/ui`, que no puede llamar a `t()` —`i18next` no es `peerDependency` de la libreria—, y
+ * las palabras entran por `textos`, como las treinta y dos del armazon.
+ *
+ * Asi que pasan a ser lo que ya eran aquellas: **un dato que se traduce**, y entran en el locale
+ * DERIVADAS por `delMarco()` (`catalogo-de-claves.ts`) en vez de listadas a mano. Son las mismas
+ * trece, palabra por palabra: `es.json` no gana ni pierde ninguna.
+ *
+ * <h2>Por que tres sacos y no uno</h2>
+ *
+ * Porque los rotulos de las identidades y de los modos van ATADOS a sus tipos —`Record<Identidad,
+ * string>` y `Record<Modo, string>`—, igual que en la libreria: una quinta identidad en
+ * `@kamayuk/ui` deja esto sin compilar hasta que alguien diga como se lee en Rentas. Y `delMarco()`
+ * recorre un nivel de cada saco exportado, asi que uno anidado se quedaria sus seis rotulos fuera
+ * del locale sin ningun rojo.
+ */
+export const FRASES_DEL_MANDO_DE_TEMA = {
+  titulo: 'Preferencias',
+  nota: 'Se guarda en este navegador y solo aqui: no viaja al servidor ni cambia lo que ven las demas personas.',
+  ejeDeLaIdentidad: 'Identidad visual',
+  notaDeLaIdentidad: 'La paleta con que se dibuja este servicio.',
+  ejeDelModo: 'Apariencia',
+  notaDelModo: 'Sin elegir, se sigue lo que el equipo tenga puesto.',
+  elDelSistema: 'El del sistema',
+} as const satisfies Record<Exclude<keyof TextosDelMandoDeTema, 'identidades' | 'modos'>, string>;
+
+/** Como se lee cada identidad. Una que `@kamayuk/ui` publique y aqui no este, no compila. */
+export const ROTULOS_DE_LAS_IDENTIDADES = {
+  institucional: 'Institucional',
+  'alto-contraste': 'Alto contraste',
+  sepia: 'Sepia',
+  clasico: 'Clásico',
+} as const satisfies Record<Identidad, string>;
+
+/** Como se lee cada modo. El tercero —no elegir— es `elDelSistema`: no es un modo. */
+export const ROTULOS_DE_LOS_MODOS = {
+  claro: 'Claro',
+  oscuro: 'Oscuro',
+} as const satisfies Record<Modo, string>;
+
+/**
  * El saco que `<Pantalla>` de `@kamayuk/ui` recibe como `textos`, ya pasado por `t()`.
  *
  * Memorizado sobre `t`, por lo mismo que el del armazon: cambia de identidad cuando cambia el
@@ -471,6 +522,40 @@ export function useTextosDelMarco(): TextosDelArmazon {
       salirYPerderLosCambios: t(FRASES_DEL_MARCO.salirYPerderLosCambios),
       seguirEditando: t(FRASES_DEL_MARCO.seguirEditando),
       guardarYCerrar: t(FRASES_DEL_MARCO.guardarYCerrar),
+    }),
+    [t],
+  );
+}
+
+/**
+ * El saco que `<MandoDeTema>` de `@kamayuk/ui` recibe, con las trece ya pasadas por `t()`
+ * (`kamayuk-lib`#53).
+ *
+ * Memorizado sobre `t`, por lo mismo que los otros dos: cambia de identidad cuando cambia el idioma,
+ * que es exactamente cuando el saco tiene que rehacerse.
+ */
+export function useTextosDelMandoDeTema(): TextosDelMandoDeTema {
+  const { t } = useTranslation();
+
+  return useMemo<TextosDelMandoDeTema>(
+    () => ({
+      titulo: t(FRASES_DEL_MANDO_DE_TEMA.titulo),
+      nota: t(FRASES_DEL_MANDO_DE_TEMA.nota),
+      ejeDeLaIdentidad: t(FRASES_DEL_MANDO_DE_TEMA.ejeDeLaIdentidad),
+      notaDeLaIdentidad: t(FRASES_DEL_MANDO_DE_TEMA.notaDeLaIdentidad),
+      ejeDelModo: t(FRASES_DEL_MANDO_DE_TEMA.ejeDelModo),
+      notaDelModo: t(FRASES_DEL_MANDO_DE_TEMA.notaDelModo),
+      identidades: {
+        institucional: t(ROTULOS_DE_LAS_IDENTIDADES.institucional),
+        'alto-contraste': t(ROTULOS_DE_LAS_IDENTIDADES['alto-contraste']),
+        sepia: t(ROTULOS_DE_LAS_IDENTIDADES.sepia),
+        clasico: t(ROTULOS_DE_LAS_IDENTIDADES.clasico),
+      },
+      modos: {
+        claro: t(ROTULOS_DE_LOS_MODOS.claro),
+        oscuro: t(ROTULOS_DE_LOS_MODOS.oscuro),
+      },
+      elDelSistema: t(FRASES_DEL_MANDO_DE_TEMA.elDelSistema),
     }),
     [t],
   );

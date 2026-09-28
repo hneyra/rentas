@@ -3,6 +3,9 @@ import { join } from 'node:path';
 
 import { TEXTOS_DEL_ARMAZON, type TextosDelArmazon } from '@kamayuk/shell';
 import {
+  IDENTIDADES,
+  MandoDeTema,
+  MODOS,
   ProveedorDeTema,
   TEXTOS_DE_LA_UI,
   TEXTOS_DE_LAS_PIEZAS,
@@ -13,7 +16,6 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { RAIZ } from './artboards.ts';
 
-import { MandoDeTema } from '../src/preferencias/MandoDeTema.tsx';
 import { Aplicacion, CONSULTAS } from '../src/aplicacion.tsx';
 import { fijarToken } from '../src/api/identidad.ts';
 import { arrancar } from '../src/arranque.ts';
@@ -31,6 +33,7 @@ import {
   FRASES_DE_LAS_TABLAS,
   FRASES_DEL_MARCO,
   useTextosDelInterprete,
+  useTextosDelMandoDeTema,
   useTextosDelMarco,
 } from '../src/i18n/textosDelMarco.ts';
 import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
@@ -171,21 +174,35 @@ describe('ninguna cadena llega al DOM sin pasar por `t()`', () => {
   );
 
   /**
-   * **El mando de preferencias tambien** (#111).
+   * **El mando de preferencias tambien** (#111; desde `kamayuk-lib`#53, el de la libreria).
    *
-   * Es la unica pieza que este repositorio dibuja fuera del interprete, asi que es la unica que el
-   * recorrido de las cuarenta **no** puede ver: no es una pantalla y no esta en el catalogo. Sus
-   * once cadenas —los rotulos de los dos ejes, las tres identidades, los tres modos y las tres
-   * notas— llegarian al DOM sin que nadie mirase.
+   * No es una pantalla ni esta en el catalogo, asi que el recorrido de las cuarenta **no** lo ve.
+   * Sus trece cadenas —el titulo y la nota del cajon, los rotulos de los dos ejes y sus dos notas,
+   * las cuatro identidades, los dos modos y «el del sistema»— llegarian al DOM sin que nadie
+   * mirase.
+   *
+   * Desde `kamayuk-lib`#53 la pieza es `MandoDeTema` de `@kamayuk/ui` y no llama a `t()`: las
+   * palabras se las da este sistema por `textos`, con `useTextosDelMandoDeTema`, que es como la
+   * monta `aplicacion.tsx`. Montarla SIN ellos saldria roja aqui con las trece en castellano, que
+   * es exactamente lo que esta guarda tiene que ver.
    *
    * Se lee de `document.body` y no del contenedor porque el cajon sale en un portal: lo que se
    * dibuja no cuelga de lo que `render` devuelve.
    */
+  function ElMandoDeRentas() {
+    return <MandoDeTema abierto alCerrar={() => {}} textos={useTextosDelMandoDeTema()} />;
+  }
+
   it('y el mando de preferencias, que no es una pantalla y por eso se le olvida a todo el mundo', () => {
     render(
       <ProveedorDeTema configuracion={{ identidadPorOmision: 'institucional', prefijoDeClaves: 'kamayuk.prueba' }}>
-        <MandoDeTema abierto alCerrar={() => {}} />
+        <ElMandoDeRentas />
       </ProveedorDeTema>,
+    );
+    // EL CENTINELA: el cajon esta ABIERTO y dibuja todas sus opciones. Cerrado no monta nada, y
+    // una lista vacia de escapadas es justo lo que esta prueba da por buena.
+    expect(document.querySelectorAll('[data-slot="opcion-del-tema"]')).toHaveLength(
+      IDENTIDADES.length + MODOS.length + 1,
     );
     const escapadas = sinTraducir(document.body);
     expect(
