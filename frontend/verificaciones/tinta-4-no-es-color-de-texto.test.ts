@@ -32,6 +32,12 @@ import {
  * accesibilidad visual. La segunda es la unica que dice que hace la opcion «El del sistema», o sea
  * que quien no la lea no sabe que esta eligiendo.
  *
+ * **Desde `kamayuk-lib`#53 ese mando ya no esta en `src/`**: subio a `@kamayuk/ui`
+ * (`paquetes/ui/temas/MandoDeTema.tsx`) con su `text-tinta-3`, y esta guarda no barre la libreria
+ * por lo que se explica abajo. El contraste de sus dos notas lo sigue midiendo en el navegador
+ * `e2e/los-temas-llegan-al-navegador.spec.ts`, en las seis combinaciones; y aqui la regla sigue
+ * valiendo para lo que este repositorio dibuja.
+ *
  * La regla estaba escrita en prosa **en dos hojas de estilo**, y una regla que solo vive en un
  * comentario se incumple en seis meses. Aqui se convierte en rojo.
  *
