@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { RAIZ } from './artboards.ts';
 import { ACCESOS_MEDIDOS } from '../src/datos/seguridadMedida.ts';
 import { OPCIONES_QUE_LEEN_EL_CATALOGO } from '../src/datos/useCatalogoPermitido.ts';
-import { CAMBIAR_EL_EJERCICIO } from '../src/permisos.ts';
+import { ANULAR_LA_LICENCIA_DE_EDIFICACION, CAMBIAR_EL_EJERCICIO } from '../src/permisos.ts';
 
 /**
  * **Las dos opciones que la pantalla del 403 nombra son las que el backend pide y siembra** (#311).
@@ -40,6 +40,12 @@ const CATALOGO_DE_OPCIONES = join(RAIZ, '../docs/10-negocio/catalogo-de-opciones
 const CONTROLADOR_DE_LA_SESION = join(
   RAIZ,
   '../backend/kamayuk-rentas-seguridad/src/main/java/kamayuk/rentas/seguridad/infraestructura/web/SesionController.java',
+);
+
+/** Donde vive `POST /licencias/edificacion/{expediente}/anulacion`, el acto de `aut-sol` (#629). */
+const CONTROLADOR_DE_EDIFICACION = join(
+  RAIZ,
+  '../backend/kamayuk-rentas-licencias/src/main/java/kamayuk/rentas/licencias/infraestructura/web/EdificacionController.java',
 );
 
 function leer(ruta: string): string {
@@ -129,6 +135,43 @@ describe('la opcion que fija el ejercicio (#391)', () => {
     expect(nombreEnElCatalogo(catalogo, CAMBIAR_EL_EJERCICIO.codigo)).toBe(CAMBIAR_EL_EJERCICIO.nombre);
     expect(ACCESOS_MEDIDOS.find((a) => a.codigo === CAMBIAR_EL_EJERCICIO.codigo)?.nombre).toBe(
       CAMBIAR_EL_EJERCICIO.nombre,
+    );
+  });
+});
+
+/**
+ * **La opcion con que se anula una licencia de edificacion es la que el `POST` pide** (#629).
+ *
+ * El boton del acto de `aut-sol` sale impedido si la cuenta no tiene
+ * `ANULAR_LA_LICENCIA_DE_EDIFICACION.privilegio` sobre `.codigo`, y el motivo nombra la opcion por
+ * su nombre del catalogo. Escritos sin esta guarda, el dia que el backend pidiera otra cosa el boton
+ * se ofreceria a quien recibe 403 —o se impediria a quien si puede—. Las mismas tres fuentes que la
+ * del ejercicio, mas una: aqui el codigo no esta escrito en la anotacion sino en una constante del
+ * controlador (`ACCESO_FUE`), y se resuelve.
+ */
+describe('la opcion que anula una licencia de edificacion (#629)', () => {
+  const controlador = leer(CONTROLADOR_DE_EDIFICACION);
+  const catalogo = leer(CATALOGO_DE_OPCIONES);
+
+  it('`POST /licencias/edificacion/{expediente}/anulacion` pide el codigo y el privilegio que el boton pregunta', () => {
+    const patron =
+      /@PostMapping\("\/\{expediente\}\/anulacion"\)\s*@RequiereAcceso\(acceso\s*=\s*([A-Z_]+),\s*privilegio\s*=\s*Privilegio\.([A-Z]+)\)/;
+    const casa = patron.exec(controlador);
+    expect(casa, 'el patron ya no encuentra la anulacion en `EdificacionController`').not.toBeNull();
+    // La constante del controlador, resuelta a su valor.
+    const constante = new RegExp(`static final String ${casa?.[1] ?? '—'} = "([a-z_]+)";`).exec(controlador);
+    expect(constante?.[1], 'la anulacion ya no pide ese codigo').toBe(ANULAR_LA_LICENCIA_DE_EDIFICACION.codigo);
+    expect(casa?.[2]?.toLowerCase(), 'la anulacion ya no pide ese privilegio').toBe(
+      ANULAR_LA_LICENCIA_DE_EDIFICACION.privilegio,
+    );
+  });
+
+  it('y su nombre es el que se siembra y el que contesto la instalacion', () => {
+    expect(nombreEnElCatalogo(catalogo, ANULAR_LA_LICENCIA_DE_EDIFICACION.codigo)).toBe(
+      ANULAR_LA_LICENCIA_DE_EDIFICACION.nombre,
+    );
+    expect(ACCESOS_MEDIDOS.find((a) => a.codigo === ANULAR_LA_LICENCIA_DE_EDIFICACION.codigo)?.nombre).toBe(
+      ANULAR_LA_LICENCIA_DE_EDIFICACION.nombre,
     );
   });
 });

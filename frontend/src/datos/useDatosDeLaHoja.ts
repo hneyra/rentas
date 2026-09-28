@@ -5,7 +5,13 @@ import { ErrorDeLaApi } from '../api/cliente.ts';
 import { peldanoDe } from '../api/escalera.ts';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import { hojaDe } from '../pantallas/arbol.ts';
-import type { Ausencia, DatosDeLaPantalla, DatosDeUnaTabla, RutaDeLaHoja } from '@kamayuk/ui';
+import type {
+  Ausencia,
+  DatosDeLaPantalla,
+  DatosDeUnaTabla,
+  EstadoDeUnaLectura,
+  RutaDeLaHoja,
+} from '@kamayuk/ui';
 import { porQueNoHayDato } from '../porQueNoHayDato.ts';
 import type { DeQuienEs, Reparto } from './conectores.ts';
 import { CONECTORES, loQueLaHojaDeclara } from './conectores.ts';
@@ -189,6 +195,38 @@ function alFallar(
     // «El sistema funcionando» no se pinta de «algo se rompio»: un 403 en tono de averia manda a
     // mirar un despliegue cuando lo que falta es una fila en una tabla de permisos.
     tono: peldano.esAveria ? 'atencion' : 'info',
+  };
+}
+
+/**
+ * **Lo que se dice cuando el backend NO acepta un acto**, con la misma escalera (#629).
+ *
+ * Un acto del interprete no pinta su rechazo con una `Ausencia` —eso es el hueco de un campo—: lo
+ * pinta encima del formulario, que se queda con lo escrito, desde `datos.lecturas` con la clave del
+ * acto y el peldano **ya resuelto** (`kamayuk-lib`#44, #66). Lo resuelve esta, al lado de
+ * `alFallar` y con el mismo `peldanoDe`, por lo mismo que el mando del ejercicio pasa por `alFallar`:
+ * dos escaleras que dicen cosas distintas del mismo 403 es lo que `escalera.test.ts` vigila que no
+ * pase. Las tres frases fijas del peldano pasan por `t()` —son claves, y ya estan en el locale—; el
+ * `detalle` que dijo el backend no es clave, y `t()` lo devuelve tal cual.
+ *
+ * **Sin `reintentar`**, a proposito: reintentar un acto es volver a pulsar su boton, con lo escrito
+ * todavia en el formulario, y ofrecer otro boton que haga lo mismo seria ofrecer insistir sobre un
+ * 409 que va a contestar lo mismo.
+ */
+function alRechazarElActo(
+  error: unknown,
+  t: (clave: string, datos?: Readonly<Record<string, unknown>>) => string,
+): EstadoDeUnaLectura {
+  const peldano = peldanoDe(error);
+  return {
+    estado: 'fallo',
+    peldano: {
+      titulo: t(peldano.titulo),
+      detalle: t(peldano.detalle),
+      remedio: t(peldano.remedio),
+    },
+    // `mal` solo cuando algo se rompio: un 409 o un 422 son el backend funcionando.
+    tono: peldano.esAveria ? 'mal' : 'atencion',
   };
 }
 
@@ -506,4 +544,5 @@ export {
   VACIO,
   alFallar,
   alNoPoderDibujarla,
+  alRechazarElActo,
 };

@@ -1,6 +1,13 @@
 import type { ClaveDeHoja } from '../arbol.ts';
+import {
+  ANULAR_LA_LICENCIA,
+  LARGO_DE_LA_OBSERVACION,
+  LO_QUE_CONTESTO_LA_ANULACION,
+  opcionQueLoPide,
+  puedeHacerlo,
+} from '../actos.ts';
 import { EN_LA_RUTA, hayMasDe, paginasDe } from '../tablas.ts';
-import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
+import type { DefinicionDePantalla as Pantalla, PiezaDeLaPantalla as Pieza } from '@kamayuk/ui';
 
 /**
  * Las cuatro pantallas de **Autorizaciones y licencias** (UI-5, #85, AC2).
@@ -75,6 +82,28 @@ export const AUTORIZACIONES_Y_LICENCIAS = {
             opciones: ['De 06:00 a 23:00 horas', 'De 08:00 a 20:00 horas', 'Las 24 horas'],
           },
         ],
+        // **La anulacion de la licencia de edificacion tiene boton** (#455, #629). El backend la
+        // sirve desde #455 —`POST /licencias/edificacion/{expediente}/anulacion`— y ninguna
+        // pantalla la ofrecia. Abre el acto del final de esta hoja; sin el privilegio de registro
+        // sobre el FUE sale IMPEDIDO y dice por que —nunca `disabled`—: no se ofrece una puerta
+        // que contesta 403.
+        acciones: [
+          {
+            // El boton que ABRE no se llama como el acto, a proposito: el primario del acto lleva su
+            // titulo, y dos botones con el mismo nombre a la vista no se distinguen con un lector
+            // de pantalla —uno abre el formulario y el otro anula—.
+            rotulo: 'Anular una licencia de edificación',
+            abre: ANULAR_LA_LICENCIA,
+            impedida: [
+              {
+                si: { dato: puedeHacerlo(ANULAR_LA_LICENCIA), hay: false },
+                motivo: {
+                  plantilla: `Anular una licencia de edificación pide el privilegio de registro sobre «{${opcionQueLoPide(ANULAR_LA_LICENCIA)}}», que esta cuenta no tiene.`,
+                },
+              },
+            ],
+          },
+        ],
       },
       {
         titulo: 'Requisitos del TUPA',
@@ -105,6 +134,47 @@ export const AUTORIZACIONES_Y_LICENCIAS = {
             { rotulo: 'Estado', alineadoDerecha: false },
           ],
           columnaDeInsignia: 4,
+        },
+      },
+      /**
+       * **El acto de anular la licencia de edificacion** (#455, #629). No es un bloque del
+       * artboard, y por eso `pantallas-del-artboard` no lo compara: el artboard declara la
+       * operacion —en `const ARBOL`, junto a esta hoja— y el acto es lo que la ofrece.
+       *
+       * · **La observacion es obligatoria EN EL TIPO** (regla 10): `@kamayuk/ui` no deja escribir
+       *   un acto sin ella, y su largo es el del backend (`LARGO_DE_LA_OBSERVACION`).
+       * · **No se deshace**, y por eso lleva `advertencia`: el primario abre la confirmacion en vez
+       *   de enviar. Una segunda anulacion de la misma licencia el backend la rechaza con 409.
+       * · **`fecha` y `formato` no se piden**: sin ellos el backend anula con la fecha de hoy y saca
+       *   la resolucion en PDF. Ver `anularLicenciaDeEdificacion`.
+       */
+      {
+        tipo: 'acto',
+        clave: ANULAR_LA_LICENCIA,
+        titulo: 'Anular la licencia',
+        nota: 'Deja sin efecto la licencia del expediente con una resolución que dice el motivo. No la borra: queda en su historial, y a una fecha anterior la licencia sigue vigente.',
+        campos: [
+          { nombre: 'expediente', etiqueta: 'Expediente del FUE', tipo: '' },
+          {
+            nombre: 'motivo',
+            etiqueta: 'Motivo de la anulación',
+            tipo: '1',
+            ayuda: 'Es lo que dirá la resolución.',
+          },
+        ],
+        observacion: {
+          etiqueta: 'Observación',
+          ayuda: 'Por qué se registra. Queda en la auditoría, con la cuenta que anuló.',
+          largo: LARGO_DE_LA_OBSERVACION,
+        },
+        advertencia:
+          'La anulación no se deshace: la resolución queda emitida, y la licencia no se puede volver a anular.',
+        errores: 'trasElPrimerIntento',
+        hecho: {
+          titulo: 'Licencia anulada',
+          texto: {
+            plantilla: `Resolución {${LO_QUE_CONTESTO_LA_ANULACION.resolucion}}: la licencia {${LO_QUE_CONTESTO_LA_ANULACION.licencia}} del expediente {${LO_QUE_CONTESTO_LA_ANULACION.expediente}} queda sin efecto.`,
+          },
         },
       },
     ],
@@ -243,4 +313,4 @@ export const AUTORIZACIONES_Y_LICENCIAS = {
       },
     ],
   },
-} satisfies Partial<Record<ClaveDeHoja, Pantalla>>;
+} satisfies Partial<Record<ClaveDeHoja, Pantalla<Pieza>>>;

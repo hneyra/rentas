@@ -169,8 +169,8 @@ export const FRASES_DEL_INTERPRETE = {
  * Porque aquel es `satisfies Record<keyof TextosDelInterprete, string>` y `TextosDelInterprete`
  * son **tres**: una cuarta clave no compila. Los mandos viven en `TextosDeLasPiezas`, que es el
  * saco hermano, y de el se toma **solo lo que se dibuja**: las demas piezas de #44 y #66 —lecturas,
- * actos, acciones— este sistema no las usa, y prometer su traduccion seria inventario que nadie
- * reclama.
+ * y hasta #629 actos y acciones— este sistema no las usa, y prometer su traduccion seria inventario
+ * que nadie reclama. Las de los actos llegaron con el primero: ver `FRASES_DE_LOS_ACTOS`.
  */
 export const FRASES_DE_LAS_TABLAS = {
   paginaAnterior: 'Anterior',
@@ -217,6 +217,59 @@ type LasQueSeDibujan = Pick<
   | 'celdaSinDato'
   | 'porQueLaCeldaNoTieneDato'
   | 'tablaSinMotivo'
+>;
+
+/**
+ * **Las palabras de un ACTO del interprete** (#629).
+ *
+ * Por lo mismo que las de los mandos de una tabla (#186): mientras ninguna definicion de este
+ * sistema llevaba un acto, ninguna de estas llegaba al DOM y no faltaba ninguna —el javadoc de
+ * `FRASES_DE_LAS_TABLAS` lo dejaba escrito: «prometer su traduccion seria inventario que nadie
+ * reclama»—. Con el primero, anular la licencia de edificacion en `aut-sol`, llegan de golpe: el
+ * motivo del primario mientras falta algo, la confirmacion de lo que no se deshace, «Escribiendo…».
+ * Sin pasarlas por aqui, el acto saldria **a medias** en un segundo idioma.
+ *
+ * Las que llevan un dato lo llevan por interpolacion. Las dos de la observacion estan escritas para
+ * **no necesitar plural** —«tiene 3 de los 5 caracteres»—: la de la libreria elige «caracter» o
+ * «caracteres» con un ternario, que es justo lo que un idioma con mas de dos formas no admite.
+ */
+export const FRASES_DE_LOS_ACTOS = {
+  cerrarElActo: TEXTOS_DE_LAS_PIEZAS.cerrarElActo,
+  escribiendo: TEXTOS_DE_LAS_PIEZAS.escribiendo,
+  enCurso: TEXTOS_DE_LAS_PIEZAS.enCurso,
+  faltaRellenar: 'Falta rellenar: {{rotulos}}.',
+  observacionCorta: 'La observacion tiene {{tiene}} de los {{minimo}} caracteres que necesita como minimo.',
+  observacionLarga: 'La observacion tiene {{tiene}} caracteres y no puede pasar de {{maximo}}.',
+  sinQuienLoAtienda: 'Nadie atiende «{{clave}}» en esta pantalla: pulsarlo no haria nada.',
+  estoNoSeDeshace: TEXTOS_DE_LAS_PIEZAS.estoNoSeDeshace,
+  siConfirmar: TEXTOS_DE_LAS_PIEZAS.siConfirmar,
+  cancelar: TEXTOS_DE_LAS_PIEZAS.cancelar,
+  actoHecho: TEXTOS_DE_LAS_PIEZAS.actoHecho,
+  rechazoSinFallo:
+    'La escritura «{{clave}}» no se completo, y nadie ha dado su fallo: esta pantalla no sabe decir por que.',
+  campoObligatorio: TEXTOS_DE_LAS_PIEZAS.campoObligatorio,
+  // La raya de un dato que no llego dentro de un texto —la tarjeta de lo hecho, antes de que el
+  // servidor conteste—. Es un signo, y entra por el saco igual que las flechas del orden.
+  datoAusente: TEXTOS_DE_LAS_PIEZAS.datoAusente,
+} as const satisfies Record<keyof LasDeLosActos, string>;
+
+/** Las de `TextosDeLasPiezas` que dibuja un acto (#629). Derivado del tipo, como `LasQueSeDibujan`. */
+type LasDeLosActos = Pick<
+  TextosDeLasPiezas,
+  | 'cerrarElActo'
+  | 'escribiendo'
+  | 'enCurso'
+  | 'faltaRellenar'
+  | 'observacionCorta'
+  | 'observacionLarga'
+  | 'sinQuienLoAtienda'
+  | 'estoNoSeDeshace'
+  | 'siConfirmar'
+  | 'cancelar'
+  | 'actoHecho'
+  | 'rechazoSinFallo'
+  | 'campoObligatorio'
+  | 'datoAusente'
 >;
 
 /**
@@ -437,10 +490,10 @@ export const ROTULOS_DE_LOS_MODOS = {
  * Memorizado sobre `t`, por lo mismo que el del armazon: cambia de identidad cuando cambia el
  * idioma, que es exactamente cuando el saco tiene que rehacerse.
  */
-export function useTextosDelInterprete(): TextosDelInterprete & LasQueSeDibujan {
+export function useTextosDelInterprete(): TextosDelInterprete & LasQueSeDibujan & LasDeLosActos {
   const { t } = useTranslation();
 
-  return useMemo<TextosDelInterprete & LasQueSeDibujan>(
+  return useMemo<TextosDelInterprete & LasQueSeDibujan & LasDeLosActos>(
     () => ({
       opcional: t(FRASES_DEL_INTERPRETE.opcional),
       marcadorDeFecha: t(FRASES_DEL_INTERPRETE.marcadorDeFecha),
@@ -464,6 +517,22 @@ export function useTextosDelInterprete(): TextosDelInterprete & LasQueSeDibujan 
       celdaSinDato: t(FRASES_DE_LAS_TABLAS.celdaSinDato),
       porQueLaCeldaNoTieneDato: t(FRASES_DE_LAS_TABLAS.porQueLaCeldaNoTieneDato),
       tablaSinMotivo: t(FRASES_DE_LAS_TABLAS.tablaSinMotivo),
+
+      // Las de un acto (#629). Ver `FRASES_DE_LOS_ACTOS`.
+      cerrarElActo: t(FRASES_DE_LOS_ACTOS.cerrarElActo),
+      escribiendo: t(FRASES_DE_LOS_ACTOS.escribiendo),
+      enCurso: t(FRASES_DE_LOS_ACTOS.enCurso),
+      faltaRellenar: (rotulos) => t(FRASES_DE_LOS_ACTOS.faltaRellenar, { rotulos: rotulos.join(', ') }),
+      observacionCorta: (minimo, tiene) => t(FRASES_DE_LOS_ACTOS.observacionCorta, { minimo, tiene }),
+      observacionLarga: (maximo, tiene) => t(FRASES_DE_LOS_ACTOS.observacionLarga, { maximo, tiene }),
+      sinQuienLoAtienda: (clave) => t(FRASES_DE_LOS_ACTOS.sinQuienLoAtienda, { clave }),
+      estoNoSeDeshace: t(FRASES_DE_LOS_ACTOS.estoNoSeDeshace),
+      siConfirmar: t(FRASES_DE_LOS_ACTOS.siConfirmar),
+      cancelar: t(FRASES_DE_LOS_ACTOS.cancelar),
+      actoHecho: t(FRASES_DE_LOS_ACTOS.actoHecho),
+      rechazoSinFallo: (clave) => t(FRASES_DE_LOS_ACTOS.rechazoSinFallo, { clave }),
+      campoObligatorio: t(FRASES_DE_LOS_ACTOS.campoObligatorio),
+      datoAusente: t(FRASES_DE_LOS_ACTOS.datoAusente),
     }),
     [t],
   );

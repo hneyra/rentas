@@ -1,4 +1,12 @@
-import type { Ausencia, DefinicionDePantalla, PiezaDeLaPantalla } from '@kamayuk/ui';
+import type {
+  Ausencia,
+  DefinicionDeAccion,
+  DefinicionDeActo,
+  DefinicionDeCampo,
+  DefinicionDePantalla,
+  PiezaDeLaPantalla,
+  Texto,
+} from '@kamayuk/ui';
 
 import { ErrorDeLaApi } from '../api/cliente.ts';
 import { EXPLICACIONES_DE_LA_VUELTA, MOTIVOS_DE_LA_VUELTA } from '../api/identidad.ts';
@@ -48,6 +56,59 @@ import * as elMarco from './textosDelMarco.ts';
  */
 
 /**
+ * **Las frases de un `Texto`**, que son las que pasan por `traducir` (#629).
+ *
+ * La cadena y la plantilla —con sus huecos dentro: es la plantilla la que se traduce, y el dato se
+ * mete despues—, y los casos de un `segun`. Un `desde` no: es un dato, y no se traduce.
+ */
+function frasesDe(texto: Texto | undefined): readonly string[] {
+  if (texto === undefined) return [];
+  if (typeof texto === 'string') return [texto];
+  if ('plantilla' in texto) return [texto.plantilla];
+  if ('desde' in texto) return [];
+  return [...Object.values(texto.casos), ...(texto.otro === undefined ? [] : [texto.otro])];
+}
+
+/** Lo que dice un campo: su etiqueta, sus opciones, su casilla y su ayuda. */
+function frasesDelCampo(campo: DefinicionDeCampo): readonly string[] {
+  return [
+    campo.etiqueta,
+    ...('opciones' in campo ? campo.opciones : []),
+    ...('casilla' in campo ? [campo.casilla] : []),
+    ...('ayuda' in campo && campo.ayuda !== undefined ? [campo.ayuda] : []),
+  ];
+}
+
+/** Lo que dice una accion: su rotulo y el motivo de cada impedimento (#629). */
+function frasesDeLaAccion(accion: DefinicionDeAccion): readonly string[] {
+  return [...frasesDe(accion.rotulo), ...(accion.impedida ?? []).flatMap((i) => frasesDe(i.motivo))];
+}
+
+/**
+ * **Lo que dice un ACTO** (#629): hasta #629 ninguna definicion de este sistema llevaba uno, y el
+ * inventario solo recorria bloques. El primero —anular la licencia de edificacion— trae titulo,
+ * nota, campos, observacion, advertencia y la tarjeta de lo hecho, y todo eso pasa por `traducir`.
+ */
+function frasesDelActo(acto: DefinicionDeActo): readonly string[] {
+  return [
+    ...frasesDe(acto.titulo),
+    ...frasesDe(acto.nota),
+    ...acto.campos.flatMap(frasesDelCampo),
+    ...frasesDe(acto.observacion.etiqueta),
+    ...frasesDe(acto.observacion.ayuda),
+    ...frasesDe(acto.advertencia),
+    ...(acto.impedido ?? []).flatMap((i) => frasesDe(i.motivo)),
+    ...frasesDe(acto.hecho?.titulo),
+    ...frasesDe(acto.hecho?.texto),
+    ...(acto.hecho?.acciones ?? []).flatMap(frasesDeLaAccion),
+    ...frasesDe(acto.descartar?.rotulo),
+    ...frasesDe(acto.descartar?.dicho),
+    ...frasesDe(acto.alTerminar?.aviso),
+    ...frasesDe(acto.alFallar?.aviso),
+  ];
+}
+
+/**
  * Todo lo que las 40 pantallas dicen.
  *
  * **Los bloques, y no todas las piezas** (#288): lo que una pieza del consumidor dice es de ella y
@@ -61,15 +122,16 @@ function deLasPantallas(): readonly string[] {
   // `satisfies`, que es lo que garantiza que la anotacion no miente.
   for (const pantalla of Object.values(PANTALLAS) as readonly DefinicionDePantalla<PiezaDeLaPantalla>[]) {
     salida.push(pantalla.instruccion);
+    // Los actos (#629). No son bloques: `bloquesDe` los deja fuera, y aqui se recorren aparte.
+    for (const pieza of pantalla.bloques) {
+      if (pieza.tipo === 'acto') salida.push(...frasesDelActo(pieza));
+    }
     for (const bloque of bloquesDe(pantalla)) {
+      // Los botones del bloque (#629): el que abre un acto y el motivo con que sale impedido.
+      salida.push(...(bloque.acciones ?? []).flatMap(frasesDeLaAccion));
       salida.push(bloque.titulo);
       if (bloque.nota !== '') salida.push(bloque.nota);
-      for (const campo of bloque.campos) {
-        salida.push(campo.etiqueta);
-        if ('opciones' in campo) salida.push(...campo.opciones);
-        if ('casilla' in campo) salida.push(campo.casilla);
-        if ('ayuda' in campo && campo.ayuda !== undefined) salida.push(campo.ayuda);
-      }
+      salida.push(...bloque.campos.flatMap(frasesDelCampo));
       const tabla = bloque.tabla;
       if (tabla === undefined) continue;
       salida.push(tabla.titulo, ...tabla.columnas.map((c) => c.rotulo));
@@ -179,7 +241,7 @@ const OPERACION_DE_MUESTRA = 'GET /seguridad/sesion';
  * sea la frase escrita en este arbol, que es la que puede ser clave. Con un `mensaje` dentro
  * contestaria lo que dijo el backend, que es dato y no se traduce.
  *
- * La lista es a mano —ocho fallos para siete peldanos, porque `averia` se llega de dos maneras— y
+ * La lista es a mano —nueve fallos para ocho peldanos, porque `averia` se llega de dos maneras— y
  * eso es una lista que alguien puede olvidar ampliar. Por eso no es la unica linea de defensa:
  * `verificaciones/ninguna-ausencia-se-queda-sin-inventariar.test.ts` barre `api/escalera.ts` y
  * exige que **toda** frase escrita dentro de un peldano este en este catalogo, asi que un octavo
@@ -194,6 +256,7 @@ const LOS_FALLOS_DE_LA_ESCALERA: readonly unknown[] = [
   new ErrorDeLaApi(403, OPERACION_DE_MUESTRA, { codigo: 'SIN_PRIVILEGIO' }),
   new ErrorDeLaApi(403, OPERACION_DE_MUESTRA),
   new ErrorDeLaApi(404, OPERACION_DE_MUESTRA),
+  new ErrorDeLaApi(409, OPERACION_DE_MUESTRA),
   new ErrorDeLaApi(422, OPERACION_DE_MUESTRA),
   new ErrorDeLaApi(500, OPERACION_DE_MUESTRA),
 ];
