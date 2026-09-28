@@ -2,6 +2,7 @@ package kamayuk.rentas.sanciones.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -15,6 +16,7 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.dominio.ResultadoDeNotificacion;
+import kamayuk.rentas.sanciones.dominio.DescargoRepository;
 import kamayuk.rentas.sanciones.dominio.NotificacionDeResolucion;
 import kamayuk.rentas.sanciones.dominio.NotificacionDeResolucionRepository;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
@@ -57,6 +59,15 @@ import org.springframework.transaction.annotation.Transactional;
  * recibir <b>sí</b> surta efecto no es un descuido: el art. 104 a) del TUO del Código Tributario
  * admite la certificación de la negativa como notificación válida, y si no lo hiciera bastaría con
  * cerrar la puerta para que ninguna resolución llegara a producir efecto nunca.
+ *
+ * <h2>La resolución de un recurso se busca por su recurso (#412, #629)</h2>
+ *
+ * <p>#412 le dio al recurso su propia resolución —tipo {@code RECURSO}, documento {@code RGR}—, y
+ * ninguna ruta de diligencia la admitía: la de tránsito notifica la ordinaria y la sancionadora, y
+ * la administrativa la suya (#415). {@link #registrarLaDelRecurso} la encuentra por el expediente
+ * del recurso que resuelve —el mismo con que se dictó— y la diligencia por el mismo camino que las
+ * demás: el mismo intento, la misma dirección y el plazo que ella concede, que es el de impugnarla
+ * ({@link PlazosDeSancionesParametrizados.Vigentes#queConcede}).
  */
 @Service
 public class NotificarResolucionDeGerencia {
@@ -66,6 +77,7 @@ public class NotificarResolucionDeGerencia {
     private final ResolucionDeGerenciaRepository resoluciones;
     private final NotificacionDeResolucionRepository notificaciones;
     private final PapeletaRepository papeletas;
+    private final DescargoRepository descargos;
     private final DirectorioDeContribuyentes contribuyentes;
     private final PlazosDeSancionesParametrizados plazos;
     private final Auditoria auditoria;
@@ -75,6 +87,7 @@ public class NotificarResolucionDeGerencia {
             ResolucionDeGerenciaRepository resoluciones,
             NotificacionDeResolucionRepository notificaciones,
             PapeletaRepository papeletas,
+            DescargoRepository descargos,
             DirectorioDeContribuyentes contribuyentes,
             PlazosDeSancionesParametrizados plazos,
             Auditoria auditoria,
@@ -82,6 +95,7 @@ public class NotificarResolucionDeGerencia {
         this.resoluciones = resoluciones;
         this.notificaciones = notificaciones;
         this.papeletas = papeletas;
+        this.descargos = descargos;
         this.contribuyentes = contribuyentes;
         this.plazos = plazos;
         this.auditoria = auditoria;
@@ -171,6 +185,39 @@ public class NotificarResolucionDeGerencia {
                         .con(null, descripcion(resolucion, guardada)));
 
         return new Diligencia(guardada, resolucion);
+    }
+
+    /**
+     * Registra una diligencia sobre la resolución que resolvió un recurso (#412, #629): la de tipo
+     * {@code RECURSO} que lo nombra.
+     *
+     * @param expedienteDelRecurso el número de expediente con que se registró el recurso
+     * @param peticion los datos de la diligencia
+     * @param observacion por qué se registra (regla 10, RNF-052)
+     * @throws RecursoSinResolucion si no hay recurso con ese expediente, o no se resolvió con una
+     *     resolución de recurso
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la diligencia es anterior a la resolución
+     *     o posterior a hoy (#402)
+     * @throws SinDireccion si ni el padrón ni la petición dicen dónde notificar
+     */
+    @Transactional
+    public Diligencia registrarLaDelRecurso(
+            String expedienteDelRecurso, Peticion peticion, Observacion observacion) {
+        String expediente = expedienteDelRecurso.strip();
+        // Solo la de tipo RECURSO. Un recurso resuelto a la antigua —con la ordinaria o la
+        // sancionadora que lo nombraba en `nDeExpediente`— se diligencia por la ruta de su tipo:
+        // aceptarla aqui abriria una segunda puerta, con otro acceso, a la misma resolucion.
+        ResolucionDeGerencia resolucion =
+                descargos
+                        .porNumeroDeExpediente(expediente)
+                        .flatMap(recurso -> resoluciones.queResuelve(recurso.identificador()))
+                        .filter(dictada -> dictada.tipo() == TipoDeResolucionDeGerencia.RECURSO)
+                        .orElseThrow(() -> new RecursoSinResolucion(expediente));
+        return registrar(
+                resolucion.numero(),
+                EnumSet.of(TipoDeResolucionDeGerencia.RECURSO),
+                peticion,
+                observacion);
     }
 
     // ------------------------------------------------------------------
@@ -276,6 +323,23 @@ public class NotificarResolucionDeGerencia {
 
         ResolucionInexistente(String numero) {
             super("No hay ninguna resolucion de gerencia con el numero '" + numero + "'");
+        }
+    }
+
+    /**
+     * No hay un recurso con ese expediente, o no tiene una resolución de recurso que notificar
+     * (#412): en esta ruta, las dos cosas son lo mismo, «aquí no hay nada que diligenciar».
+     */
+    public static final class RecursoSinResolucion extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        RecursoSinResolucion(String expediente) {
+            super(
+                    "El recurso '"
+                            + expediente
+                            + "' no tiene resolucion de recurso que notificar: o no existe, o"
+                            + " todavia no se resolvio por su ruta");
         }
     }
 

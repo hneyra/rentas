@@ -417,6 +417,7 @@ class ValoresMasivosYReportesJdbcTest {
                                 resoluciones,
                                 diligencias,
                                 papeletas,
+                                repositorioDeDescargos,
                                 directorio,
                                 plazos,
                                 auditoria,

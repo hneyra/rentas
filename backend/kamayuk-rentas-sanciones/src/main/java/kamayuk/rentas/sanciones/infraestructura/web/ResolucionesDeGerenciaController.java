@@ -37,17 +37,19 @@ import org.springframework.web.bind.annotation.RestController;
  * Las resoluciones de gerencia por HTTP: la ordinaria, la sancionadora, la administrativa y sus
  * notificaciones (#50, RF-065, RF-074).
  *
- * <h2>Cinco rutas, cuatro accesos</h2>
+ * <h2>Siete rutas, cinco accesos</h2>
  *
  * <p>Cada endpoint declara el suyo: {@code transito_rg_ordinaria}, {@code
- * transito_rg_sancionadora}, {@code adm_resolucion_gerencia} y {@code adm_notificacion_resolucion}.
- * Sin {@code @RequiereAcceso} el guardia <b>niega</b>, y la regla de arquitectura rompe el build;
- * las dos cosas juntas hacen que el olvido no se pueda convertir en una puerta abierta.
+ * transito_rg_sancionadora}, {@code adm_resolucion_gerencia}, {@code adm_notificacion_resolucion} y
+ * {@code transito_descargos}. Sin {@code @RequiereAcceso} el guardia <b>niega</b>, y la regla de
+ * arquitectura rompe el build; las dos cosas juntas hacen que el olvido no se pueda convertir en
+ * una puerta abierta.
  *
  * <p>La notificación de tránsito comparte acceso con la ordinaria: notificar la resolución es parte
  * de la misma opción del menú, y el manual no le da pantalla propia. La ruta sí es propia, porque
  * sin ella la sancionadora no se podría dictar nunca —su plazo se cuenta desde que la ordinaria
- * surte efecto—.
+ * surte efecto—. Y por lo mismo la resolución de un recurso (#412) se notifica con el acceso de la
+ * acción que la dicta, «Resolver» de {@code transito_descargos}, y junto a su ruta (#629).
  *
  * <h2>Los bytes no viajan en el JSON</h2>
  *
@@ -209,6 +211,25 @@ public class ResolucionesDeGerenciaController {
                                 observacion));
     }
 
+    /**
+     * La cédula de notificación de la resolución que resolvió un recurso (#412, #629): la de tipo
+     * {@code RECURSO}, buscada por el recurso, junto a la ruta que la dicta y con su mismo acceso.
+     * Sin ella, la resolución de un recurso se dictaba y se asentaba, y el plazo para impugnarla no
+     * se abría nunca.
+     */
+    @PostMapping("/transito/descargos/{nDeExpediente}/resolucion/notificacion")
+    @ResponseStatus(HttpStatus.CREATED)
+    @RequiereAcceso(acceso = ACCESO_DESCARGOS, privilegio = Privilegio.REGISTRO)
+    public DiligenciaResource notificarLaDelRecurso(
+            @PathVariable String nDeExpediente,
+            @RequestBody PeticionDeNotificacionDeResolucion peticion) {
+        Observacion observacion = PeticionesDeSanciones.observacionDe(peticion.observacion());
+        return traducirLaDiligencia(
+                () ->
+                        notificar.registrarLaDelRecurso(
+                                nDeExpediente, diligenciaDe(peticion), observacion));
+    }
+
     /** Las dos rutas que dictan fallan por las mismas razones, y se traducen en un solo sitio. */
     private static ResolucionResource traducir(
             java.util.function.Supplier<ResolverConResolucionDeGerencia.ResolucionDictada>
@@ -254,33 +275,38 @@ public class ResolucionesDeGerenciaController {
             PeticionDeNotificacionDeResolucion peticion) {
 
         Observacion observacion = PeticionesDeSanciones.observacionDe(peticion.observacion());
+        return traducirLaDiligencia(
+                () -> notificar.registrar(numero, admitidos, diligenciaDe(peticion), observacion));
+    }
+
+    /** El cuerpo de una diligencia, el mismo en las tres rutas que notifican. */
+    private static NotificarResolucionDeGerencia.Peticion diligenciaDe(
+            PeticionDeNotificacionDeResolucion peticion) {
+        return new NotificarResolucionDeGerencia.Peticion(
+                PeticionesDeSanciones.fechaDe(
+                        peticion.fechaDeNotificacion(), "fechaDeNotificacion"),
+                PeticionesDeSanciones.enumeradoDe(
+                        ModalidadDeNotificacion.class, peticion.modalidad(), "modalidad"),
+                PeticionesDeSanciones.enumeradoDe(
+                        ResultadoDeNotificacion.class, peticion.resultado(), "resultado"),
+                PeticionesDeSanciones.exigir(peticion.notificador(), "notificador"),
+                PeticionesDeSanciones.vacioEsNulo(peticion.direccion()),
+                PeticionesDeSanciones.vacioEsNulo(peticion.recibidoPor()),
+                PeticionesDeSanciones.vacioEsNulo(peticion.documentoDelReceptor()),
+                PeticionesDeSanciones.vacioEsNulo(peticion.vinculo()),
+                PeticionesDeSanciones.vacioEsNulo(peticion.acuse()));
+    }
+
+    /**
+     * Las tres rutas que notifican fallan por las mismas razones, y se traducen en un sitio. El
+     * cuerpo se lee <b>dentro</b>: un campo que no se puede leer es la misma clase de 422.
+     */
+    private static DiligenciaResource traducirLaDiligencia(
+            java.util.function.Supplier<NotificarResolucionDeGerencia.Diligencia> registro) {
         try {
-            NotificarResolucionDeGerencia.Diligencia diligencia =
-                    notificar.registrar(
-                            numero,
-                            admitidos,
-                            new NotificarResolucionDeGerencia.Peticion(
-                                    PeticionesDeSanciones.fechaDe(
-                                            peticion.fechaDeNotificacion(), "fechaDeNotificacion"),
-                                    PeticionesDeSanciones.enumeradoDe(
-                                            ModalidadDeNotificacion.class,
-                                            peticion.modalidad(),
-                                            "modalidad"),
-                                    PeticionesDeSanciones.enumeradoDe(
-                                            ResultadoDeNotificacion.class,
-                                            peticion.resultado(),
-                                            "resultado"),
-                                    PeticionesDeSanciones.exigir(
-                                            peticion.notificador(), "notificador"),
-                                    PeticionesDeSanciones.vacioEsNulo(peticion.direccion()),
-                                    PeticionesDeSanciones.vacioEsNulo(peticion.recibidoPor()),
-                                    PeticionesDeSanciones.vacioEsNulo(
-                                            peticion.documentoDelReceptor()),
-                                    PeticionesDeSanciones.vacioEsNulo(peticion.vinculo()),
-                                    PeticionesDeSanciones.vacioEsNulo(peticion.acuse())),
-                            observacion);
-            return DiligenciaResource.de(diligencia);
-        } catch (NotificarResolucionDeGerencia.ResolucionInexistente noExiste) {
+            return DiligenciaResource.de(registro.get());
+        } catch (NotificarResolucionDeGerencia.ResolucionInexistente
+                | NotificarResolucionDeGerencia.RecursoSinResolucion noExiste) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.NO_ENCONTRADO, PeticionesDeSanciones.mensajeDe(noExiste));
         } catch (NotificarResolucionDeGerencia.SinDireccion | IllegalArgumentException invalido) {

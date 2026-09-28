@@ -4518,6 +4518,44 @@ paths:
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
           $ref: "#/components/responses/ErrorDeValidacion"
+  "/transito/descargos/{nDeExpediente}/resolucion/notificacion":
+    post:
+      operationId: notificar_resolucion_de_recurso
+      summary: "Notificación de la resolución de un recurso"
+      description: >-
+        Cédula de notificación de la resolución que resolvió un recurso —la de tipo `RECURSO`,
+        documento `RGR`— con su acuse (#412, #629). Se busca por el recurso, y solo la de ese
+        tipo: un recurso resuelto con la ordinaria o la sancionadora se notifica por la ruta de
+        tránsito. La diligencia que surte efecto abre el plazo que esa resolución concede, que es
+        el de impugnarla (`PLAZO:RG_RECURSO`), el mismo que la sancionadora. Un recurso que no
+        existe, o que todavía no se resolvió por su ruta, contesta 404.
+      tags: ["Tránsito"]
+      parameters:
+        - name: nDeExpediente
+          in: path
+          required: true
+          description: "El recurso, por el número de expediente con que se registró"
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        201:
+          description: Operacion realizada
+          content:
+            application/json:
+              schema: { type: object }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          $ref: "#/components/responses/SinMunicipalidad"
+        "422":
+          $ref: "#/components/responses/ErrorDeValidacion"
   "/transito/internamientos":
     get:
       operationId: internamiento
