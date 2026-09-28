@@ -26,9 +26,10 @@ import java.util.Optional;
  * <p>Rechazar toda obligacion con un valor vivo seria mas simple y estaria mal: una RD posterior a
  * una OP sobre el mismo predial es un acto legitimo —la determinacion que sigue a la orden de
  * pago—, y {@code coactiva} ya la da por buena al deduplicar sus expedientes. Lo que si cambia
- * cuando hay un valor vivo de <b>cualquier</b> tipo es la fase: la deuda ya esta en VALOR, y volver
- * a moverla dejaria escrito en el libro que salio de ORDINARIA dos veces. Eso lo contesta {@link
- * Formalizacion#yaEstaEnFaseValor}.
+ * cuando hay un valor vivo de <b>cualquier</b> tipo es la fase: lo que ese valor formalizo ya salio
+ * de ORDINARIA, asi que lo que el segundo congela ya no tiene por que estar alli. Eso lo contesta
+ * {@link Formalizacion#yaEstaEnFaseValor}. Que no salga dos veces ya no depende de esta regla sino
+ * del libro, que desde #510 mueve solo lo que la obligacion tiene en ORDINARIA.
  *
  * <h2>Solo vale despues del candado</h2>
  *
@@ -81,7 +82,8 @@ public final class ObligacionYaFormalizada {
 
         /**
          * Si la deuda ya salio de ORDINARIA: basta un valor vivo, de cualquier tipo, porque el
-         * primero que la formalizo la movio.
+         * primero que la formalizo la movio. Lo que siga en ORDINARIA —un cargo asentado despues de
+         * ese valor— lo mueve el siguiente (#510); lo que no esta alli, lo explica este.
          */
         public boolean yaEstaEnFaseValor() {
             return !vivos.isEmpty();

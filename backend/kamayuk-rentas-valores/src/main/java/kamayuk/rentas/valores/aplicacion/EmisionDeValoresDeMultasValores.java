@@ -116,7 +116,8 @@ public class EmisionDeValoresDeMultasValores implements EmisionDeValoresDeMultas
         // La contencion de #371, ANTES de numerar nada: la obligacion es la de todas las multas
         // del obligado en ese tributo, ejercicio y unidad. Si otra papeleta tiene deuda en ella,
         // una RM la formalizaria tambien; y si ya salio de ORDINARIA, un valor ya la formalizo y
-        // `moverAValor` volveria a abonar una ORDINARIA que no debe nada.
+        // otra RM seria un segundo titulo por la misma deuda. Desde #510 `moverAValor` ya no
+        // volveria a abonar una ORDINARIA que no debe nada, pero el titulo seguiria saliendo.
         origen.exigirQueSoloLaOrigine(contribuyenteId, obligacion, referenciaDelOrigen);
         if (!origen.sigueEnOrdinaria(contribuyenteId, obligacion)) {
             throw new ObligacionYaFormalizada(
