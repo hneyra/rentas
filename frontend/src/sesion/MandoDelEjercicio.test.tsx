@@ -41,7 +41,44 @@ import { MUNICIPALIDAD_MEDIDA, SESION_MEDIDA } from '../datos/sesionMedida.ts';
  * vengan despues, como la instalacion. Asi la prueba no decide COMO se entera la cache —escribirla
  * con la respuesta del `PUT` o invalidarla y volver a pedir—: exige que se entere. Sin ninguna de
  * las dos, la sesion cacheada sigue diciendo `null` y la hoja sigue en «falta el ejercicio».
+ *
+ * <h2>Por que llevan plazo propio, y por que eso no es subir el tope a ciegas (#629)</h2>
+ *
+ * Con `yarn verificar` corriendo las ochenta suites a la vez sobre un puesto cargado, la primera
+ * prueba que monta la aplicacion caducaba en el tope de 5 s de Vitest —5 373 ms, medido— y sola
+ * pasaba en menos de uno. **No espera nada**: ni un reloj, ni un `findBy` que agote su plazo. Es
+ * trabajo de CPU, y se midio en que:
+ *
+ * · con un perfil de V8 sobre el cuerpo de la prueba, **el 58 %** es React montando y repintando
+ *   la aplicacion entera en su compilacion de desarrollo —el armazon, el arbol de diez modulos, la
+ *   paleta de cuarenta destinos, la hoja con sus tres desplegables y su tabla, y el cajon—, repartido
+ *   entre decenas de componentes sin ninguno que destaque; un 19 % son los eventos de `userEvent`,
+ *   que arrastran los repintados que disparan, y un 12 % las consultas por rol;
+ * · con `process.cpuUsage()` alrededor de cada prueba, **1 405 ms de CPU** la de `seg-aud` —que
+ *   ademas paga la primera compilacion de todos los componentes— y **795** la de `territorio`.
+ *
+ * Lo que sobraba se quito: la observacion tecleada letra a letra (ver `escribirLaObservacion`), que
+ * baja esas dos a **1 098** y **614** ms —cuatro corridas alternas de cada version, en el mismo
+ * puesto—. Lo que queda **es lo que estas pruebas existen para medir**: que el mando de la barra y
+ * la hoja se enteren a traves de la cache de la aplicacion montada, y eso no se prueba montando
+ * menos. Con la maquina cargada el reloj de pared llego a cuatro veces la CPU, asi que 1,1 s de CPU
+ * no caben con holgura en 5 s de pared.
+ *
+ * Por eso el plazo se escribe aqui, con la forma de #504 (`una-hoja-que-revienta-no-se-lleva-el-
+ * armazon.test.tsx`): las esperas de una cadena —el `PUT`, la cache, la lectura nueva y su
+ * repintado— esperan al HECHO con `ESPERAR`, y la prueba entera lleva `PLAZO_DE_LA_PRUEBA`. En
+ * verde no cuesta nada: `waitFor` vuelve en cuanto el hecho se cumple. Solo pesa cuando el hecho no
+ * llega, y entonces el rojo es el mismo, un rato despues.
  */
+
+/**
+ * **Se espera al hecho, no al reloj** (#629, como #504). `waitFor` sin opciones se rinde al segundo,
+ * y lo que se espera tras pulsar es una cadena entera: ver el javadoc de arriba.
+ */
+const ESPERAR = { timeout: 10_000 };
+
+/** Por encima de la suma de las esperas de una prueba que monta la aplicacion: ver `ESPERAR`. */
+const PLAZO_DE_LA_PRUEBA = { timeout: 60_000 };
 
 /** El ano del reloj del puesto durante estas pruebas. */
 const ANO_DEL_RELOJ = 2026;
@@ -203,7 +240,7 @@ async function montarEn(destino: string): Promise<HTMLElement> {
   await waitFor(() => {
     barra = document.querySelector<HTMLElement>('[data-slot="barra-global"]');
     expect(barra).not.toBeNull();
-  });
+  }, ESPERAR);
   return barra as unknown as HTMLElement;
 }
 
@@ -219,6 +256,30 @@ function cambiosMandados(): readonly Peticion[] {
   return peticiones.filter((p) => p.metodo === 'PUT' && p.ruta.endsWith('/seguridad/sesion/ejercicio'));
 }
 
+/**
+ * **La observacion se PEGA, no se teclea letra a letra** (#629).
+ *
+ * `usuario.type` con las 38 letras de `MOTIVO` son 38 vueltas de cinco eventos —`keydown`,
+ * `keypress`, `beforeinput`, `input` y `keyup`— por jsdom, y 38 pasadas de React sobre el mando y su
+ * cajon: medido con `process.cpuUsage()` alrededor de cada prueba, **algo mas de una quinta parte
+ * de la CPU** de las dos que montan la aplicacion para escribir —de 1 405 a 1 098 ms la de
+ * `seg-aud`, de 795 a 614 la de `territorio`—. Ninguna afirmacion de este archivo mira el camino
+ * letra a letra: el mando lee la observacion de su `onChange`, que es el mismo para una tecla que
+ * para un pegado. Lo que si se mira es que el `PUT` lleve **lo escrito**, y un pegado lo escribe
+ * igual.
+ *
+ * El ejercicio se sigue TECLEANDO: son cuatro teclas, y es donde el orden importa —un campo que
+ * arrancase en el ano del reloj daria `20262024`, que es la rotura R4 de #391—.
+ */
+async function escribirLaObservacion(
+  usuario: ReturnType<typeof userEvent.setup>,
+  dialogo: HTMLElement,
+  texto: string,
+): Promise<void> {
+  await usuario.click(within(dialogo).getByLabelText('Observacion'));
+  await usuario.paste(texto);
+}
+
 describe('#391 — el ejercicio de trabajo se fija desde la barra', () => {
   it('EL CENTINELA: el ejercicio elegido NO es el del reloj del puesto', () => {
     // Sin esto, cambiar la siembra por el ano de hoy dejaria la prueba de abajo verde con un mando
@@ -228,18 +289,18 @@ describe('#391 — el ejercicio de trabajo se fija desde la barra', () => {
     expect(SESION_MEDIDA.ejercicioDeTrabajo).toBeNull();
   });
 
-  it('desde «falta el ejercicio», el mando manda el PUT con su observacion y seg-aud pide la bitacora DE ESE ejercicio', async () => {
+  it('desde «falta el ejercicio», el mando manda el PUT con su observacion y seg-aud pide la bitacora DE ESE ejercicio', PLAZO_DE_LA_PRUEBA, async () => {
     const usuario = userEvent.setup();
     const barra = await montarEn('seg-aud');
 
     // El punto de partida es el de la instalacion: sin ejercicio, la hoja lo dice y no pide nada.
     await waitFor(() => {
       expect(screen.getAllByText('falta el ejercicio').length).toBeGreaterThan(0);
-    });
+    }, ESPERAR);
     expect(bitacorasPedidas()).toEqual([]);
 
     await usuario.click(within(barra).getByRole('button', { name: /ejercicio de trabajo/i }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Cambiar el ejercicio de trabajo' });
+    const dialogo = await screen.findByRole('dialog', { name: 'Cambiar el ejercicio de trabajo' }, ESPERAR);
 
     // El campo arranca VACIO: ni el ano del reloj ni una lista que salga de el (AC2 de #181).
     const anio = within(dialogo).getByLabelText('Ejercicio');
@@ -247,30 +308,30 @@ describe('#391 — el ejercicio de trabajo se fija desde la barra', () => {
     expect(dialogo.textContent).not.toContain(String(ANO_DEL_RELOJ));
 
     await usuario.type(anio, String(ELEGIDO));
-    await usuario.type(within(dialogo).getByLabelText('Observacion'), MOTIVO);
+    await escribirLaObservacion(usuario, dialogo, MOTIVO);
     await usuario.click(within(dialogo).getByRole('button', { name: 'Cambiar el ejercicio' }));
 
     // (a) Salio UN PUT, con el ejercicio elegido y la observacion tecleada.
     await waitFor(() => {
       expect(cambiosMandados()).toHaveLength(1);
-    });
+    }, ESPERAR);
     expect(cambiosMandados()[0]?.cuerpo).toEqual({ ejercicio: ELEGIDO, observacion: MOTIVO });
 
     // (b) Y la hoja volvio a pedir, con ESE ejercicio y con ningun otro.
     await waitFor(() => {
       expect(bitacorasPedidas()).toContain(String(ELEGIDO));
-    });
+    }, ESPERAR);
     expect(bitacorasPedidas()).not.toContain(String(ANO_DEL_RELOJ));
     await waitFor(() => {
       expect(screen.queryAllByText('falta el ejercicio')).toEqual([]);
-    });
+    }, ESPERAR);
     // Y la barra dice el ejercicio nuevo.
     expect(within(barra).getByRole('button', { name: /ejercicio de trabajo/i }).textContent).toContain(
       String(ELEGIDO),
     );
   });
 
-  it('y `territorio`, la otra hoja que lo exige, tambien vuelve a pedir con ESE ejercicio', async () => {
+  it('y `territorio`, la otra hoja que lo exige, tambien vuelve a pedir con ESE ejercicio', PLAZO_DE_LA_PRUEBA, async () => {
     const usuario = userEvent.setup();
     const barra = await montarEn('territorio/00000025673');
     const determinaciones = () =>
@@ -280,33 +341,33 @@ describe('#391 — el ejercicio de trabajo se fija desde la barra', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText('falta el ejercicio').length).toBeGreaterThan(0);
-    });
+    }, ESPERAR);
     expect(determinaciones()).toEqual([]);
 
     await usuario.click(within(barra).getByRole('button', { name: /ejercicio de trabajo/i }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Cambiar el ejercicio de trabajo' });
+    const dialogo = await screen.findByRole('dialog', { name: 'Cambiar el ejercicio de trabajo' }, ESPERAR);
     await usuario.type(within(dialogo).getByLabelText('Ejercicio'), String(ELEGIDO));
-    await usuario.type(within(dialogo).getByLabelText('Observacion'), MOTIVO);
+    await escribirLaObservacion(usuario, dialogo, MOTIVO);
     await usuario.click(within(dialogo).getByRole('button', { name: 'Cambiar el ejercicio' }));
 
     await waitFor(() => {
       expect(determinaciones()).toEqual([String(ELEGIDO)]);
-    });
+    }, ESPERAR);
   });
 
-  it('el 422 del backend se ensena con SUS palabras, y el cajon se queda abierto con lo tecleado', async () => {
+  it('el 422 del backend se ensena con SUS palabras, y el cajon se queda abierto con lo tecleado', PLAZO_DE_LA_PRUEBA, async () => {
     const usuario = userEvent.setup();
     const barra = await montarEn('seg-aud');
 
     await usuario.click(within(barra).getByRole('button', { name: /ejercicio de trabajo/i }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Cambiar el ejercicio de trabajo' });
+    const dialogo = await screen.findByRole('dialog', { name: 'Cambiar el ejercicio de trabajo' }, ESPERAR);
     await usuario.type(within(dialogo).getByLabelText('Ejercicio'), String(ELEGIDO));
     await usuario.type(within(dialogo).getByLabelText('Observacion'), 'ok');
     await usuario.click(within(dialogo).getByRole('button', { name: 'Cambiar el ejercicio' }));
 
     await waitFor(() => {
       expect(within(dialogo).getByText(OBSERVACION_CORTA, { exact: false })).toBeTruthy();
-    });
+    }, ESPERAR);
     expect(cambiosMandados()).toHaveLength(1);
     // Lo tecleado sigue ahi: el 422 mas probable es «la observacion es corta», y cerrar obligaria
     // a teclearlo todo otra vez.
@@ -317,12 +378,12 @@ describe('#391 — el ejercicio de trabajo se fija desde la barra', () => {
     expect(bitacorasPedidas()).toEqual([]);
   });
 
-  it('sin observacion NO se manda nada: el boton no se puede pulsar', async () => {
+  it('sin observacion NO se manda nada: el boton no se puede pulsar', PLAZO_DE_LA_PRUEBA, async () => {
     const usuario = userEvent.setup();
     const barra = await montarEn('seg-aud');
 
     await usuario.click(within(barra).getByRole('button', { name: /ejercicio de trabajo/i }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Cambiar el ejercicio de trabajo' });
+    const dialogo = await screen.findByRole('dialog', { name: 'Cambiar el ejercicio de trabajo' }, ESPERAR);
     await usuario.type(within(dialogo).getByLabelText('Ejercicio'), String(ELEGIDO));
 
     const cambiar = within(dialogo).getByRole('button', { name: 'Cambiar el ejercicio' });
@@ -331,13 +392,13 @@ describe('#391 — el ejercicio de trabajo se fija desde la barra', () => {
     expect(cambiosMandados()).toEqual([]);
   });
 
-  it('a la cuenta sin «especial» sobre cambiar_anio no se le ofrece el mando: solo el valor', async () => {
+  it('a la cuenta sin «especial» sobre cambiar_anio no se le ofrece el mando: solo el valor', PLAZO_DE_LA_PRUEBA, async () => {
     permisos = sinElPrivilegioEspecial();
     const barra = await montarEn('seg-aud');
 
     await waitFor(() => {
       expect(within(barra).getByText(/ejercicio/i)).toBeTruthy();
-    });
+    }, ESPERAR);
     expect(within(barra).queryByRole('button', { name: /ejercicio de trabajo/i })).toBeNull();
   });
 });
