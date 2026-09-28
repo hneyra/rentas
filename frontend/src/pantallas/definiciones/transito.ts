@@ -1,6 +1,16 @@
 import type { ClaveDeHoja } from '../arbol.ts';
 import { EN_LA_RUTA, hayMasDe, paginasDe } from '../tablas.ts';
-import { EL_SUJETO, type DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
+import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
+
+/**
+ * El nombre del sujeto en la ruta: el mismo `EL_SUJETO` de `@kamayuk/ui`, atado por el TIPO y no
+ * importado como VALOR. Las definiciones las carga tambien el arnes de Playwright en Node
+ * (`e2e/los-cuarenta.spec.ts`), y un valor de `@kamayuk/ui` arrastra su indice entero —hasta
+ * `boton.tsx` y `class-variance-authority`—, que en la CI no resuelve: alli la libreria se clona sin
+ * dependencias. Medido en `rentas`#635: `Error: Cannot find package 'class-variance-authority'` y
+ * «Total: 0 tests in 0 files». Si la libreria cambia el nombre, `satisfies` no compila.
+ */
+const EL_SUJETO = 'sujeto' satisfies typeof import('@kamayuk/ui').EL_SUJETO;
 
 /**
  * Las cuatro pantallas de **Tránsito** (UI-5, #85, AC2).
