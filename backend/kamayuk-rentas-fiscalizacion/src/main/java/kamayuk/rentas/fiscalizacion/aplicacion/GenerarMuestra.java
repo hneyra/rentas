@@ -9,8 +9,6 @@ import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
-import kamayuk.rentas.compartido.Pagina;
-import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
@@ -54,21 +52,20 @@ public class GenerarMuestra {
     private static final int TAMANO_DE_PAGINA = 200;
 
     /**
-     * Por qué campo se recorre el padrón, y <b>es el nombre que la fila publica</b>.
+     * Desde qué clave empieza el recorrido: antes de la primera. Las claves del padrón son
+     * positivas (identidad de {@code predio}).
      *
-     * <p>Hasta #586 esto pedía {@code predio_id}, y #546 lo sacó de la lista blanca de {@code
-     * DeteccionRepositoryJdbc} —con razón: ninguna fila de {@code OmisoResource} lo lleva y ningún
-     * cliente podía nombrarlo— dejándolo sólo como <b>desempate</b>. Ahí se rompió este recorrido:
-     * el {@code POST} contestaba <b>422 {@code ORDEN_NO_ADMITIDO}: «Campo pedido: predio_id»</b>
-     * para todo programa, y ninguna prueba lo veía porque las de este caso de uso hablan con un
-     * doble en memoria que ignora la {@link Paginacion}.
-     *
-     * <p>{@code codRefCatastral} da un orden <b>total</b> —el código es único por municipalidad
-     * ({@code predio_codigo_uq}, V1) y la lista blanca desempata además por {@code predio_id}—, que
-     * es lo que un recorrido paginado del padrón necesita: sin orden total dos páginas consecutivas
-     * pueden repetir un predio y omitir otro (#548).
+     * <p><b>El padrón se recorre por su clave, no por páginas numeradas</b> (#346, anotado en
+     * #629). Hasta aquí se pedía la página {@code n} con {@code OFFSET}, ordenada por {@code
+     * codRefCatastral}, y el candado de #346 serializa los sorteos pero no el padrón: un alta que
+     * catastro proyectara entre dos vueltas y que ordenara antes de la ventana repetía el último
+     * predio de la vuelta anterior —que chocaba contra {@code programa_muestra_uq}, 500— y no se
+     * examinaba nunca; una baja se saltaba en silencio el primer predio de la vuelta siguiente.
+     * Cada vuelta empieza ahora después del último predio leído. Y como el recorrido ya no pasa por
+     * la lista blanca de orden de la grilla, el 422 {@code ORDEN_NO_ADMITIDO} que #586 encontró
+     * aquí no puede volver.
      */
-    private static final String ORDEN_DEL_RECORRIDO = "codRefCatastral";
+    private static final long ANTES_DEL_PRIMERO = 0L;
 
     private final ProgramaFiscalizacionRepository programas;
     private final MuestraDelProgramaRepository muestras;
@@ -184,40 +181,39 @@ public class GenerarMuestra {
         LocalDate fechaSorteo = LocalDate.now(reloj);
         List<MuestraDelPrograma> sorteadas = new ArrayList<>();
 
-        // El padron se recorre por paginas y no de una vez: `Paginacion` tope a 500 filas por
-        // peticion a proposito, y un distrito son decenas de miles de predios.
+        // El padron se recorre por vueltas y no de una vez: la deteccion no se pide entera, y un
+        // distrito son decenas de miles de predios. Por su clave, no por numero de pagina (#346,
+        // anotado en #629): ver ANTES_DEL_PRIMERO.
         //
-        // Los tres recuentos se ACUMULAN aqui, no se leen de la ultima pagina: leerlos de la
+        // Los tres recuentos se ACUMULAN aqui, no se leen de la ultima vuelta: leerlos de la
         // ultima daria un numero plausible y equivocado, que es el modo de fallo de #586 repetido
         // un escalon mas arriba. `ResultadoDelSorteo` no se deja construir si la suma no cuadra.
         int detectados = 0;
         int porOtroPrograma = 0;
         int porActaDelEjercicio = 0;
 
-        int pagina = 0;
-        long total;
+        long ultimo = ANTES_DEL_PRIMERO;
+        List<FilaDeOmisos> encontradas;
         do {
-            Pagina<FilaDeOmisos> encontradas =
-                    deteccion.detectar(
+            encontradas =
+                    deteccion.siguientes(
                             ejercicio,
                             programa.sectorCodigo(),
                             programa.criterio(),
                             fechaSorteo,
-                            new Paginacion(
-                                    pagina,
-                                    TAMANO_DE_PAGINA,
-                                    ORDEN_DEL_RECORRIDO,
-                                    Paginacion.Sentido.ASCENDENTE));
+                            ultimo,
+                            TAMANO_DE_PAGINA);
 
-            Reparto reparto = repartir(encontradas.contenido(), programaId, ejercicio, fechaSorteo);
+            Reparto reparto = repartir(encontradas, programaId, ejercicio, fechaSorteo);
             sorteadas.addAll(reparto.admitidas());
-            detectados += encontradas.contenido().size();
+            detectados += encontradas.size();
             porOtroPrograma += reparto.porOtroPrograma();
             porActaDelEjercicio += reparto.porActaDelEjercicio();
 
-            total = encontradas.totalElementos();
-            pagina++;
-        } while ((long) pagina * TAMANO_DE_PAGINA < total);
+            if (!encontradas.isEmpty()) {
+                ultimo = encontradas.getLast().predioId();
+            }
+        } while (encontradas.size() == TAMANO_DE_PAGINA);
 
         ResultadoDelSorteo resultado =
                 new ResultadoDelSorteo(

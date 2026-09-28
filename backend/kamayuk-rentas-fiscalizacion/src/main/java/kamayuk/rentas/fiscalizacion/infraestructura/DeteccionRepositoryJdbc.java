@@ -194,6 +194,23 @@ public class DeteccionRepositoryJdbc extends RepositorioJdbc implements Deteccio
      */
     static final String PAGINA = "SELECT d.* FROM (" + INTERIOR + ") d" + FILTRO_DE_CONDICION;
 
+    /**
+     * El recorrido del sorteo por la clave (#346, anotado en #629): el mismo {@link #INTERIOR} y el
+     * mismo filtro de condición que la página, más la clave. Se compone de los mismos trozos para
+     * que el sorteo examine exactamente lo que la grilla enseña; lo único que cambia es por dónde
+     * se avanza.
+     *
+     * <p>Sin conteo: el recorrido se acaba cuando una vuelta trae menos filas de las pedidas, así
+     * que no hace falta —y el conteo con filtro de condición cuesta el padrón entero, una vez por
+     * vuelta—.
+     */
+    static final String SIGUIENTES =
+            "SELECT d.* FROM ("
+                    + INTERIOR
+                    + "  AND p.predio_id > :despuesDe) d"
+                    + FILTRO_DE_CONDICION
+                    + " ORDER BY d.predio_id LIMIT :cuantas";
+
     /** El conteo cuando hay filtro de condición: hay que evaluarla, y eso cuesta el padrón. */
     static final String CONTEO_CON_CONDICION =
             "SELECT count(*) FROM (" + INTERIOR + ") d" + FILTRO_DE_CONDICION;
@@ -266,6 +283,33 @@ public class DeteccionRepositoryJdbc extends RepositorioJdbc implements Deteccio
 
     @Override
     public Pagina<FilaDeOmisos> detectar(CriterioDeDeteccion criterio, Paginacion paginacion) {
+        return paginar(
+                PAGINA,
+                criterio.condicion() == null ? CONTEO_SIN_CONDICION : CONTEO_CON_CONDICION,
+                Map.copyOf(parametrosDe(criterio)),
+                paginacion,
+                ORDEN,
+                (fila, numeroDeFila) -> mapear(fila, criterio));
+    }
+
+    @Override
+    public List<FilaDeOmisos> siguientes(
+            CriterioDeDeteccion criterio, long despuesDe, int cuantas) {
+        if (cuantas <= 0) {
+            throw new IllegalArgumentException(
+                    "Un recorrido pide al menos una fila por vuelta, no " + cuantas);
+        }
+        Map<String, Object> parametros = parametrosDe(criterio);
+        parametros.put("despuesDe", despuesDe);
+        parametros.put("cuantas", cuantas);
+        return jdbc().sql(SIGUIENTES)
+                .params(parametros)
+                .query((fila, numeroDeFila) -> mapear(fila, criterio))
+                .list();
+    }
+
+    /** Los parámetros del conjunto, los mismos para la página y para el recorrido. */
+    private static Map<String, Object> parametrosDe(CriterioDeDeteccion criterio) {
         String sector = criterio.sectorCodigo();
         CondicionFiscalizada condicion = criterio.condicion();
 
@@ -278,14 +322,7 @@ public class DeteccionRepositoryJdbc extends RepositorioJdbc implements Deteccio
         parametros.put("conSector", sector != null);
         parametros.put("condicion", condicion == null ? "" : condicion.name());
         parametros.put("conCondicion", condicion != null);
-
-        return paginar(
-                PAGINA,
-                condicion == null ? CONTEO_SIN_CONDICION : CONTEO_CON_CONDICION,
-                Map.copyOf(parametros),
-                paginacion,
-                ORDEN,
-                (fila, numeroDeFila) -> mapear(fila, criterio));
+        return parametros;
     }
 
     private static FilaDeOmisos mapear(ResultSet fila, CriterioDeDeteccion criterio)

@@ -1,6 +1,7 @@
 package kamayuk.rentas.fiscalizacion.dobles;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
@@ -29,18 +30,7 @@ public final class DeteccionDeMentira implements DeteccionRepository {
 
     @Override
     public Pagina<FilaDeOmisos> detectar(CriterioDeDeteccion criterio, Paginacion paginacion) {
-        List<FilaDeOmisos> acotadas =
-                filas.stream()
-                        .filter(
-                                fila ->
-                                        criterio.sectorCodigo() == null
-                                                || criterio.sectorCodigo()
-                                                        .equals(fila.sectorCodigo()))
-                        .filter(
-                                fila ->
-                                        criterio.condicion() == null
-                                                || criterio.condicion() == fila.condicion())
-                        .toList();
+        List<FilaDeOmisos> acotadas = acotadas(criterio);
 
         int desde = Math.min(paginacion.desplazamiento(), acotadas.size());
         int hasta = Math.min(desde + paginacion.tamano(), acotadas.size());
@@ -49,5 +39,32 @@ public final class DeteccionDeMentira implements DeteccionRepository {
                 paginacion.pagina(),
                 paginacion.tamano(),
                 acotadas.size());
+    }
+
+    /**
+     * El recorrido por la clave (#346, anotado en #629): las siguientes a {@code despuesDe}, en
+     * orden de {@code predioId}, como la consulta de verdad —y no en el orden en que se sembraron—.
+     */
+    @Override
+    public List<FilaDeOmisos> siguientes(
+            CriterioDeDeteccion criterio, long despuesDe, int cuantas) {
+        return acotadas(criterio).stream()
+                .filter(fila -> fila.predioId() > despuesDe)
+                .sorted(Comparator.comparingLong(FilaDeOmisos::predioId))
+                .limit(cuantas)
+                .toList();
+    }
+
+    private List<FilaDeOmisos> acotadas(CriterioDeDeteccion criterio) {
+        return filas.stream()
+                .filter(
+                        fila ->
+                                criterio.sectorCodigo() == null
+                                        || criterio.sectorCodigo().equals(fila.sectorCodigo()))
+                .filter(
+                        fila ->
+                                criterio.condicion() == null
+                                        || criterio.condicion() == fila.condicion())
+                .toList();
     }
 }
