@@ -1,6 +1,7 @@
 package kamayuk.rentas.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -72,6 +73,58 @@ class ConfiguracionDeJsonTest {
     void seAceptaElNumeroAlLeer() {
         assertThat(json.readValue("100", Dinero.class)).isEqualTo(Dinero.de("100"));
         assertThat(json.readValue("\"100.00\"", Dinero.class)).isEqualTo(Dinero.de("100.00"));
+    }
+
+    @Test
+    @DisplayName(
+            "#395 — un importe o un area con TRES decimales en el cuerpo se rechaza nombrando el"
+                    + " campo, como el tecleado")
+    void elTercerDecimalDelCuerpoSeRechaza() {
+        // El cuerpo JSON es la tercera puerta de lo tecleado, despues del controlador y del
+        // archivo que se importa. Hasta #629 el deserializador de Dinero y de AreaM2 aceptaba
+        // cualquier escala, y la columna `dinero numeric(15,2)` la redondeaba en silencio.
+        assertThat(
+                        catchThrowable(
+                                () ->
+                                        json.readValue(
+                                                "{\"importe\":\"33.333\",\"alicuota\":\"0.6000\","
+                                                        + "\"porcentaje\":\"50.00\",\"area\":\"1\"}",
+                                                Cuerpo.class)))
+                .as(
+                        "33.333 no es un importe que se pueda guardar, y redondearlo es decidir por otro")
+                .hasRootCauseInstanceOf(ProblemaDeNegocio.class)
+                .rootCause()
+                .hasMessageContaining("'importe'")
+                .hasMessageContaining("3 decimales");
+        assertThat(
+                        catchThrowable(
+                                () ->
+                                        json.readValue(
+                                                "{\"importe\":\"1\",\"alicuota\":\"0.6000\","
+                                                        + "\"porcentaje\":\"50.00\",\"area\":120.004}",
+                                                Cuerpo.class)))
+                .as("y el area, tambien cuando llega como numero JSON")
+                .hasRootCauseInstanceOf(ProblemaDeNegocio.class)
+                .rootCause()
+                .hasMessageContaining("'area'");
+    }
+
+    @Test
+    @DisplayName(
+            "#395 — los ceros de la derecha no son un decimal mas, y la alicuota conserva su escala")
+    void losCerosDeLaDerechaYLaAlicuota() {
+        Cuerpo leido =
+                json.readValue(
+                        "{\"importe\":\"10.500\",\"alicuota\":\"0.6000\","
+                                + "\"porcentaje\":\"33.3333\",\"area\":\"120.50\"}",
+                        Cuerpo.class);
+
+        assertThat(leido.importe()).isEqualTo(Dinero.de("10.5"));
+        assertThat(leido.area()).isEqualTo(AreaM2.de("120.5"));
+        assertThat(leido.alicuota().valor())
+                .as("la alicuota y el porcentaje tienen su propia escala: la regla no es suya")
+                .isEqualByComparingTo("0.6000");
+        assertThat(leido.porcentaje().valor()).isEqualByComparingTo("33.3333");
     }
 
     @Test
