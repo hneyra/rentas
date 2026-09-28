@@ -185,7 +185,7 @@ public class DeudaCoactivaController {
     /**
      * El resumen de la cartera coactiva: cuantos expedientes hay en cada etapa (#272, RF-100).
      *
-     * <h2>Que corrige, y por que era un defecto en verde</h2>
+     * <h4>Que corrige, y por que era un defecto en verde</h4>
      *
      * <p>El panel {@code coa-panel} dibujaba «Expedientes abiertos» con el {@code totalElementos}
      * de {@code GET /coactiva/deudas}. La unidad era la correcta —esa consulta devuelve una fila
@@ -194,7 +194,7 @@ public class DeudaCoactivaController {
      * descarta por no tener nada que cobrar. Aqui {@code expedientes} y {@code abiertos} viajan
      * separados y con su nombre.
      *
-     * <h2>Ninguna cifra de dinero</h2>
+     * <h4>Ninguna cifra de dinero</h4>
      *
      * <p>«Deuda en cartera» no se publica, y esta escrito por que en {@code
      * ConsultaDeExpedientes.resumenDeLaCartera}: componerla costaria una lectura del libro por

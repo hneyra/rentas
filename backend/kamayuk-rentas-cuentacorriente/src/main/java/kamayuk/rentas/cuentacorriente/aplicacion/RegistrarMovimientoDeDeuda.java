@@ -151,7 +151,7 @@ public class RegistrarMovimientoDeDeuda {
      * misma un escalon mas arriba: media baja de «cuotas 1 a 4» —tres si y la cuarta no, porque no
      * cabia— dejaria un acto que ningun papel explica.
      *
-     * <h2>Un acto, n obligaciones, un solo documento</h2>
+     * <h4>Un acto, n obligaciones, un solo documento</h4>
      *
      * <p>El rango se expande a las {@code n} claves que de verdad se mueven ({@link
      * MovimientoDeDeuda#enCadaCuota}) y cada una se comprueba y se asienta por separado —son
@@ -210,7 +210,7 @@ public class RegistrarMovimientoDeDeuda {
     /**
      * La baja de <b>una fila de la grilla</b>, repartida entre los periodos que la componen (#598).
      *
-     * <h2>Por que hacia falta, y por que repartir es cosa del servidor</h2>
+     * <h4>Por que hacia falta, y por que repartir es cosa del servidor</h4>
      *
      * <p>Las filas de {@code consulta_deuda} <b>agregan varios periodos</b>: {@code
      * periodoDesde}/{@code periodoHasta} son el minimo y el maximo del grupo, no una obligacion. Un

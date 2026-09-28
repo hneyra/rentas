@@ -199,7 +199,7 @@ public class ResolucionController {
      * sirven los tres formatos desde su misma ruta, y este —que es el valor que se notifica al
      * contribuyente y el que arranca el plazo del art. 137 para reclamar— solo devolvia JSON.
      *
-     * <h2>Se mira, y no se emite otra vez</h2>
+     * <h4>Se mira, y no se emite otra vez</h4>
      *
      * <p><b>No registra nada</b>, y el motivo es mas fuerte que el de la ficha y la constancia: no
      * es que aqui no haya nada que numerar, es que <b>ya esta numerado</b>. La transferencia emitio
@@ -209,7 +209,7 @@ public class ResolucionController {
      * vez que ese papel sale del sistema, porque {@code POST /fiscalizacion/transferencias}
      * devuelve JSON y <b>descarta los bytes que emitio</b>. Ver {@link EmitirDocumento#copia}.
      *
-     * <h2>Basta {@code LECTURA}</h2>
+     * <h4>Basta {@code LECTURA}</h4>
      *
      * <p>Mismo reparto que {@code ConstanciaController} y {@code catastro.ReporteController}: el
      * documento es la misma hoja que esta pantalla ya dibuja con {@code lectura}, y que el

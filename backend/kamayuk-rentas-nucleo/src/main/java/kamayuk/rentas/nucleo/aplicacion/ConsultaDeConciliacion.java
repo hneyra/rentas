@@ -100,7 +100,7 @@ public class ConsultaDeConciliacion {
      * padron»: una acusacion de omision a todo el distrito que ninguna de las dos cifras pretendia
      * hacer.
      *
-     * <h2>Este recuento NO deja rastro en la bitacora, y ese es el motivo</h2>
+     * <h4>Este recuento NO deja rastro en la bitacora, y ese es el motivo</h4>
      *
      * <p>{@link #noConciliadas} si lo deja, porque <b>nombra</b>: es la lista de los predios que no
      * generan deuda predial, y en manos equivocadas el mapa de a quien no le va a llegar recibo

@@ -39,7 +39,7 @@ public interface CobrosDeTasas {
     /**
      * Lo que la caja recaudo por ese concepto del TUPA entre esos dos dias (#54, RF-115).
      *
-     * <h2>Por que es un agregado y no una lista de recibos</h2>
+     * <h4>Por que es un agregado y no una lista de recibos</h4>
      *
      * <p>El resumen anual de licencias necesita, para cada año, la recaudacion por el derecho de
      * tramite. La alternativa —pedirle a {@code licencias} los identificadores de los recibos de
@@ -50,7 +50,7 @@ public interface CobrosDeTasas {
      * <p>Se reutiliza el agregado que #36 ya escribio para el avance de recaudacion: el rango se
      * aplica sobre la <b>fecha del turno</b>, y lo anulado se resta en lugar de excluirse.
      *
-     * <h2>Que es y que no es esta cifra</h2>
+     * <h4>Que es y que no es esta cifra</h4>
      *
      * <p>Es lo que la <b>ventanilla cobro</b> por ese concepto en el rango, y no «lo que costaron
      * las licencias emitidas en el». Los dos numeros pueden diferir legitimamente: un derecho

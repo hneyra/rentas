@@ -211,7 +211,7 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
      * La relacion de altas y bajas de un contribuyente (RF-045), que son <b>actos</b> y no todo el
      * libro (#640).
      *
-     * <h2>Lo que queda fuera, y por que</h2>
+     * <h4>Lo que queda fuera, y por que</h4>
      *
      * <p>Un cobro de ventanilla no es una baja de deuda ni el cargo de la emision masiva es un
      * alta, aunque los tres se escriban con los mismos conceptos del desglose. Se acota por {@code
@@ -225,7 +225,7 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
      * baja no salia aqui, que es tanto como decir que la pantalla del control se saltaba la via por
      * la que se extingue deuda con mas consecuencias.
      *
-     * <h2>Los asientos anteriores a V68, dicho en vez de callado</h2>
+     * <h4>Los asientos anteriores a V68, dicho en vez de callado</h4>
      *
      * <p>Los que existian antes de esa migracion tienen {@code acto} nulo y <b>no se pueden
      * reparar</b>: el libro no admite {@code UPDATE} (V7, regla 4) y el migrador no puede
@@ -734,7 +734,7 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
     /**
      * {@inheritDoc}
      *
-     * <h2>Por que la traduccion solo envuelve al alta</h2>
+     * <h4>Por que la traduccion solo envuelve al alta</h4>
      *
      * <p>El unico indice unico que este {@code INSERT} puede violar hoy es {@code
      * asiento_alta_unica_uq} (V75, #588), que es <b>parcial</b> y solo cubre {@code acto =

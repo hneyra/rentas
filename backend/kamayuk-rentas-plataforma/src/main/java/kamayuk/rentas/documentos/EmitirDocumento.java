@@ -138,7 +138,7 @@ public class EmitirDocumento {
     /**
      * Vuelve a dibujar un documento ya emitido, <b>sin registrar nada y sin marcarlo</b>.
      *
-     * <h2>Por que existe, si ya esta {@link #reimprimir}</h2>
+     * <h4>Por que existe, si ya esta {@link #reimprimir}</h4>
      *
      * <p>Porque no todo documento emitido <b>entrego</b> sus bytes. El recibo de caja si: la
      * ventanilla se lleva el papel en la cobranza, asi que sacarlo otra vez es un duplicado y tiene

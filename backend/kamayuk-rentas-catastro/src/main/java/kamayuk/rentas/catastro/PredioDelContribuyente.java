@@ -7,7 +7,7 @@ import kamayuk.rentas.dominio.Porcentaje;
  * Un predio del que un contribuyente es titular, publicado para otros contextos acotados (ARQ-01
  * §4, #25).
  *
- * <p>No es {@link kamayuk.rentas.catastro.dominio.Predio} entero: quien consulta desde fuera
+ * <p>No es {@code kamayuk.rentas.catastro.dominio.Predio} entero: quien consulta desde fuera
  * necesita identificar la unidad y saber cuanto le corresponde, no el catalogo de vias, manzanas ni
  * el estado del padron —eso es {@code .dominio}, y cruzar la frontera del modulo con ello obligaria
  * a este contexto a exponer su modelo interno completo—.

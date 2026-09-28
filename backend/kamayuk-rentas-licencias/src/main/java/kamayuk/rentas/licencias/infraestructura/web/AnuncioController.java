@@ -117,7 +117,7 @@ public class AnuncioController {
      * pantalla dibuja al abrir una autorizacion. Sin el, la fila es la que la grilla pinta y nada
      * mas —una pagina de veinte no puede costar veinte lecturas de detalle—.
      *
-     * <h2>El filtro del domicilio se llama {@code direccionDelAnuncio} (#226)</h2>
+     * <h4>El filtro del domicilio se llama {@code direccionDelAnuncio} (#226)</h4>
      *
      * <p>Se llamaba {@code direccion}, que es tambien el nombre del <b>sentido del orden</b> del
      * dialecto de la paginacion, admitido en toda operacion: Spring ataba el mismo parametro de

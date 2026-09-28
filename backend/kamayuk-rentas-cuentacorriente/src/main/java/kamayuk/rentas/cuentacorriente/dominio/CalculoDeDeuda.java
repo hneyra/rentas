@@ -115,7 +115,7 @@ public final class CalculoDeDeuda {
      * Lo que todavia se puede <b>extinguir</b> de una obligacion con un acto de fecha valor {@code
      * fecha}: una baja de ventanilla o la extincion por resolucion de gerencia (#445).
      *
-     * <h2>No es {@link #deudaActualizadaA}, y confundirlas fue el defecto</h2>
+     * <h4>No es {@link #deudaActualizadaA}, y confundirlas fue el defecto</h4>
      *
      * <p>{@code deudaActualizadaA(fecha)} contesta «¿cuanto se debia ese dia?», y para contestarlo
      * descarta todo asiento posterior al corte. Un acto que extingue deuda con una fecha valor en
@@ -128,7 +128,7 @@ public final class CalculoDeDeuda {
      * retroactiva a proposito, asi que el caso no es raro: es el de cualquier baja fechada antes de
      * un pago.
      *
-     * <h2>La cuenta: el minimo, parte por parte</h2>
+     * <h4>La cuenta: el minimo, parte por parte</h4>
      *
      * <p>Un acto que abona {@code b} con fecha {@code f} resta {@code b} de la deuda en {@code f} y
      * en <b>cada</b> fecha posterior. Que ninguna quede en negativo exige que {@code b} no pase del

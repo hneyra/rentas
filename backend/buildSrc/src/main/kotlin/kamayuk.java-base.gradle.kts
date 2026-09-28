@@ -31,3 +31,16 @@ tasks.withType<Test>().configureEach {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
 }
+
+// El javadoc se revisa AL COMPILAR, y no en una tarea aparte que nadie corre (#629). Hasta #629
+// `./gradlew javadoc` salia rojo en trece modulos —65 errores: 43 encabezados `<h2>` dentro del
+// javadoc de un metodo o un campo, que javadoc numera bajo el `<h3>` del miembro; 18 `{@link}` a
+// clases que se fueron con catastro y caja o que el modulo no ve; dos tablas sin `<caption>` y dos
+// `@param` de un record escritos en la clase de al lado— y no lo veia nadie, porque ni la CI ni
+// `build` lo corren. Con doclint en `javac` el mismo analisis corre en cada compilacion, sin tarea
+// nueva que recordar. `all/protected` mira lo que javadoc publica —lo publico y lo protegido—, y
+// `-missing` deja fuera los comentarios que faltan: son avisos de javadoc, no errores, y exigirlos
+// seria otro issue. Solo `src/main`: las pruebas no publican javadoc.
+tasks.named<JavaCompile>("compileJava") {
+    options.compilerArgs.add("-Xdoclint:all/protected,-missing")
+}

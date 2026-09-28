@@ -78,7 +78,7 @@ public interface LectorDeParametros {
      * El conjunto que rige hoy el ejercicio <b>con</b> sus parametros, de una sola resolucion
      * (#361). Para quien calcula con los parametros y guarda el identificador.
      *
-     * <h2>Por que no basta con {@link #vigenteEn} y {@link #conjuntoVigenteEn}</h2>
+     * <h4>Por que no basta con {@link #vigenteEn} y {@link #conjuntoVigenteEn}</h4>
      *
      * <p>Cada una es una resolucion: en produccion, una pregunta por red a {@code normativa} con su
      * propio repliegue al conjunto cacheado si no contesta. Dos llamadas pueden contestar dos

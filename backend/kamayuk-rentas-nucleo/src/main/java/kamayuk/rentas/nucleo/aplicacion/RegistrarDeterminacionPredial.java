@@ -84,7 +84,7 @@ public class RegistrarDeterminacionPredial {
      * tramos y el minimo, y devuelve la cabecera <b>sin identificador</b> —{@link
      * Determinacion#esNueva()}—.
      *
-     * <h2>Por que calcular y asentar son dos metodos (#359)</h2>
+     * <h4>Por que calcular y asentar son dos metodos (#359)</h4>
      *
      * <p>Hasta #359 esto era {@code registrar}, que calculaba <b>y</b> asentaba en la misma
      * transaccion. {@link DeterminarPredial} necesita el monto para repartir las cuotas, y la unica
@@ -102,7 +102,7 @@ public class RegistrarDeterminacionPredial {
      *
      * <p>No abre transaccion: no escribe, y no lee nada —el conjunto sellado llega resuelto—.
      *
-     * <h2>El conjunto llega resuelto, y no se vuelve a preguntar (#361)</h2>
+     * <h4>El conjunto llega resuelto, y no se vuelve a preguntar (#361)</h4>
      *
      * <p>Hasta #361 este metodo recibia el ejercicio y preguntaba al lector dos veces: {@code
      * vigenteEn} para el redondeo y {@code conjuntoVigenteEn} para el {@code conjunto_id} que se

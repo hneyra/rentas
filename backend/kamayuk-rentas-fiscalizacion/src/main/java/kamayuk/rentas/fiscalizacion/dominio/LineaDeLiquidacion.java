@@ -198,7 +198,7 @@ public record LineaDeLiquidacion(
      * <p>La condición se recalcula y no se recibe: si llegara del cliente, una reliquidación podría
      * declarar {@code CONFORME} un predio con quinientos metros de diferencia.
      *
-     * <h2>Los lados salen de lo que la base implica, no de sus nulos</h2>
+     * <h4>Los lados salen de lo que la base implica, no de sus nulos</h4>
      *
      * <p>{@link ComparacionHalladoDeclarado#condicion} decide con siete entradas y la línea guarda
      * cuatro —áreas y usos— más la <b>salida</b>. Las otras tres —si se presentó declaración, si se

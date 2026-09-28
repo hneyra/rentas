@@ -155,7 +155,7 @@ public class PredialController {
     /**
      * La ultima determinacion predial GUARDADA de un contribuyente (#207).
      *
-     * <h2>Por que hacia falta</h2>
+     * <h4>Por que hacia falta</h4>
      *
      * <p>{@code territorio} —la hoja de la Determinacion— era la unica de las cuarenta que
      * declaraba siete operaciones y <b>ni una lectura</b>: las siete escriben. La que se le
@@ -163,7 +163,7 @@ public class PredialController {
      * no puede determinar de oficio a nadie, y con {@code simulacion=false} cada llamada inserta
      * una fila.
      *
-     * <h2>204 y 404 no dicen lo mismo, y aqui se distinguen</h2>
+     * <h4>204 y 404 no dicen lo mismo, y aqui se distinguen</h4>
      *
      * <p>Un codigo que no esta en el padron es <b>404</b> nombrandolo: la pregunta no tiene sujeto.
      * Un contribuyente que existe y no tiene determinacion de ese ejercicio es <b>204</b>: la
@@ -215,7 +215,7 @@ public class PredialController {
      * no se ha corrido» y «se corrio y no emitio nada» son dos cosas distintas, y una cabecera de
      * ceros las dice igual.
      *
-     * <h2>Y con {@code ?simulacion=false}, la ultima EMISION (#357)</h2>
+     * <h4>Y con {@code ?simulacion=false}, la ultima EMISION (#357)</h4>
      *
      * <p>«La ultima corrida» y «la ultima emision» son dos preguntas, y hasta #357 esta ruta solo
      * sabia contestar la primera. El bloque «Estado de la emision» del panel necesita la segunda:

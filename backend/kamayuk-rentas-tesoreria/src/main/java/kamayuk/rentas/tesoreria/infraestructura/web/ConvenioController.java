@@ -60,7 +60,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Los convenios de fraccionamiento por HTTP: registro, consulta y cierre (RF-084, RF-085, RF-086).
  *
- * <p>Ningun {@code PUT} ni {@code PATCH}, igual que en {@link CajaController} y por lo mismo: un
+ * <p>Ningun {@code PUT} ni {@code PATCH}, igual que en {@code CajaController} y por lo mismo: un
  * convenio no se corrige (regla 4, V31). Lo que le pasa llega como un recurso nuevo —una anulacion,
  * un quiebre, una reformulacion—, porque eso es lo que son: actos que se agregan.
  *
@@ -73,7 +73,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <h2>La cabecera {@code Idempotency-Key} (#606)</h2>
  *
- * <p>Las <b>dos</b> escrituras la leen, como {@link CajaController} desde #33. Tras un 500 o un
+ * <p>Las <b>dos</b> escrituras la leen, como {@code CajaController} desde #33. Tras un 500 o un
  * tiempo de espera agotado, quien atiende no sabe si escribio; reenviar el mismo intento devuelve
  * <b>lo de la primera vez</b> —el mismo convenio, con su mismo numero; el mismo acta de cierre— en
  * vez de abrir un segundo preconvenio sobre la misma deuda o contestar un 409 que se lee como un
@@ -259,7 +259,7 @@ public class ConvenioController {
     /**
      * El seguimiento de los convenios suscritos, paginado (RF-084).
      *
-     * <h2>El detalle se carga solo cuando la consulta apunta a uno</h2>
+     * <h4>El detalle se carga solo cuando la consulta apunta a uno</h4>
      *
      * <p>Con {@code nroDeConvenio}, la fila trae ademas su cronograma, la deuda original que acogio
      * y sus movimientos: es la ficha que la pantalla dibuja al abrir un convenio. Sin el, la fila

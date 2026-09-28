@@ -34,9 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Y ademas las dos consultas tienen que ir juntas: la ficha y su historial se leen en el mismo
  * instante o el historial puede describir un vehiculo que ya cambio.
- *
- * @param vehiculo la ficha
- * @param historial las placas que tuvo, de la mas reciente a la mas antigua
  */
 @Service
 public class ConsultaDeVehiculos {
@@ -114,7 +111,12 @@ public class ConsultaDeVehiculos {
         return new ImporteActualizado(total, fecha);
     }
 
-    /** Lo que la pantalla de la ficha necesita, leido de una vez. */
+    /**
+     * Lo que la pantalla de la ficha necesita, leido de una vez.
+     *
+     * @param vehiculo la ficha
+     * @param historial las placas que tuvo, de la mas reciente a la mas antigua
+     */
     public record FichaDeVehiculo(Vehiculo vehiculo, List<CambioDePlaca> historial) {}
 
     /** Una fila de la consulta: el vehiculo, su titular y cuanto debe a la fecha de corte. */
