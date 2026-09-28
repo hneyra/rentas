@@ -530,6 +530,11 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/transito/reportes/resumen-papeletas' },
   { metodo: 'GET', ruta: '/rentas/predial/determinaciones' },
   { metodo: 'GET', ruta: '/coactiva/cartera/resumen' },
+  // #629 (#455). **La segunda escritura, y la primera que es un ACTO del interprete**: anular la
+  // licencia de edificacion de un expediente, desde `aut-sol`. La pide `datos/actos.ts` y no un
+  // conector —una escritura no pinta una pantalla—; que sea la que la hoja declara, que la sirva el
+  // contrato y que su acto lleve la observacion lo vigila `verificaciones/el-acto-escribe-lo-que-la-hoja-declara.test.ts`.
+  { metodo: 'POST', ruta: '/licencias/edificacion/{expediente}/anulacion' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */

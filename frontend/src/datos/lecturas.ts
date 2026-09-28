@@ -1832,6 +1832,42 @@ export interface SesionTrasElCambio {
   readonly ejercicioDeTrabajo: number | null;
 }
 
+/** El papel de un acto sobre un expediente de edificacion: se reimprime por su `numero`. */
+export interface DocumentoDelActoDeEdificacion {
+  readonly numero: string;
+  readonly formato: string;
+  /** El SHA-256 del papel. Los bytes no viajan en el JSON: la descarga es otra peticion. */
+  readonly resumen: string;
+  readonly bytes: number;
+  readonly reimpresiones: number;
+}
+
+/** Un tramo de vigencia de una licencia de edificacion. */
+export interface TramoDeVigenciaDeEdificacion {
+  readonly tramo: number;
+  readonly desde: string;
+  readonly hasta: string;
+}
+
+/**
+ * **Lo que contesta un acto sobre un FUE**, de `POST /licencias/edificacion/{expediente}/anulacion`
+ * (#455, #629). Es `ActoDeEdificacionResource`, la misma forma que devuelven la emision y la
+ * revalidacion.
+ *
+ * De una anulacion, `acto` es `ANULACION`, `vigencias` llega **vacia** —la anulacion no abre
+ * ningun tramo: deja sin efecto los que habia— y `valorDeObraNoDisponible` llega nulo. Lo que la
+ * pantalla ensena es `resolucion.numero`, que es el papel que se entrega.
+ */
+export interface ActoDeEdificacion {
+  readonly nroExpediente: string;
+  readonly nroLicencia: string;
+  readonly acto: string;
+  readonly fecha: string;
+  readonly resolucion: DocumentoDelActoDeEdificacion;
+  readonly vigencias: readonly TramoDeVigenciaDeEdificacion[];
+  readonly valorDeObraNoDisponible: string | null;
+}
+
 // ── Las rutas, escritas una vez ─────────────────────────────────────────────────────────────
 
 /**
@@ -2306,6 +2342,12 @@ export const RUTAS = {
    */
   vehiculoDe: (placa: string) => `/rentas/vehiculos/${encodeURIComponent(placa)}`,
   /**
+   * La anulacion de la licencia de edificacion de UN expediente (#455, #629). Es una ESCRITURA: la
+   * llama `anularLicenciaDeEdificacion`, y nadie la pide para pintar una pantalla.
+   */
+  anulacionDeEdificacion: (expediente: string) =>
+    `/licencias/edificacion/${encodeURIComponent(expediente)}/anulacion`,
+  /**
    * El resumen de papeletas del ejercicio en curso, **agrupado por ano** (#184).
    *
    * <h2>`?agrupadoPor=ANO` escrito, aunque sea el valor por omision</h2>
@@ -2487,5 +2529,38 @@ export async function cambiarElEjercicio(ejercicio: number, observacion: string)
   return solicitar<SesionTrasElCambio>(RUTAS.ejercicioDeLaSesion, {
     metodo: "PUT",
     cuerpo: { ejercicio, observacion },
+  });
+}
+
+/**
+ * **Anula la licencia de edificacion de un expediente** (#455, #629). Es la segunda escritura de
+ * esta interfaz, y la primera que se dibuja como un ACTO del interprete: la llama el manejador de
+ * `anular-licencia-de-edificacion` en `datos/actos.ts`.
+ *
+ * <h2>Lo que manda, y lo que deja al backend</h2>
+ *
+ * El cuerpo es `PeticionDeAnulacion`: `motivo` —lo que la resolucion dice, y el backend lo exige
+ * (422 «motivo» sin el)— y `observacion` —regla 10, y como en `cambiarElEjercicio` **es un
+ * parametro obligatorio de esta funcion**: no existe la forma de llamarla sin decir por que—.
+ * `fecha` y `formato` **no se mandan**: sin ellos el backend anula con la fecha de hoy y saca la
+ * resolucion en PDF, que es lo que su javadoc declara. Ofrecerlos aqui seria dibujar dos campos
+ * que la pantalla no necesita para lo que el issue pide.
+ *
+ * Lo que el backend contesta cuando no la acepta se ensena con sus palabras: 404 si el expediente
+ * no es de esta municipalidad, 409 si no tiene licencia o ya estaba anulada, 422 si falta el
+ * motivo o la observacion es corta. Ninguno de esos limites se copia aqui.
+ *
+ * @param expediente el numero del expediente cuya licencia se anula; va en la RUTA
+ * @param motivo por que se anula; es lo que dira la resolucion
+ * @param observacion por que se registra. Sin ella la operacion no se puede ni escribir
+ */
+export async function anularLicenciaDeEdificacion(
+  expediente: string,
+  motivo: string,
+  observacion: string,
+): Promise<ActoDeEdificacion> {
+  return solicitar<ActoDeEdificacion>(RUTAS.anulacionDeEdificacion(expediente), {
+    metodo: "POST",
+    cuerpo: { motivo, observacion },
   });
 }

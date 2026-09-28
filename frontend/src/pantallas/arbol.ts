@@ -695,6 +695,16 @@ export const ARBOL = [
             ruta: '/licencias/edificacion/{expediente}/licencia',
             nota: 'EdificacionController',
           },
+          // **La anulacion de la licencia de edificacion** (#455, #629). El backend la sirve desde
+          // #455 y la pantalla no la ofrecia: hoy es el acto «Anular la licencia de edificación» de
+          // esta hoja (`definiciones/autorizaciones-y-licencias.ts`), y la escribe `datos/actos.ts`.
+          // Se declara aqui Y en el artboard a la vez, como #169 y #173: `pantallas-del-artboard`
+          // compara las dos fuentes.
+          {
+            verbo: 'POST',
+            ruta: '/licencias/edificacion/{expediente}/anulacion',
+            nota: 'Anulación de la licencia de edificación',
+          },
           {
             verbo: 'POST',
             ruta: '/autorizaciones/anuncios/{id}/renovacion',

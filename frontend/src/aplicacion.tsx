@@ -13,6 +13,7 @@ import { PantallaDeRentas } from './pantallas/PantallaDeRentas.tsx';
 import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
 import { alNoPoderDibujarla, useDatosDeLaHoja } from './datos/useDatosDeLaHoja.ts';
+import { conLoQueHace, useActosDeLaHoja } from './datos/actos.ts';
 import { FronteraDeLaHoja } from './pantallas/FronteraDeLaHoja.tsx';
 import type { FallaDeLaPuerta, VueltaFallida } from './api/identidad.ts';
 import { abrirLaCuenta, salir } from './api/identidad.ts';
@@ -162,13 +163,19 @@ function CuerpoDeLaPantalla({ clave }: { readonly clave: ClaveDeHoja }) {
   // nada (`MandosDeLaTabla.tsx` de `@kamayuk/ui`), asi que quien pide tiene que leerla. Con solo
   // el sujeto, pulsar «Siguiente» movia la direccion y nadie volvia a pedir.
   const hoja = useHoja();
+  const datos = useDatosDeLaHoja(clave, hoja.ruta);
+  // **Y lo que la hoja HACE** (#629): los manejadores de sus actos, si la cuenta puede cada uno y
+  // el rechazo del ultimo envio. Se SUMAN a lo que la hoja lee —`nombrados` y `lecturas` son de
+  // los dos— sin pisarlo: una hoja sin actos recibe mapas vacios y no cambia en nada.
+  const hace = useActosDeLaHoja(clave);
   return (
     // `hoja` es ademas lo que el interprete necesita para ESCRIBIR ahi: sin ella, la tabla guarda
     // la pagina en su propio estado —no sobrevive a recargar y, peor, no llega al conector—.
     <PantallaDeRentas
       definicion={pantallaDe(clave)}
-      datos={useDatosDeLaHoja(clave, hoja.ruta)}
+      datos={conLoQueHace(datos, hace)}
       hoja={hoja}
+      actos={hace.actos}
     />
   );
 }

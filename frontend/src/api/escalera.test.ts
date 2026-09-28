@@ -137,6 +137,32 @@ describe('422 VALIDACION — el backend entendio la peticion y la rechazo por un
   });
 });
 
+/**
+ * El octavo peldano, que llego con la primera escritura que es un acto del interprete (#629).
+ *
+ * `POST /licencias/edificacion/{expediente}/anulacion` contesta 409 `CONFLICTO` a una licencia ya
+ * anulada o a un expediente sin licencia. El contrato lo dice de todas las escrituras desde #436:
+ * no es un fallo del servidor, y repetir la misma peticion da lo mismo.
+ */
+describe('409 CONFLICTO — el estado de lo pedido no admite la escritura (#629)', () => {
+  const YA_ANULADA = 'La licencia del expediente EXP-2026-0042 ya estaba anulada';
+
+  it('NO es una averia, y NO manda a reintentar: la segunda anulacion da lo mismo que la primera', () => {
+    const peldano = peldanoDe(fallo(409, 'CONFLICTO', YA_ANULADA));
+
+    expect(peldano.clave).toBe('en-conflicto');
+    // Sin este peldano caia en `averia`: «Reintente en unos segundos. Si sigue igual, avise a
+    // soporte», con el tono de que algo se rompio — por una licencia que ya estaba anulada.
+    expect(peldano.esAveria).toBe(false);
+    expect(peldano.remedio).not.toMatch(/reintente/i);
+    expect(peldano.pideIdentidad).toBe(false);
+  });
+
+  it('y el mensaje del backend se conserva TAL CUAL, porque dice que ya estaba hecho', () => {
+    expect(peldanoDe(fallo(409, 'CONFLICTO', YA_ANULADA)).detalle).toBe(YA_ANULADA);
+  });
+});
+
 describe('AC6 — lo que SI es una averia', () => {
   it('un corte de red: no llega ningun ErrorDeLaApi, y hay que decir algo igual', () => {
     const peldano = peldanoDe(new TypeError('Failed to fetch'));

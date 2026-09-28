@@ -66,13 +66,33 @@ export const CAMBIAR_EL_EJERCICIO = {
   nombre: 'Cambiar el año de trabajo',
 } as const;
 
+/** `Privilegio.REGISTRO`. El que pide dar de alta o anular un acto, como la anulacion de #629. */
+export const PRIVILEGIO_REGISTRO = 'registro';
+
+/**
+ * **La opcion con que se anula una licencia de edificacion, y el privilegio que pide** (#629, #455).
+ *
+ * Es lo que declara `POST /licencias/edificacion/{expediente}/anulacion` en `EdificacionController`:
+ * `@RequiereAcceso(acceso = ACCESO_FUE, privilegio = Privilegio.REGISTRO)`, con `ACCESO_FUE =
+ * "fue_edificacion"`. Sin el, el boton del acto sale impedido y dice que opcion falta, por su
+ * nombre del catalogo: no se ofrece una puerta que contesta 403. Que los tres sigan siendo esos lo
+ * vigila `verificaciones/las-opciones-que-leen-el-catalogo-son-las-del-backend.test.ts`, como a
+ * `CAMBIAR_EL_EJERCICIO`.
+ */
+export const ANULAR_LA_LICENCIA_DE_EDIFICACION = {
+  codigo: 'fue_edificacion',
+  privilegio: PRIVILEGIO_REGISTRO,
+  nombre: 'Formulario único de edificación (FUE)',
+} as const;
+
 /**
  * **Si la cuenta tiene `privilegio` sobre `codigo`**, leido de `GET /seguridad/sesion/permisos`.
  *
- * Es el unico sitio donde se lee esa matriz, y lo usan los dos que la necesitan: el catalogo, que
- * pregunta por `lectura` para saber que ofrecer, y el mando del ejercicio de la barra (#391), que
- * pregunta por `especial` sobre `cambiar_anio` para saber si ofrecerse. Con dos lecturas a mano,
- * una podria aceptar lo que la otra rechaza.
+ * Es el unico sitio donde se lee esa matriz, y lo usan los tres que la necesitan: el catalogo, que
+ * pregunta por `lectura` para saber que ofrecer; el mando del ejercicio de la barra (#391), que
+ * pregunta por `especial` sobre `cambiar_anio` para saber si ofrecerse; y los actos de una hoja
+ * (#629, `datos/actos.ts`), que preguntan por el privilegio que su escritura pide para saber si
+ * su boton sale impedido. Con dos lecturas a mano, una podria aceptar lo que la otra rechaza.
  *
  * `Array.isArray` y no un `as`: esto viene de la red, y lo que el contrato promete es «objeto».
  * Un valor que no sea lista aqui no puede tumbar el arbol entero, ni ofrecer un mando.

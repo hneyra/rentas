@@ -34,6 +34,17 @@
  * `averia`, que recoge el corte de red y el 5xx. Siete claves en total, cinco medidas y dos de
  * respaldo; el `clave` de abajo es la cuenta que vale.
  *
+ * <h2>El octavo lo trajo la primera escritura que es un acto (#629)</h2>
+ *
+ * **409 `CONFLICTO`**: anular una licencia de edificacion que ya estaba anulada, o un expediente
+ * que no tiene licencia. No sale de un `curl` sino del contrato —la respuesta 409 de
+ * `rentas-v1.yaml`, igual en todas las escrituras desde #436: «el estado actual no admite la
+ * operacion, o ya estaba hecha. **No es un fallo del servidor**»—, y hasta #629 no podia llegar:
+ * ninguna lectura contesta 409. Sin este peldano caia en `averia` y mandaba a **reintentar y avisar a
+ * soporte** por una licencia que ya estaba anulada, en el tono de que algo se rompio. Ocho claves.
+ * **Y la escalera sigue siendo una**: el acto la dibuja por `alRechazarElActo`, al lado de
+ * `alFallar`, en el mismo archivo.
+ *
  * <h2>Dos de ellas NO son averias, y decirlo importa</h2>
  *
  * `SIN_PRIVILEGIO` y `SIN_MUNICIPALIDAD` son el sistema funcionando: contesto lo que tenia que
@@ -98,6 +109,7 @@ export interface Peldano {
     | 'no-encontrado'
     | 'no-permitido'
     | 'no-valido'
+    | 'en-conflicto'
     | 'averia';
   /**
    * **La palabra del hueco de un campo: una o dos, en minuscula.**
@@ -242,6 +254,23 @@ export function peldanoDe(fallo: unknown): Peldano {
       remedio:
         'Revise con que cuenta esta entrando: puede ser valida en el emisor de identidad y no ' +
         'estar dada de alta en esta municipalidad.',
+      pideIdentidad: false,
+      esAveria: false,
+    };
+  }
+
+  if (fallo.estado === 409) {
+    return {
+      clave: 'en-conflicto',
+      enElHueco: 'en conflicto',
+      estado: fallo.estado,
+      titulo: 'El estado actual no admite la operacion',
+      // Tal cual, como el 422: es el backend diciendo QUE cambio o que ya existia —«la licencia ya
+      // estaba anulada»—, y eso es lo unico con lo que quien esta delante sabe que hacer.
+      detalle: loQueDijo(fallo, 'Lo que se pidio ya estaba hecho, o su estado no lo admite.'),
+      remedio:
+        'No es una averia, y repetir la misma peticion da lo mismo: lo que hay que cambiar es lo ' +
+        'que se pidio.',
       pideIdentidad: false,
       esAveria: false,
     };
