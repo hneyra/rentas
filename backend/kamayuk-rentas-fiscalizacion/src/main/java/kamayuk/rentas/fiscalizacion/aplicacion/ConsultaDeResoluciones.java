@@ -62,7 +62,7 @@ public class ConsultaDeResoluciones {
     /**
      * La misma resolucion como documento descargable (#593, RF-057, RF-132).
      *
-     * <h2>Se sirve el papel guardado, no uno recompuesto</h2>
+     * <h4>Se sirve el papel guardado, no uno recompuesto</h4>
      *
      * <p>La resolucion <b>ya se emitio</b>: {@code TransferirARentas} la numero y guardo su modelo
      * y su resumen en el registro de documentos, en la misma transaccion que versiono la ficha y

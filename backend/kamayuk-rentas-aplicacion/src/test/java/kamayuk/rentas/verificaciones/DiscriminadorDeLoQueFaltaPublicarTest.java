@@ -60,7 +60,7 @@ class DiscriminadorDeLoQueFaltaPublicarTest {
 
         assertThat(familia)
                 .as(
-                        "toda excepcion que declare ParametroSinPublicar entra sola; anadir una no"
+                        "toda excepcion que extienda CifraSinPublicar entra sola; anadir una no"
                                 + " obliga a tocar la guarda")
                 .contains(
                         "EjercicioSinSellar",
@@ -88,18 +88,18 @@ class DiscriminadorDeLoQueFaltaPublicarTest {
                 .as(
                         "y el censo no puede encoger sin que se vea. Es un suelo y no una cifra"
                                 + " exacta a proposito: anadir una excepcion a la familia no obliga a"
-                                + " tocar esta guarda, pero quitarle la interfaz a una si la pone roja"
+                                + " tocar esta guarda, pero sacar a una de la base si la pone roja"
                                 + " diciendo las dos cifras")
                 .hasSizeGreaterThanOrEqualTo(19);
         assertThat(familia)
                 .as(
-                        "y la del cuadro de valores unitarios, que tenia llave() y no declaraba la"
-                                + " interfaz: hoy no la traduce nadie a una respuesta, y por eso"
+                        "y la del cuadro de valores unitarios, que tenia llave() y no era de la"
+                                + " familia: hoy no la traduce nadie a una respuesta, y por eso"
                                 + " justamente la trampa solo saltaba al pisarla (#723)")
                 .contains("ValorUnitarioSinParametrizar");
         assertThat(familia)
                 .as(
-                        "y la del dominio puro, que no puede declararla: vive bajo la interfaz en el"
+                        "y la del dominio puro, que no puede extenderla: vive bajo la base en el"
                                 + " grafo de modulos y no sabe de que ejercicio son sus politicas")
                 .contains(RevisorDelDiscriminador.LA_DEL_DOMINIO_PURO);
         assertThat(familia)

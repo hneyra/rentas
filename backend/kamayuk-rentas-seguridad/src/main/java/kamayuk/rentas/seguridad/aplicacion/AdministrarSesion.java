@@ -1,5 +1,6 @@
 package kamayuk.rentas.seguridad.aplicacion;
 
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.OrigenContext;
@@ -64,7 +65,7 @@ public class AdministrarSesion {
                                 String.valueOf(actualizada.id()),
                                 Operacion.MODIFICACION,
                                 observacion)
-                        .con(null, "{\"ejercicioDeTrabajo\":" + ejercicio.valor() + "}"));
+                        .con(null, Map.of("ejercicioDeTrabajo", ejercicio.valor())));
 
         return actualizada;
     }

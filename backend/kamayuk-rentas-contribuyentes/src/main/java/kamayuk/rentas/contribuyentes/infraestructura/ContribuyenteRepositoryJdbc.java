@@ -119,7 +119,7 @@ public class ContribuyenteRepositoryJdbc extends RepositorioJdbc
     /**
      * El padron acotado por el criterio, paginado.
      *
-     * <h2>El codigo va por PREFIJO, y por rango (#35)</h2>
+     * <h4>El codigo va por PREFIJO, y por rango (#35)</h4>
      *
      * <p>Hasta #35 era {@code codigo_contribuyente = :codigo}, y sobre un padron cuyos codigos
      * empiezan todos por ceros eso solo sirve a quien ya sabe el codigo entero: medido contra

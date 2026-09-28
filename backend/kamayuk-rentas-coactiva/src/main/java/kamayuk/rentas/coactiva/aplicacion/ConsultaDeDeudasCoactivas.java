@@ -105,7 +105,7 @@ public class ConsultaDeDeudasCoactivas {
      * Eso es exactamente lo que {@link PaginaDescartadaTrasPaginar} publica, y por eso no es una
      * {@link Pagina}: vease su javadoc (#307).
      *
-     * <h2>Por que el recuento no se puede ajustar a las filas, medido</h2>
+     * <h4>Por que el recuento no se puede ajustar a las filas, medido</h4>
      *
      * <p>Se midio antes de elegir, porque la otra salida —resolver «con deuda» <b>antes</b> de
      * paginar— habria sido mejor:

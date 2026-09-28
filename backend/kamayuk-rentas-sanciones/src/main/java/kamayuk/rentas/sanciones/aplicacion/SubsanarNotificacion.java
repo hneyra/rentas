@@ -1,6 +1,8 @@
 package kamayuk.rentas.sanciones.aplicacion;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -9,6 +11,7 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.sanciones.dominio.EstadoDeNotificacion;
 import kamayuk.rentas.sanciones.dominio.NotificacionAdministrativa;
 import kamayuk.rentas.sanciones.dominio.NotificacionAdministrativaRepository;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,15 +71,11 @@ public class SubsanarNotificacion {
                                 Operacion.MODIFICACION,
                                 observacion)
                         .con(
-                                "{\"estado\":\"" + notificacion.estado() + "\"}",
+                                descripcion(notificacion, null),
                                 // La fecha de la subsanacion es la del acto, y desde #398 no es
                                 // la de la fila de auditoria: sin ella aqui no quedaria en ningun
                                 // sitio, porque la notificacion solo guarda su estado.
-                                "{\"estado\":\""
-                                        + subsanada.estado()
-                                        + "\",\"fechaSubsanacion\":\""
-                                        + fechaSubsanacion
-                                        + "\"}"));
+                                descripcion(subsanada, fechaSubsanacion)));
 
         return subsanada;
     }
@@ -119,5 +118,16 @@ public class SubsanarNotificacion {
                             + intento
                             + " ya esta fuera de plazo");
         }
+    }
+
+    /** El estado, y la fecha de la subsanacion solo cuando la hay. */
+    private static Map<String, Object> descripcion(
+            NotificacionAdministrativa notificacion, @Nullable LocalDate fechaSubsanacion) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("estado", notificacion.estado());
+        if (fechaSubsanacion != null) {
+            campos.put("fechaSubsanacion", fechaSubsanacion);
+        }
+        return campos;
     }
 }

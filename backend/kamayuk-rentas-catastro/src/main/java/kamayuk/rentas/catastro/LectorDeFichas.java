@@ -15,7 +15,7 @@ import java.util.Optional;
  *
  * <p>Devuelve el identificador y no la ficha entera a proposito: una declaracion jurada no necesita
  * el area ni las categorias constructivas, y traerlas aqui obligaria a este modulo a exponer todo
- * {@link kamayuk.rentas.catastro.dominio.FichaCatastral} como API publica.
+ * {@code kamayuk.rentas.catastro.dominio.FichaCatastral} como API publica.
  */
 public interface LectorDeFichas {
 

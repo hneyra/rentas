@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
  * <h2>La decisión, valor por valor</h2>
  *
  * <table>
+ *   <caption>Cada valor del enumerado, y si este sistema lo escribe</caption>
  *   <tr><th>Valor</th><th>Qué es</th></tr>
  *   <tr><td>{@link #IMPUESTA}</td><td><b>Se escribe.</b> Es como nace toda papeleta, y es el único
  *       valor que este sistema pone.</td></tr>

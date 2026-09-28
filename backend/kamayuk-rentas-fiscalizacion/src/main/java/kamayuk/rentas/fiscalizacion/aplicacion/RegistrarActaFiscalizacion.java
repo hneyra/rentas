@@ -2,6 +2,8 @@ package kamayuk.rentas.fiscalizacion.aplicacion;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -302,16 +304,13 @@ public class RegistrarActaFiscalizacion {
                 acta, actas.loDeclaradoDeLasActas(java.util.Set.of(actaId)).get(actaId));
     }
 
-    private static String descripcion(ActaFiscalizacion acta) {
-        return "{\"programaId\":"
-                + acta.programaId()
-                + ",\"version\":"
-                + acta.version()
-                + ",\"contribuyenteId\":"
-                + acta.contribuyenteId()
-                + ",\"hallazgo\":"
-                + (acta.hallazgo() == null ? "null" : "\"" + acta.hallazgo() + "\"")
-                + "}";
+    private static Map<String, Object> descripcion(ActaFiscalizacion acta) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("programaId", acta.programaId());
+        campos.put("version", acta.version());
+        campos.put("contribuyenteId", acta.contribuyenteId());
+        campos.put("hallazgo", acta.hallazgo());
+        return campos;
     }
 
     /**

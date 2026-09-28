@@ -30,14 +30,14 @@ import org.junit.jupiter.api.Test;
  * equivocada, que es el modo de fallo que este repositorio lleva midiendo desde #51.
  */
 @DisplayName("#604 — Las excepciones de lo que falta publicar lo dicen legible por programa")
-class ParametroSinPublicarTest {
+class CifraSinPublicarTest {
 
     private static final Ejercicio EJERCICIO = new Ejercicio(2026);
 
     @Test
     @DisplayName("sin conjunto sellado: publica su ejercicio y NINGUNA llave")
     void sinConjuntoSelladoNoHayLlaveQueNombrar() {
-        ParametroSinPublicar falta = new LectorDeParametros.EjercicioSinSellar(EJERCICIO);
+        CifraSinPublicar falta = new LectorDeParametros.EjercicioSinSellar(EJERCICIO);
 
         assertThat(falta.ejercicio()).isEqualTo(EJERCICIO);
         assertThat(falta.llave())

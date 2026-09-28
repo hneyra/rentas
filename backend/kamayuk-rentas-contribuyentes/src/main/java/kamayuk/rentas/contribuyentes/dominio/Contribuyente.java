@@ -1,6 +1,8 @@
 package kamayuk.rentas.contribuyentes.dominio;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.dominio.CodigoContribuyente;
 import kamayuk.rentas.dominio.DocumentoIdentidad;
@@ -119,24 +121,17 @@ public record Contribuyente(
      * auditoria} con {@code LECTURA} —la pantalla {@code seg-aud}—, y la aplicacion no tiene sobre
      * la tabla mas que {@code SELECT} e {@code INSERT} (DAT-02 §2.4 y §2.6).
      */
-    public String paraLaAuditoria() {
-        return "{\"codigo\":"
-                + JsonDeAuditoria.texto(codigo)
-                + ",\"tipoPersona\":"
-                + JsonDeAuditoria.texto(tipoPersona)
-                + ",\"nombreRazonSocial\":"
-                + JsonDeAuditoria.texto(nombreRazonSocial)
-                + ",\"condicionEspecial\":"
-                + JsonDeAuditoria.texto(condicionEspecial)
-                + ",\"fechaNacimiento\":"
-                + JsonDeAuditoria.texto(fechaNacimiento)
-                + ",\"estadoCivil\":"
-                + JsonDeAuditoria.texto(estadoCivil)
-                + ",\"conyugeId\":"
-                + JsonDeAuditoria.numero(conyugeId)
-                + ",\"activo\":"
-                + activo
-                + "}";
+    public Map<String, Object> paraLaAuditoria() {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("codigo", codigo);
+        campos.put("tipoPersona", tipoPersona);
+        campos.put("nombreRazonSocial", nombreRazonSocial);
+        campos.put("condicionEspecial", condicionEspecial);
+        campos.put("fechaNacimiento", fechaNacimiento);
+        campos.put("estadoCivil", estadoCivil);
+        campos.put("conyugeId", conyugeId);
+        campos.put("activo", activo);
+        return campos;
     }
 
     /**

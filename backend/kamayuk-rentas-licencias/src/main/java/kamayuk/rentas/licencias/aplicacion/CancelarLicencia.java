@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -215,15 +216,14 @@ public class CancelarLicencia {
         return titular;
     }
 
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             LicenciaDeFuncionamiento licencia, MovimientoDeLicencia movimiento) {
-        return "{\"licencia\":\""
-                + licencia.numero()
-                + "\",\"estado\":\"CANCELADA\",\"resolucion\":\""
-                + movimiento.documentoNumero()
-                + "\",\"fecha\":\""
-                + movimiento.fecha()
-                + "\"}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("licencia", licencia.numero());
+        campos.put("estado", "CANCELADA");
+        campos.put("resolucion", movimiento.documentoNumero());
+        campos.put("fecha", movimiento.fecha());
+        return campos;
     }
 
     // ------------------------------------------------------------------

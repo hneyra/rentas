@@ -153,7 +153,7 @@ public record MovimientoDeAnuncio(
      * para el año siguiente se asentaba en el año del acto y con su tarifa. Nadie lo veia porque
      * todas las pruebas renovaban en enero, donde los dos ejercicios coinciden.
      *
-     * <h2>La regla</h2>
+     * <h4>La regla</h4>
      *
      * <ul>
      *   <li>El ejercicio de {@code vigenciaHasta}, que es hasta donde llega la prorroga.

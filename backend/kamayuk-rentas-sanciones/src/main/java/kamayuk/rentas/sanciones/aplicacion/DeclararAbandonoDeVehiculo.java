@@ -3,7 +3,9 @@ package kamayuk.rentas.sanciones.aplicacion;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -136,15 +138,7 @@ public class DeclararAbandonoDeVehiculo {
                                 String.valueOf(guardado.id()),
                                 Operacion.ALTA,
                                 observacion)
-                        .con(
-                                null,
-                                "{\"placa\":\""
-                                        + internamiento.placa()
-                                        + "\",\"tipo\":\"ABANDONO\",\"acta\":\""
-                                        + guardado.acta()
-                                        + "\",\"dias\":"
-                                        + dias
-                                        + "}"));
+                        .con(null, descripcion(internamiento, guardado, dias)));
 
         List<MovimientoDeInternamiento> historial =
                 internamientos.movimientosDe(internamiento.identificador());
@@ -201,5 +195,15 @@ public class DeclararAbandonoDeVehiculo {
                             + ": no se pudo declarar abandonado el "
                             + fecha);
         }
+    }
+
+    private static Map<String, Object> descripcion(
+            Internamiento internamiento, MovimientoDeInternamiento movimiento, int dias) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("placa", internamiento.placa());
+        campos.put("tipo", "ABANDONO");
+        campos.put("acta", movimiento.acta());
+        campos.put("dias", dias);
+        return campos;
     }
 }

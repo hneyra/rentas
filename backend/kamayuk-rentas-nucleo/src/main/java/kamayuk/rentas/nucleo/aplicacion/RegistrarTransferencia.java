@@ -1,6 +1,8 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -175,20 +177,15 @@ public class RegistrarTransferencia {
      * se fecha y se particiona con el dia en que se REGISTRA, y la compra de diciembre registrada
      * en enero perderia su fecha si no viajara aqui.
      */
-    private static String descripcion(Transferencia transferencia) {
-        return "{\"objeto\":\""
-                + transferencia.objeto()
-                + "\",\"transferenteId\":"
-                + transferencia.transferenteId()
-                + ",\"adquirienteId\":"
-                + transferencia.adquirienteId()
-                + ",\"tipoTransferencia\":\""
-                + transferencia.tipoTransferencia()
-                + "\",\"fechaTransferencia\":\""
-                + transferencia.fechaTransferencia()
-                + "\",\"porcentajeTransferido\":\""
-                + transferencia.porcentajeTransferido()
-                + "\"}";
+    private static Map<String, Object> descripcion(Transferencia transferencia) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("objeto", transferencia.objeto());
+        campos.put("transferenteId", transferencia.transferenteId());
+        campos.put("adquirienteId", transferencia.adquirienteId());
+        campos.put("tipoTransferencia", transferencia.tipoTransferencia());
+        campos.put("fechaTransferencia", transferencia.fechaTransferencia());
+        campos.put("porcentajeTransferido", transferencia.porcentajeTransferido());
+        return campos;
     }
 
     /** El transferente no tiene ninguna titularidad vigente sobre ese predio a esa fecha. */

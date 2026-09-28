@@ -2,6 +2,8 @@ package kamayuk.rentas.tesoreria.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -190,18 +192,15 @@ public class FormalizarConvenio {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(NumeroDeConvenio numero, MovimientoDeConvenio movimiento) {
-        return "{\"numero\":\""
-                + numero.impreso()
-                + "\",\"tipo\":\""
-                + movimiento.tipo()
-                + "\",\"importe\":"
-                + movimiento.importe().valor().toPlainString()
-                + ",\"asientos\":"
-                + movimiento.asientos()
-                + ",\"fecha\":\""
-                + movimiento.fecha()
-                + "\"}";
+    private static Map<String, Object> descripcion(
+            NumeroDeConvenio numero, MovimientoDeConvenio movimiento) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", numero.impreso());
+        campos.put("tipo", movimiento.tipo());
+        campos.put("importe", movimiento.importe().valor());
+        campos.put("asientos", movimiento.asientos());
+        campos.put("fecha", movimiento.fecha());
+        return campos;
     }
 
     /**

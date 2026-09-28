@@ -76,7 +76,7 @@ public class ReconstruirSaldo {
      * <p>No repara: ver el javadoc de {@link Divergencia}. Devolver la lista vacia significa que la
      * proyeccion coincide con el libro obligacion por obligacion.
      *
-     * <h2>{@code REPEATABLE READ}, porque compara dos tablas (#630)</h2>
+     * <h4>{@code REPEATABLE READ}, porque compara dos tablas (#630)</h4>
      *
      * <p>Lee el libro y despues la proyeccion, en dos sentencias. Con el {@code READ COMMITTED} de
      * siempre cada una ve lo confirmado hasta ELLA, asi que un asiento que otra transaccion

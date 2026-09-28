@@ -37,11 +37,11 @@ import kamayuk.rentas.web.ProblemaDeNegocio;
  *
  * <h2>Por que vive en {@code kamayuk-rentas-parametros}</h2>
  *
- * <p>Porque es el unico modulo que puede nombrar a la vez las dos mitades: {@link
- * ParametroSinPublicar} —suyo— y {@link ProblemaDeNegocio} de {@code kamayuk-rentas-plataforma},
- * del que todo contexto depende. Al reves no se puede: {@code kamayuk-rentas-plataforma} es la base
- * del grafo y no depende de ningun contexto acotado, asi que {@code kamayuk.rentas.web} no puede
- * nombrar {@code ParametroSinPublicar} (lo dice el javadoc de {@link ParametroQueFalta}).
+ * <p>Porque es el unico modulo que puede nombrar a la vez las dos mitades: {@link CifraSinPublicar}
+ * —suya— y {@link ProblemaDeNegocio} de {@code kamayuk-rentas-plataforma}, del que todo contexto
+ * depende. Al reves no se puede: {@code kamayuk-rentas-plataforma} es la base del grafo y no
+ * depende de ningun contexto acotado, asi que {@code kamayuk.rentas.web} no puede nombrar {@code
+ * CifraSinPublicar} (lo dice el javadoc de {@link ParametroQueFalta}).
  *
  * <h2>El tipo es la guarda, no el nombre del metodo</h2>
  *
@@ -67,10 +67,10 @@ public final class FaltaPublicar {
     }
 
     /**
-     * El discriminador sale del <b>contrato</b>, no de la base: lo unico que hace falta saber para
-     * escribirlo es el ejercicio y la llave, y eso es lo que {@link ParametroSinPublicar} promete.
+     * El discriminador sale del ejercicio y la llave, que es lo que {@link CifraSinPublicar}
+     * promete, y nada mas.
      */
-    private static ParametroQueFalta discriminadorDe(ParametroSinPublicar falta) {
+    private static ParametroQueFalta discriminadorDe(CifraSinPublicar falta) {
         int ejercicio = falta.ejercicio().valor();
         return falta.llave()
                 .map(llave -> ParametroQueFalta.llave(ejercicio, llave))
@@ -78,8 +78,8 @@ public final class FaltaPublicar {
     }
 
     /**
-     * El mismo 422 para la <b>unica</b> de estas excepciones que no puede declarar {@link
-     * ParametroSinPublicar}: la del dominio puro.
+     * El mismo 422 para la <b>unica</b> de estas excepciones que no puede extender {@link
+     * CifraSinPublicar}: la del dominio puro.
      *
      * <p>{@link PoliticasDeRedondeo.PuntoSinPolitica} vive en {@code
      * kamayuk-rentas-dominio-compartido} y no sabe de que ejercicio salieron las politicas —no

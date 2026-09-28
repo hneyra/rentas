@@ -199,7 +199,7 @@ public class DeterminarPredial {
      * SET LOCAL}, y la politica de RLS la hacia fallar con un 500. Un colaborador nuevo que lea la
      * base tiene que traer su transaccion: aqui no hay ninguna a la que unirse.
      *
-     * <h2>Se asienta al final (#359)</h2>
+     * <h4>Se asienta al final (#359)</h4>
      *
      * <p>Primero se compone la determinacion entera —la cabecera calculada, el derecho de emision,
      * los vencimientos de la modalidad pedida y las cuotas con su redondeo— y solo despues se

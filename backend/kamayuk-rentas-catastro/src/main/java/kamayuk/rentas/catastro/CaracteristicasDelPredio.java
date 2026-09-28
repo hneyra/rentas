@@ -7,7 +7,7 @@ import org.jspecify.annotations.Nullable;
  * Lo que otro contexto necesita saber de un predio para determinar arbitrios (#31) y para
  * contrastar lo hallado con lo declarado (#49), publicado desde este contexto (ARQ-01 §4).
  *
- * <p>No es {@link kamayuk.rentas.catastro.dominio.Predio} ni {@link
+ * <p>No es {@code kamayuk.rentas.catastro.dominio.Predio} ni {@code
  * kamayuk.rentas.catastro.dominio.FichaCatastral}: quien consulta no necesita las construcciones,
  * las instalaciones ni el estado del padron, solo estas tres claves.
  *

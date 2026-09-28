@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
  * <h2>Los desenlaces que no son «aplicado» no se tratan igual</h2>
  *
  * <table>
+ *   <caption>Lo que le pasa a cada hecho que no se puede aplicar</caption>
  *   <tr><th>Que paso</th><th>Que se hace</th><th>Por que</th></tr>
  *   <tr><td>{@code catastro} no contesta</td><td>se corta la vuelta, sin acusar nada</td>
  *       <td>Se arregla levantando un despliegue y va a arreglarse solo</td></tr>

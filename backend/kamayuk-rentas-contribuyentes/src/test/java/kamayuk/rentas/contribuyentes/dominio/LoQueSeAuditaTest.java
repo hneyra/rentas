@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import kamayuk.rentas.auditoria.JsonDeAuditoria;
 import kamayuk.rentas.dominio.CodigoContribuyente;
 import kamayuk.rentas.dominio.DocumentoIdentidad;
 import org.junit.jupiter.api.DisplayName;
@@ -129,11 +130,11 @@ class LoQueSeAuditaTest {
 
     private static void cadaComponenteSeAuditaODiceQueNo(
             Record registro,
-            String json,
+            Map<String, Object> campos,
             Map<String, String> excluidos,
             Map<String, String> clavePorComponente) {
 
-        JsonNode auditado = leer(json);
+        JsonNode auditado = leer(campos);
         Set<String> esperadas = new HashSet<>();
 
         for (RecordComponent componente : registro.getClass().getRecordComponents()) {
@@ -178,7 +179,8 @@ class LoQueSeAuditaTest {
         return objeto.has(clave) && objeto.get(clave).isNull();
     }
 
-    private static JsonNode leer(String json) {
-        return JSON.readTree(json);
+    /** Lo que llega a la columna: el mapa escrito por {@link JsonDeAuditoria}, leido de vuelta. */
+    private static JsonNode leer(Map<String, Object> campos) {
+        return JSON.readTree(JsonDeAuditoria.objeto(campos));
     }
 }

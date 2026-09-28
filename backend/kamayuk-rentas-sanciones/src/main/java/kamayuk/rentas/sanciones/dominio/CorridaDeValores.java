@@ -127,7 +127,7 @@ public record CorridaDeValores(
      * De las resoluciones de una papeleta, la que ordena su cobranza en esta familia, si alguna la
      * ordena (#384).
      *
-     * <h2>Por qué es una política y no una consulta</h2>
+     * <h4>Por qué es una política y no una consulta</h4>
      *
      * <p>Hasta #384 la respuesta estaba escondida en la cardinalidad de una lectura: se pedía al
      * repositorio «la» resolución del {@linkplain #resolucionQueOrdenaLaCobranza() tipo} y se
@@ -138,7 +138,7 @@ public record CorridaDeValores(
      * IncorrectResultSizeDataAccessException}, la corrida lo contaba como un fallo pasajero y la
      * multa firme no se formalizaba nunca.
      *
-     * <h2>La regla</h2>
+     * <h4>La regla</h4>
      *
      * <ol>
      *   <li>Se miran solo las del tipo que ordena la cobranza en la familia, en el orden en que se
@@ -150,7 +150,7 @@ public record CorridaDeValores(
      *       sin efecto exige resolver un recurso y la última que lo hizo no lo hizo.
      * </ol>
      *
-     * <h2>Qué notificación abre el plazo después de resolverse un recurso</h2>
+     * <h4>Qué notificación abre el plazo después de resolverse un recurso</h4>
      *
      * <p>La de <b>la resolución que lo resuelve</b>, que es la última, y no la de la RIS. Resolver
      * una reconsideración con un «se mantiene» es un acto nuevo que se notifica y que a su vez se

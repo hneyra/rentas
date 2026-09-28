@@ -13,7 +13,8 @@ tasks.register("verificarArquitectura") {
     group = "verification"
     description =
         "Reglas de ArchUnit, escaner del codigo fuente y limites de Spring Modulith. Bloqueante."
-    dependsOn(":kamayuk-rentas-aplicacion:test")
+    // Las barreras y los censos del contrato corren en dos tareas desde #629, cada una en su JVM.
+    dependsOn(":kamayuk-rentas-aplicacion:test", ":kamayuk-rentas-aplicacion:censosDelContrato")
 }
 
 tasks.register("verificarArranque") {

@@ -3,8 +3,10 @@ package kamayuk.rentas.sanciones.aplicacion;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -222,16 +224,13 @@ public class IniciarCorridaDeValores {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoría. */
-    private static String descripcion(CorridaDeValores corrida) {
-        return "{\"familia\":\""
-                + corrida.familia()
-                + "\",\"origen\":\""
-                + corrida.origen()
-                + "\",\"fechaCriterio\":\""
-                + corrida.fechaCriterio()
-                + "\",\"candidatos\":"
-                + corrida.totalCandidatos()
-                + "}";
+    private static Map<String, Object> descripcion(CorridaDeValores corrida) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("familia", corrida.familia());
+        campos.put("origen", corrida.origen());
+        campos.put("fechaCriterio", corrida.fechaCriterio());
+        campos.put("candidatos", corrida.totalCandidatos());
+        return campos;
     }
 
     /** La corrida no seleccionó ninguna papeleta. */

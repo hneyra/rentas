@@ -4,9 +4,11 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -286,16 +288,13 @@ public class RegistrarValor {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(Valor valor) {
-        return "{\"tipo\":\""
-                + valor.tipo()
-                + "\",\"numero\":\""
-                + valor.numero()
-                + "\",\"ejercicio\":"
-                + valor.ejercicio().valor()
-                + ",\"total\":"
-                + valor.total().valor().toPlainString()
-                + "}";
+    private static Map<String, Object> descripcion(Valor valor) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("tipo", valor.tipo());
+        campos.put("numero", valor.numero());
+        campos.put("ejercicio", valor.ejercicio().valor());
+        campos.put("total", valor.total().valor());
+        return campos;
     }
 
     /** Un valor sin ninguna obligacion no formaliza nada. */

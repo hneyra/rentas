@@ -53,7 +53,7 @@ import org.springframework.stereotype.Service;
  *
  * <h2>Rechazo por fila, no por archivo</h2>
  *
- * <p>Mismo reparto transaccional que {@link ImportarVias}: sin {@code @Transactional} aqui, con el
+ * <p>Mismo reparto transaccional que {@code ImportarVias}: sin {@code @Transactional} aqui, con el
  * suyo en cada cargo. Una fila cuyo ejercicio no tenga particion declarada en el libro se rechaza
  * sola —«no partition of relation found»— y no se lleva por delante a las que la siguen.
  */

@@ -79,7 +79,7 @@ public class IndicadoresController {
     /**
      * El trabajo parado por modulo: que espera un acto y no cobra mientras espera (#549).
      *
-     * <h2>El permiso de cada frente se comprueba aqui, uno por uno</h2>
+     * <h4>El permiso de cada frente se comprueba aqui, uno por uno</h4>
      *
      * <p>{@code @RequiereAcceso} abre la pantalla de inicio, y eso es lo unico que ese guardia
      * puede decir: el endpoint es uno y los frentes son de cuatro modulos distintos. Asi que el

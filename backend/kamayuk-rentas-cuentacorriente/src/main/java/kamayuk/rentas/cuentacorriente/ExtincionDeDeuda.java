@@ -57,7 +57,7 @@ public interface ExtincionDeDeuda {
      * el pago tiene fecha <b>posterior</b> a la de la resolucion (#445): la fecha es retroactiva, y
      * lo que ya se pago despues de ella no se vuelve a extinguir.
      *
-     * <h2>Solo lo que origino quien la pide (#371)</h2>
+     * <h4>Solo lo que origino quien la pide (#371)</h4>
      *
      * <p>La clave del libro no distingue el acto que origino cada cargo, y dos papeletas del mismo
      * obligado, del mismo ejercicio y de la misma unidad —o sin unidad— comparten obligacion. Hasta

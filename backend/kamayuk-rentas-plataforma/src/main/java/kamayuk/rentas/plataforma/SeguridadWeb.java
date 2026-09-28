@@ -100,7 +100,7 @@ public class SeguridadWeb {
      * matchIfMissing = true)}—, asi que aqui no hay ninguna propiedad que anadir: lo unico que
      * faltaba era abrirlo.
      *
-     * <h2>Por que se abre, habiendo un {@code /actuator/health} que ya es publico</h2>
+     * <h4>Por que se abre, habiendo un {@code /actuator/health} que ya es publico</h4>
      *
      * <p>Porque los dos <b>no dicen lo mismo</b>. {@code /actuator/health} incluye el indicador de
      * la base de datos, y una sonda de VIDA que incluya la base le dice al orquestador «mata este
@@ -110,7 +110,7 @@ public class SeguridadWeb {
      * cinco. Este grupo contiene <b>solo</b> {@code livenessState}: contesta si el proceso esta
      * vivo, que es la unica pregunta cuya respuesta «no» se arregla reiniciando.
      *
-     * <h2>Lo que cuesta, medido y no supuesto</h2>
+     * <h4>Lo que cuesta, medido y no supuesto</h4>
      *
      * <p>Lo que se anade a la superficie sin token son dos <b>subrecursos del endpoint que ya era
      * publico</b>, y con {@code show-details: never} cada uno contesta exactamente {@code
@@ -119,7 +119,7 @@ public class SeguridadWeb {
      * cualquier grupo que alguien anada despues, que es justo lo que el docstring de esta clase
      * dice que no se hace.
      *
-     * <h2>Como se llego a esto</h2>
+     * <h4>Como se llego a esto</h4>
      *
      * <p>Los cuatro descriptores declaraban estas dos rutas en sus sondas desde que existen, y esta
      * cadena permitia <b>solo</b> {@code /actuator/health}. Medido dentro del clúster: {@code

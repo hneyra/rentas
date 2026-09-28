@@ -19,7 +19,7 @@ import kamayuk.rentas.dominio.PoliticaDeRedondeo;
  * proyecto: una estructura inventada sin poder leer el documento que la resuelve (ver NEG-05 y
  * ARQ-09, CLAUDE.md).
  *
- * <p>Es el mismo mecanismo de {@link kamayuk.rentas.parametros.ReglaTributaria} para #14: una
+ * <p>Es el mismo mecanismo de {@code kamayuk.rentas.parametros.ReglaTributaria} para #14: una
  * interfaz pura, sin base de datos, sin reloj y sin configuracion global (regla 6, regla 2 —la
  * politica de redondeo se recibe, no se elige, D-03—), lista para que D-02 y D-03 le den una
  * implementacion real sin tocar {@link CalculoDeDeuda}. Hasta entonces, la unica implementacion que

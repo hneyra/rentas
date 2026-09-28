@@ -2,8 +2,10 @@ package kamayuk.rentas.nucleo.aplicacion;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -98,7 +100,7 @@ public class ConsultaDeConciliacion {
      * padron»: una acusacion de omision a todo el distrito que ninguna de las dos cifras pretendia
      * hacer.
      *
-     * <h2>Este recuento NO deja rastro en la bitacora, y ese es el motivo</h2>
+     * <h4>Este recuento NO deja rastro en la bitacora, y ese es el motivo</h4>
      *
      * <p>{@link #noConciliadas} si lo deja, porque <b>nombra</b>: es la lista de los predios que no
      * generan deuda predial, y en manos equivocadas el mapa de a quien no le va a llegar recibo
@@ -179,13 +181,7 @@ public class ConsultaDeConciliacion {
                                                 + " (conciliadaConRentas=No, ADR-0015)"))
                         // Solo cifras: el criterio lleva texto del usuario y componer JSON con el
                         // a mano acabaria en una comilla que rompe el cast a jsonb.
-                        .con(
-                                null,
-                                "{\"conciliadaConRentas\":\"NO\",\"ejercicio\":"
-                                        + ejercicio.valor()
-                                        + ",\"pagina\":"
-                                        + paginacion.pagina()
-                                        + "}"));
+                        .con(null, descripcionDelAcceso(ejercicio, paginacion)));
 
         return resolver(criterio, ejercicio, aLaFecha, paginacion, false);
     }
@@ -282,5 +278,14 @@ public class ConsultaDeConciliacion {
         }
 
         return new Pagina<>(filas, pagina.pagina(), pagina.tamano(), pagina.totalElementos());
+    }
+
+    private static Map<String, Object> descripcionDelAcceso(
+            Ejercicio ejercicio, Paginacion paginacion) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("conciliadaConRentas", "NO");
+        campos.put("ejercicio", ejercicio.valor());
+        campos.put("pagina", paginacion.pagina());
+        return campos;
     }
 }

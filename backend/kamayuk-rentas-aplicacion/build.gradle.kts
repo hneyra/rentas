@@ -75,6 +75,69 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
+// Las pruebas de este modulo corren en DOS tareas, y en dos JVM (#627, #629): `test`, con las
+// barreras —ArchUnit sobre los diecisiete modulos, los escaneres de fuentes, los limites de
+// Modulith—, y `censosDelContrato`, con lo que compara `docs/50-api/` contra el codigo. Juntas
+// necesitaban 1 GB de heap: la CI salio `OutOfMemoryError: Java heap space` tres veces seguidas con
+// los 512 MB que Gradle pone por omision, siempre al terminar `RespuestasDeLaApiTest` (run
+// 36281244516 en `main` y dos PR que no tocaban nada de esto). No es una sola prueba grande: lo que
+// cada clase importa o cachea en un campo estatico —el `OrdenDeCadaOperacion.importadas` de los
+// censos; el `clases` de `ArquitecturaTestBase` y el `produccion` de
+// `NingunRelojSinLaZonaDelProductoTest` y de `TodaPuertaConObservacionAbreSuTransaccionTest` en
+// las barreras— vive hasta que muere la JVM, y en una sola JVM se acumula. Medido en #629 con el
+// registro de GC: la JVM unica con 512 MB muere igual que en la CI, `OutOfMemoryError` al terminar
+// `RespuestasDeLaApiTest` tras 272 GC completos; partidas, con 512 MB cada una, `test` hace un solo
+// GC completo (511 -> 173 MB) y `censosDelContrato` ninguno.
+//
+// La lista es UNA y las dos tareas la leen: `test` excluye lo que `censosDelContrato` incluye, asi
+// que una clase no puede quedarse fuera de las dos ni correr dos veces. Un nombre mal escrito no
+// pasa en silencio: `censosDelContrato` falla con «No tests found for given includes». Una clase
+// nueva que no este en la lista corre en `test`, que es lo seguro.
+val clasesDeLosCensos =
+    listOf(
+        "kamayuk.rentas.verificaciones.AccesosCompartidosTest",
+        "kamayuk.rentas.verificaciones.AreaEnLaMismaFormaEntreModulosTest",
+        "kamayuk.rentas.verificaciones.ContratoConCajaTest",
+        "kamayuk.rentas.verificaciones.ContratoDeApiTest",
+        "kamayuk.rentas.verificaciones.ContratoQueConsumeDeCaja",
+        "kamayuk.rentas.verificaciones.ContratoQueConsumeDeCatastro",
+        "kamayuk.rentas.verificaciones.ContratoQueConsumeDeIdentidad",
+        "kamayuk.rentas.verificaciones.ContratoQueConsumeDeNormativa",
+        "kamayuk.rentas.verificaciones.EscriturasQueNoPuedenTerminarTest",
+        "kamayuk.rentas.verificaciones.FormaSegunJacksonTest",
+        "kamayuk.rentas.verificaciones.FormasDeLaApiTest",
+        "kamayuk.rentas.verificaciones.NingunaHoraSePublicaSinSuDesfaseTest",
+        "kamayuk.rentas.verificaciones.ParametrosDeLaApiTest",
+        "kamayuk.rentas.verificaciones.ParametrosDeLaConsultaTest",
+        "kamayuk.rentas.verificaciones.RespuestasDeLaApiTest",
+        "kamayuk.rentas.verificaciones.VectoresDeHuellaTest",
+        "kamayuk.rentas.catastro.infraestructura.LecturaDeCatastroTest",
+        "kamayuk.rentas.catastro.infraestructura.PeticionesACatastroTest",
+        "kamayuk.rentas.tesoreria.infraestructura.LecturaDeCajaTest",
+        "kamayuk.rentas.tesoreria.infraestructura.PeticionesACajaTest",
+    )
+
+val censosDelContrato = tasks.register<Test>("censosDelContrato") {
+    group = "verification"
+    description =
+        "Los censos del contrato: docs/50-api contra lo que los controladores publican y los " +
+            "adaptadores leen. Sin base de datos."
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    filter { clasesDeLosCensos.forEach { includeTestsMatching(it) } }
+    // Despues de las barreras, no a la vez. Con la cache de configuracion Gradle lanza en paralelo
+    // tareas del mismo proyecto, y dos JVM de 512 MB solapadas volverian a pedir el giga de antes.
+    mustRunAfter(tasks.test)
+}
+
+tasks.test {
+    filter { clasesDeLosCensos.forEach { excludeTestsMatching(it) } }
+}
+
+tasks.check {
+    dependsOn(censosDelContrato)
+}
+
 // El contrato vive fuera de este modulo y dos pruebas lo leen del disco:
 // `ContratoDeApiTest` compara sus rutas con las publicadas, y
 // `ParametrosDeLaConsultaTest` compara sus parametros de consulta con lo que cada
@@ -83,14 +146,14 @@ dependencies {
 // corre fresco y muerde, que es la peor forma de enterarse—. Es la leccion de
 // #192 punto 2, aplicada al contrato: lo destapo #399 al mutar el YAML y ver la
 // prueba dar BUILD SUCCESSFUL sin haber corrido.
-tasks.test {
-    // El heap de la JVM de pruebas, dicho y no heredado. Aqui corren las barreras que importan
-    // TODO el backend —ArchUnit sobre las clases de los diecisiete modulos, los escaneres de
-    // fuentes, el bytecode de `CasosDeUsoSinLlamadorTest` y los censos del contrato—, y con los
-    // 512 MB que Gradle pone por omision la CI salio `OutOfMemoryError: Java heap space` tres veces
-    // seguidas, siempre al terminar `RespuestasDeLaApiTest`: en `main` (run 36281244516) y en dos
-    // PR que no tocaban nada de esto. En el puesto pasaba, que es justo por lo que no avisaba nadie.
-    maxHeapSize = "1g"
+// Las entradas se declaran en las DOS tareas, y las mismas: cual de las dos clases lee cada archivo
+// cambia con la lista de arriba, y declarar de mas solo cuesta una ejecucion; declarar de menos es
+// el verde rancio de #192 punto 2.
+for (tarea in listOf(tasks.test, censosDelContrato)) tarea.configure {
+    // El heap de cada JVM, dicho y no heredado: el que Gradle pone por omision, que tras partir las
+    // pruebas en dos alcanza a cada una (ver arriba). Si una guarda nueva vuelve a acercarse al
+    // techo, se parte otra vez; subirlo es esconder lo que se acumula.
+    maxHeapSize = "512m"
 
     inputs
         .file(rootProject.file("../docs/50-api/openapi/rentas-v1.yaml"))
@@ -231,11 +294,11 @@ tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
 
 // La prueba de arranque va en su PROPIA tarea, y no es una manía de organización.
 //
-// `verificarArquitectura` corre `:kamayuk-rentas-aplicacion:test` y no necesita motor de base de
-// datos: son ArchUnit, escaneres de fuentes y limites de Modulith. `ArranqueDeLaAplicacionTest`
-// si lo necesita —levanta el artefacto de verdad y su sonda de salud consulta la base—, asi que
-// meterla en `test` convertiria la barrera de arquitectura en una que no se puede correr sin
-// PostgreSQL. Se excluye de `test` y se declara aparte; `check` depende de las dos, de modo que
+// `verificarArquitectura` corre `:kamayuk-rentas-aplicacion:test` y `censosDelContrato`, y no
+// necesita motor de base de datos: son ArchUnit, escaneres de fuentes, limites de Modulith y el
+// contrato leido del disco. `ArranqueDeLaAplicacionTest` si lo necesita —levanta el artefacto de
+// verdad y su sonda de salud consulta la base—, asi que meterla en `test` convertiria la barrera
+// de arquitectura en una que no se puede correr sin PostgreSQL. Se excluye de `test` y se declara aparte; `check` depende de las dos, de modo que
 // `./gradlew build` sigue corriendo ambas.
 val pruebaDeArranque = tasks.register<Test>("pruebaDeArranque") {
     group = "verification"

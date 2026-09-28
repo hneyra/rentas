@@ -291,17 +291,15 @@ public class ImportarValoresACoactiva {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             ExpedienteCoactivo expediente,
             List<ValorParaCoactiva> admitidos,
             List<ValorRechazado> rechazados) {
-        return "{\"expediente\":\""
-                + expediente.numero()
-                + "\",\"importados\":"
-                + admitidos.size()
-                + ",\"rechazados\":"
-                + rechazados.size()
-                + "}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("expediente", expediente.numero());
+        campos.put("importados", admitidos.size());
+        campos.put("rechazados", rechazados.size());
+        return campos;
     }
 
     /** Un valor pedido, ya resuelto contra el padron de valores. */

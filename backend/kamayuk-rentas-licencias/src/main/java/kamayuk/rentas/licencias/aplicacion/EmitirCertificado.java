@@ -3,6 +3,8 @@ package kamayuk.rentas.licencias.aplicacion;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -386,34 +388,26 @@ public class EmitirCertificado {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             Certificado certificado, ReciboDeTramite recibo, String concepto) {
-        return "{\"numero\":\""
-                + certificado.numero()
-                + "\",\"tipo\":\""
-                + certificado.tipo()
-                + "\",\"recibo\":\""
-                + recibo.numero()
-                + "\",\"concepto\":\""
-                + concepto
-                + "\",\"vigenciaHasta\":\""
-                + certificado.vigenciaHasta()
-                + "\",\"derecho\":\""
-                + certificado.derecho().valor().toPlainString()
-                + "\",\"derechoA\":\""
-                + certificado.derechoA()
-                + "\"}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", certificado.numero());
+        campos.put("tipo", certificado.tipo());
+        campos.put("recibo", recibo.numero());
+        campos.put("concepto", concepto);
+        campos.put("vigenciaHasta", certificado.vigenciaHasta());
+        campos.put("derecho", certificado.derecho().valor().toPlainString());
+        campos.put("derechoA", certificado.derechoA());
+        return campos;
     }
 
-    private static String descripcionDeLaReimpresion(
+    private static Map<String, Object> descripcionDeLaReimpresion(
             Certificado certificado, EmitirDocumento.Emision papel) {
-        return "{\"numero\":\""
-                + certificado.numero()
-                + "\",\"documento\":\""
-                + papel.registro().numero()
-                + "\",\"reimpresiones\":"
-                + papel.registro().reimpresiones()
-                + "}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("numero", certificado.numero());
+        campos.put("documento", papel.registro().numero());
+        campos.put("reimpresiones", papel.registro().reimpresiones());
+        return campos;
     }
 
     private static @Nullable String vacioAnulo(@Nullable String texto) {

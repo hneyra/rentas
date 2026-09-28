@@ -27,8 +27,8 @@ import tools.jackson.databind.json.JsonMapper;
  * Authorization}. Desde #21 AC-2 <b>pide el suyo</b> con {@code client_credentials} y la clave de
  * su cliente confidencial —uno por sistema y municipalidad, ADR-0028 §2—, en vez de mandar una
  * cadena configurada que ningun emisor firmo. Quien lo pide y lo guarda es {@link
- * TokenDeServicioDeKeycloak}; este cliente solo sabe que hay una {@link CredencialDeServicio} y que
- * puede tardar, porque un token se renueva.
+ * kamayuk.rentas.plataforma.TokenDeServicioDeKeycloak}; este cliente solo sabe que hay una {@link
+ * kamayuk.rentas.plataforma.CredencialDeServicio} y que puede tardar, porque un token se renueva.
  *
  * <p>Sin identidad configurada la llamada sale sin credencial y el destino la rechaza, que sigue
  * siendo lo correcto: es lo que hace que el compose sin Keycloak no se pase la vida pidiendo tokens

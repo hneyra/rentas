@@ -78,7 +78,7 @@ public interface LectorDeParametros {
      * El conjunto que rige hoy el ejercicio <b>con</b> sus parametros, de una sola resolucion
      * (#361). Para quien calcula con los parametros y guarda el identificador.
      *
-     * <h2>Por que no basta con {@link #vigenteEn} y {@link #conjuntoVigenteEn}</h2>
+     * <h4>Por que no basta con {@link #vigenteEn} y {@link #conjuntoVigenteEn}</h4>
      *
      * <p>Cada una es una resolucion: en produccion, una pregunta por red a {@code normativa} con su
      * propio repliegue al conjunto cacheado si no contesta. Dos llamadas pueden contestar dos
@@ -138,8 +138,8 @@ public interface LectorDeParametros {
     /**
      * Ningun conjunto sellado rige el ejercicio. No hay valor por omision (ARQ-09 §2.5).
      *
-     * <p>Publica su ejercicio y <b>ninguna llave</b> ({@link ParametroSinPublicar}): lo que falta
-     * no es una fila, es el conjunto donde publicarla. Nombrar una llave aqui diria que basta con
+     * <p>Publica su ejercicio y <b>ninguna llave</b> ({@link CifraSinPublicar}): lo que falta no es
+     * una fila, es el conjunto donde publicarla. Nombrar una llave aqui diria que basta con
      * publicarla, y no basta: primero hay que sellar el ejercicio.
      */
     final class EjercicioSinSellar extends CifraSinPublicar {

@@ -1,6 +1,8 @@
 package kamayuk.rentas.licencias.aplicacion;
 
 import java.time.Clock;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -95,18 +97,14 @@ public class MantenerCatalogoCiiu {
         return guardado;
     }
 
-    private static String descripcion(Ciiu giro) {
-        return "{\"codigo\":\""
-                + giro.codigo()
-                + "\",\"seccion\":"
-                + (giro.seccion() == null ? "null" : "\"" + giro.seccion() + "\"")
-                + ",\"riesgoItse\":"
-                + (giro.riesgoItse() == null ? "null" : "\"" + giro.riesgoItse() + "\"")
-                + ",\"requiereSectorial\":"
-                + giro.requiereSectorial()
-                + ",\"extendido\":"
-                + giro.extendido()
-                + "}";
+    private static Map<String, Object> descripcion(Ciiu giro) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("codigo", giro.codigo());
+        campos.put("seccion", giro.seccion());
+        campos.put("riesgoItse", giro.riesgoItse());
+        campos.put("requiereSectorial", giro.requiereSectorial());
+        campos.put("extendido", giro.extendido());
+        return campos;
     }
 
     /**

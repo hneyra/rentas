@@ -32,7 +32,7 @@ import org.springframework.stereotype.Service;
  *
  * <h2>Rechazo por fila, no por archivo</h2>
  *
- * <p>Mismo reparto transaccional que {@link ImportarVias}, y por el mismo motivo: este metodo
+ * <p>Mismo reparto transaccional que {@code ImportarVias}, y por el mismo motivo: este metodo
  * <b>no</b> lleva {@code @Transactional}, asi que cada fila abre la suya al llamar a {@link
  * RegistrarVehiculo}, que es un {@code @Service} distinto. Una placa repetida revienta {@code
  * vehiculo_placa_uq} y aborta <b>esa</b> transaccion; la fila siguiente entra con normalidad.

@@ -8,7 +8,7 @@ import kamayuk.rentas.dominio.Ejercicio;
  * El numero de un convenio de fraccionamiento: su ejercicio y su correlativo dentro del ejercicio
  * (V31, #35).
  *
- * <p>Por <b>ejercicio</b> y no por caja, al reves que {@link NumeroDeRecibo}, y la diferencia no es
+ * <p>Por <b>ejercicio</b> y no por caja, al reves que {@code NumeroDeRecibo}, y la diferencia no es
  * de gusto: un recibo lo emite una ventanilla —y que cada una tenga su serie es lo que impide que
  * dos cajeros compitan por el mismo correlativo—, mientras que un convenio es un acto
  * administrativo de la municipalidad, que se aprueba con una resolucion y no en una cola. Su

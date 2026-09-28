@@ -3,6 +3,8 @@ package kamayuk.rentas.sanciones.aplicacion;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -251,21 +253,15 @@ public class NotificarResolucionDeGerencia {
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoría. */
-    private static String descripcion(
+    private static Map<String, Object> descripcion(
             ResolucionDeGerencia resolucion, NotificacionDeResolucion diligencia) {
-        return "{\"resolucion\":\""
-                + resolucion.numero()
-                + "\",\"intento\":"
-                + diligencia.intento()
-                + ",\"modalidad\":\""
-                + diligencia.modalidad()
-                + "\",\"resultado\":\""
-                + diligencia.resultado()
-                + "\",\"exigibleDesde\":"
-                + (diligencia.exigibleDesde() == null
-                        ? "null"
-                        : "\"" + diligencia.exigibleDesde() + "\"")
-                + "}";
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("resolucion", resolucion.numero());
+        campos.put("intento", diligencia.intento());
+        campos.put("modalidad", diligencia.modalidad());
+        campos.put("resultado", diligencia.resultado());
+        campos.put("exigibleDesde", diligencia.exigibleDesde());
+        return campos;
     }
 
     /**

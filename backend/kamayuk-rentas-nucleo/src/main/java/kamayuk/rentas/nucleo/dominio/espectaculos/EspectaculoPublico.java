@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
  * <p>La tabla ya existía —la baseline la dio de alta junto con el resto de {@code rentas}— con su
  * propio ciclo de vida: {@code REGISTRADO} al darse de alta, {@code LIQUIDADO} cuando se determina
  * el impuesto y {@code base_imponible} deja de ser nulo, {@code ANULADO} si el evento no se
- * realiza. {@link #liquidar} es la única transición que este contexto usa todavía.
+ * realiza. {@code liquidar} es la única transición que este contexto usa todavía.
  *
  * <p>No calcula nada: {@code baseImponible} es la base que declara el organizador —o la que resulta
  * de {@code aforo × valorEntrada}, cuando se conocen—, y la alícuota por tipo de evento vive en el

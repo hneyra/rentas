@@ -1,9 +1,10 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -83,7 +84,7 @@ public class RegistrarDeterminacionPredial {
      * tramos y el minimo, y devuelve la cabecera <b>sin identificador</b> —{@link
      * Determinacion#esNueva()}—.
      *
-     * <h2>Por que calcular y asentar son dos metodos (#359)</h2>
+     * <h4>Por que calcular y asentar son dos metodos (#359)</h4>
      *
      * <p>Hasta #359 esto era {@code registrar}, que calculaba <b>y</b> asentaba en la misma
      * transaccion. {@link DeterminarPredial} necesita el monto para repartir las cuotas, y la unica
@@ -101,7 +102,7 @@ public class RegistrarDeterminacionPredial {
      *
      * <p>No abre transaccion: no escribe, y no lee nada —el conjunto sellado llega resuelto—.
      *
-     * <h2>El conjunto llega resuelto, y no se vuelve a preguntar (#361)</h2>
+     * <h4>El conjunto llega resuelto, y no se vuelve a preguntar (#361)</h4>
      *
      * <p>Hasta #361 este metodo recibia el ejercicio y preguntaba al lector dos veces: {@code
      * vigenteEn} para el redondeo y {@code conjuntoVigenteEn} para el {@code conjunto_id} que se
@@ -217,26 +218,16 @@ public class RegistrarDeterminacionPredial {
                         .con(null, descripcion(guardada)));
     }
 
-    private static String descripcion(Determinacion determinacion) {
-        String reglas =
-                determinacion.reglasAplicadas().stream()
-                        .map(regla -> "\"" + regla + "\"")
-                        .collect(Collectors.joining(",", "[", "]"));
-        return "{\"contribuyenteId\":"
-                + determinacion.contribuyenteId()
-                + ",\"ejercicio\":\""
-                + determinacion.ejercicio()
-                + "\",\"conjuntoId\":"
-                + determinacion.conjuntoId()
-                + ",\"baseImponible\":\""
-                + determinacion.baseImponible()
-                + "\",\"montoDeterminado\":\""
-                + determinacion.montoDeterminado()
-                + "\",\"reglasAplicadas\":"
-                + reglas
-                + ",\"modalidad\":\""
-                + determinacion.modalidad()
-                + "\"}";
+    private static Map<String, Object> descripcion(Determinacion determinacion) {
+        Map<String, Object> campos = new LinkedHashMap<>();
+        campos.put("contribuyenteId", determinacion.contribuyenteId());
+        campos.put("ejercicio", String.valueOf(determinacion.ejercicio()));
+        campos.put("conjuntoId", determinacion.conjuntoId());
+        campos.put("baseImponible", String.valueOf(determinacion.baseImponible()));
+        campos.put("montoDeterminado", String.valueOf(determinacion.montoDeterminado()));
+        campos.put("reglasAplicadas", determinacion.reglasAplicadas());
+        campos.put("modalidad", determinacion.modalidad());
+        return campos;
     }
 
     /** Se pidio determinar un contribuyente sin ningun predio declarado. */
