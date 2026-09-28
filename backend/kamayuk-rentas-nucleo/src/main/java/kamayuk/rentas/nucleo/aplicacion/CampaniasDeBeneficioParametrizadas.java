@@ -338,7 +338,7 @@ public class CampaniasDeBeneficioParametrizadas {
      * excepcion. Aquella dice que falta publicar una cifra —no se arregla desde la pantalla, y la
      * respuesta lleva {@code parametroQueFalta}—; esta dice que la cifra esta publicada y que ese
      * dia no rige: no hay nada que publicar, y lo que hay que corregir es la <b>peticion</b>. Por
-     * eso <b>no</b> declara {@code ParametroSinPublicar}: con el discriminador dentro, la interfaz
+     * eso <b>no</b> extiende {@code CifraSinPublicar}: con el discriminador dentro, la interfaz
      * mandaria a pedir una ordenanza que ya existe.
      *
      * <p>El mensaje dice cuando rigio —o desde cuando rige—, que es lo que quien atiende necesita

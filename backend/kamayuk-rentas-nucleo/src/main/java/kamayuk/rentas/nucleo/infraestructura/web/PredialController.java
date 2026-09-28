@@ -118,9 +118,9 @@ import org.springframework.web.bind.annotation.RestController;
  * faltaban. Lo traduce {@link FaltaPublicar}, no un ayudante privado por controlador.
  *
  * <p>La septima —{@code PoliticasDeRedondeo.PuntoSinPolitica}— tiene su propio {@code catch} y no
- * por gusto: es la unica que no puede declarar {@code ParametroSinPublicar}, porque vive en el
- * dominio puro y no sabe de que ejercicio salieron sus politicas (regla 7). El ejercicio se lo pone
- * quien lo pidio, que es este controlador, y la llave se compone con el punto que la excepcion si
+ * por gusto: es la unica que no puede extender {@code CifraSinPublicar}, porque vive en el dominio
+ * puro y no sabe de que ejercicio salieron sus politicas (regla 7). El ejercicio se lo pone quien
+ * lo pidio, que es este controlador, y la llave se compone con el punto que la excepcion si
  * publica.
  *
  * <p>Lo que <b>no</b> cambia: un fallo de verdad del servidor sigue siendo 500 con su incidencia.

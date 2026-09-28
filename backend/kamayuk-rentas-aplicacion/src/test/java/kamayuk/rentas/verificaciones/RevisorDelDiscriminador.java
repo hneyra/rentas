@@ -27,15 +27,16 @@ import kamayuk.comun.verificaciones.RevisorDeCodigoFuente;
  * <h2>Como se computa la familia</h2>
  *
  * <p><b>Del codigo fuente, no de una lista escrita a mano</b>, igual que el escaner de la regla 5:
- * es familia toda excepcion cuya declaracion diga {@code implements ParametroSinPublicar}. Anadir
- * una excepcion de «falta publicar» la mete en la guarda sin tocar esta clase; y una excepcion que
- * NO declare la interfaz no puede traducirse con el ayudante, porque su tipo no compila ahi.
+ * es familia toda excepcion cuya declaracion diga {@code extends CifraSinPublicar} (desde #435; la
+ * interfaz {@code ParametroSinPublicar} que #691 contaba se fundio en esa base en #629). Anadir una
+ * excepcion de «falta publicar» la mete en la guarda sin tocar esta clase; y una excepcion que NO
+ * la extienda no puede traducirse con el ayudante, porque su tipo no compila ahi.
  *
  * <p>A esa lista se suma <b>una</b> excepcion nombrada, {@link #LA_DEL_DOMINIO_PURO}: {@code
  * PoliticasDeRedondeo.PuntoSinPolitica} vive en {@code kamayuk-rentas-dominio-compartido} y no
- * puede declarar la interfaz —la interfaz vive en {@code kamayuk-rentas-parametros}, que depende
- * del dominio y no al reves— ni sabe de que ejercicio salieron sus politicas (regla 7). Es la
- * unica, y es lo que la sobrecarga de {@code FaltaPublicar} existe para traducir.
+ * puede extender la base —la base vive en {@code kamayuk-rentas-parametros}, que depende del
+ * dominio y no al reves— ni sabe de que ejercicio salieron sus politicas (regla 7). Es la unica, y
+ * es lo que la sobrecarga de {@code FaltaPublicar} existe para traducir.
  *
  * <h2>Que NO mira</h2>
  *
@@ -60,11 +61,11 @@ import kamayuk.comun.verificaciones.RevisorDeCodigoFuente;
 public final class RevisorDelDiscriminador {
 
     /**
-     * La unica excepcion de la familia que no puede declarar {@code ParametroSinPublicar}.
+     * La unica excepcion de la familia que no puede extender {@code CifraSinPublicar}.
      *
      * <p>Esta escrita a mano y con nombre propio porque su motivo tambien lo es: {@code
      * PuntoSinPolitica} es dominio puro. Cualquier otra que quiera entrar en la familia lo hace
-     * declarando la interfaz, que es lo que la hace traducible.
+     * extendiendo la base, que es lo que la hace traducible.
      */
     public static final String LA_DEL_DOMINIO_PURO = "PuntoSinPolitica";
 

@@ -36,7 +36,7 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@code ejercicio}: siempre. Todas hablan del conjunto sellado <b>de un ejercicio</b>.
  *   <li>{@code llave}: {@code TIPO:CLAVE} cuando falta exactamente una fila; el {@code TIPO} solo
  *       cuando falta el bloque entero; y <b>ausente</b> cuando lo que falta es el conjunto. Nunca
- *       una clave inventada para rellenar el hueco (ver {@code ParametroSinPublicar} de {@code
+ *       una clave inventada para rellenar el hueco (ver {@code CifraSinPublicar} de {@code
  *       kamayuk-rentas-parametros}).
  * </ul>
  *

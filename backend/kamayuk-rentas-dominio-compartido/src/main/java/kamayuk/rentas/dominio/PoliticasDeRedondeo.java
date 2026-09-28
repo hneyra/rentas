@@ -87,11 +87,11 @@ public final class PoliticasDeRedondeo {
      * una fila de la campana de observacion del SRTM del MEF.
      *
      * <p><b>Y el punto sale tambien por {@link #punto()}, no solo dentro del texto</b> (#691). Esta
-     * es la unica de las excepciones de «falta publicar» que no puede declarar {@code
-     * ParametroSinPublicar} —vive en el dominio puro y no sabe de que ejercicio salieron las
-     * politicas (regla 7)—, asi que quien si sabe el ejercicio compone con las dos mitades la llave
-     * {@code REDONDEO:‹punto›} que el cuerpo del 422 publica. Leerla del mensaje seria reaccionar
-     * al texto, que es exactamente lo que el discriminador existe para evitar.
+     * es la unica de las excepciones de «falta publicar» que no puede extender {@code
+     * CifraSinPublicar} —vive en el dominio puro y no sabe de que ejercicio salieron las politicas
+     * (regla 7)—, asi que quien si sabe el ejercicio compone con las dos mitades la llave {@code
+     * REDONDEO:‹punto›} que el cuerpo del 422 publica. Leerla del mensaje seria reaccionar al
+     * texto, que es exactamente lo que el discriminador existe para evitar.
      */
     public static final class PuntoSinPolitica extends RuntimeException {
 

@@ -138,8 +138,8 @@ public interface LectorDeParametros {
     /**
      * Ningun conjunto sellado rige el ejercicio. No hay valor por omision (ARQ-09 §2.5).
      *
-     * <p>Publica su ejercicio y <b>ninguna llave</b> ({@link ParametroSinPublicar}): lo que falta
-     * no es una fila, es el conjunto donde publicarla. Nombrar una llave aqui diria que basta con
+     * <p>Publica su ejercicio y <b>ninguna llave</b> ({@link CifraSinPublicar}): lo que falta no es
+     * una fila, es el conjunto donde publicarla. Nombrar una llave aqui diria que basta con
      * publicarla, y no basta: primero hay que sellar el ejercicio.
      */
     final class EjercicioSinSellar extends CifraSinPublicar {
