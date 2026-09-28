@@ -1,13 +1,19 @@
 package kamayuk.rentas.cuentacorriente.aplicacion;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.LongConsumer;
 import kamayuk.rentas.cuentacorriente.dominio.AsientoRepository;
+import kamayuk.rentas.cuentacorriente.dominio.Divergencia;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Reconstruye el saldo proyectado de <b>todo el padron</b>, en lotes y reanudable (#23).
+ * Reconstruye —y concilia— el saldo proyectado de <b>todo el padron</b>, en lotes y reanudable
+ * (#23, #630).
  *
  * <h2>Por que es una clase aparte de {@link ReconstruirSaldo}</h2>
  *
@@ -37,6 +43,22 @@ import org.springframework.transaction.support.TransactionTemplate;
  * debe pasar (ARQ-03)—. Por eso el cursor se lee dentro de un {@link TransactionTemplate} corto y
  * propio, en vez de anotar este metodo: anotarlo metaria el padron entero en una sola transaccion y
  * destruiria justo la propiedad que esta clase existe para conservar.
+ *
+ * <h2>Y la conciliacion recorre el mismo padron (#630)</h2>
+ *
+ * <p>{@link #conciliar} es el mismo recorrido con {@link ReconstruirSaldo#conciliar} en vez de
+ * {@link ReconstruirSaldo#deContribuyente}, y vive aqui por los mismos tres motivos: una
+ * transaccion por contribuyente —de lectura—, que tiene que atravesar el proxy; el cursor por
+ * identificador; y la lectura del lote en su transaccion corta. Escrito en otra clase habria sido
+ * este bucle copiado.
+ *
+ * <p><b>Recorre los contribuyentes con asientos, y eso deja un caso fuera, dicho</b>: el de un
+ * contribuyente <i>sin ningun asiento</i> y con filas en la proyeccion. {@link
+ * ReconstruirSaldo#conciliar} si las reporta cuando el contribuyente tiene libro —«el libro dice
+ * cero y la fila dice otra cosa»—, pero a uno sin libro este cursor no llega. Tampoco lo repararia
+ * nadie: la reconstruccion solo reescribe las obligaciones que el libro tiene, y {@code
+ * kamayuk_app} no puede borrar una fila de {@code saldo_proyectado} (V1 le concede {@code SELECT,
+ * INSERT, UPDATE}).
  */
 @Service
 public class ReconstruirPadron {
@@ -65,6 +87,42 @@ public class ReconstruirPadron {
      * @return el ultimo identificador reconstruido, con el que reanudar si hiciera falta
      */
     public long reconstruir(long desdeContribuyente) {
+        return recorrer(desdeContribuyente, reconstruir::deContribuyente);
+    }
+
+    /**
+     * Compara la proyeccion de <b>cada</b> contribuyente del padron contra su libro, y
+     * <b>reporta</b> lo que no cuadra (#630).
+     *
+     * <p>No repara nada, igual que {@link ReconstruirSaldo#conciliar}: la reparacion es {@link
+     * #reconstruir}, y la pide quien lea el informe. Cada contribuyente se lee en su propia
+     * transaccion de lectura, de modo que conciliar el padron entero no retiene una conexion
+     * durante toda la pasada.
+     *
+     * @return cuantos contribuyentes se miraron y, de los que no cuadran, sus divergencias
+     */
+    public Conciliacion conciliar() {
+        Map<Long, List<Divergencia>> divergentes = new LinkedHashMap<>();
+        long[] mirados = {0};
+        recorrer(
+                0L,
+                contribuyenteId -> {
+                    mirados[0]++;
+                    List<Divergencia> suyas = reconstruir.conciliar(contribuyenteId);
+                    if (!suyas.isEmpty()) {
+                        divergentes.put(contribuyenteId, suyas);
+                    }
+                });
+        return new Conciliacion(mirados[0], divergentes);
+    }
+
+    /**
+     * El recorrido comun: el padron del libro por cursor de identificador, en lotes, y el paso de
+     * cada contribuyente fuera de toda transaccion para que abra la suya.
+     *
+     * @return el ultimo identificador recorrido, con el que reanudar
+     */
+    private long recorrer(long desdeContribuyente, LongConsumer paso) {
         long ultimo = desdeContribuyente;
         while (true) {
             long desde = ultimo;
@@ -75,9 +133,29 @@ public class ReconstruirPadron {
                 return ultimo;
             }
             for (long contribuyenteId : lote) {
-                reconstruir.deContribuyente(contribuyenteId);
+                paso.accept(contribuyenteId);
                 ultimo = contribuyenteId;
             }
+        }
+    }
+
+    /**
+     * Lo que una conciliacion del padron encontro.
+     *
+     * @param contribuyentes cuantos contribuyentes con libro se conciliaron
+     * @param divergencias las de cada contribuyente que no cuadra, en el orden del recorrido; vacio
+     *     si la proyeccion entera coincide con el libro
+     */
+    public record Conciliacion(long contribuyentes, Map<Long, List<Divergencia>> divergencias) {
+
+        public Conciliacion {
+            // Sin `Map.copyOf`, que no conserva el orden: el informe sale en el del padron.
+            divergencias = Collections.unmodifiableMap(new LinkedHashMap<>(divergencias));
+        }
+
+        /** Si la proyeccion coincide con el libro en todo el padron. */
+        public boolean cuadra() {
+            return divergencias.isEmpty();
         }
     }
 }

@@ -67,8 +67,8 @@ import org.springframework.web.bind.annotation.RestController;
  * proceso. Quien la corre es {@code CorrerLasCorridasDeValores}, que el {@code CronJob} {@code
  * kamayuk-rentas-corridas} lanza en la ventana de lote (#400): hasta #400 esta frase lo afirmaba y
  * no habia ningun proceso que lo hiciera, asi que la corrida se aceptaba con 201 y sus candidatos
- * se quedaban {@code PENDIENTE} para siempre. La etapa "impresion" sigue sin ruta: publicarla lo
- * decide la pantalla.
+ * se quedaban {@code PENDIENTE} para siempre. La etapa "impresion" la publica {@code
+ * ImpresionDeLaCorridaMasivaController} desde #631.
  *
  * <h2>Que devuelve 422, y por que no 500 (#562)</h2>
  *

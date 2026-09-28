@@ -14,6 +14,7 @@ import kamayuk.rentas.cuentacorriente.dominio.SaldoProyectado;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoRepository;
 import kamayuk.rentas.dominio.Dinero;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -35,6 +36,11 @@ import org.springframework.transaction.annotation.Transactional;
  * gobierna las modificaciones de datos, y aqui el unico dato que existe —el libro— queda intacto.
  * Si esto exigiera observacion, la exigiria un proceso automatico de madrugada, que no tiene
  * ninguna que dar.
+ *
+ * <p><b>Ese proceso es {@link CorrerLaConciliacionDelSaldo}</b> (#630), que el {@code CronJob}
+ * {@code kamayuk-rentas-conciliacion-del-saldo} lanza cada noche: concilia el padron de cada
+ * municipalidad y solo reconstruye si se le pide. Hasta #630 no existia, y {@link #conciliar} no lo
+ * llamaba nadie fuera de sus pruebas.
  */
 @Service
 public class ReconstruirSaldo {
@@ -69,8 +75,19 @@ public class ReconstruirSaldo {
      *
      * <p>No repara: ver el javadoc de {@link Divergencia}. Devolver la lista vacia significa que la
      * proyeccion coincide con el libro obligacion por obligacion.
+     *
+     * <h2>{@code REPEATABLE READ}, porque compara dos tablas (#630)</h2>
+     *
+     * <p>Lee el libro y despues la proyeccion, en dos sentencias. Con el {@code READ COMMITTED} de
+     * siempre cada una ve lo confirmado hasta ELLA, asi que un asiento que otra transaccion
+     * confirme entre las dos —la ventanilla, un pago que llega del buzon de {@code caja}, una
+     * corrida— entra en la proyeccion y no en el libro ya leido, y un saldo correcto sale como
+     * divergencia. Medido: «el libro dice 1000.00 y la proyeccion 1250.00» sobre un contribuyente
+     * que cuadraba. Con una sola instantanea para toda la transaccion, las dos lecturas ven lo
+     * mismo. Es de lectura, asi que en PostgreSQL no puede fallar por serializacion: no cuesta
+     * nada.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public List<Divergencia> conciliar(long contribuyenteId) {
         List<Asiento> libro = asientos.deContribuyente(contribuyenteId);
         Map<ClaveDeSaldo, Dinero> segunElLibro = new LinkedHashMap<>();

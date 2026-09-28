@@ -69,9 +69,6 @@ class CasosDeUsoSinLlamadorTest {
                 "FormalizarConvenio#cuotaInicialDe(NumeroDeConvenio)",
                 "La leia `CobrarDeuda` para cobrar la cuota inicial en ventanilla, y se fue a `caja` en P5D (#430)");
         SIN_LLAMADOR_CON_MOTIVO.put(
-                "ImprimirCorridaMasiva#imprimir(long, FormatoDeDocumento, Function)",
-                "#400 cerro el PROCESAMIENTO de la generacion masiva, no su impresion: no hay ruta ni proceso que imprima la corrida (#631)");
-        SIN_LLAMADOR_CON_MOTIVO.put(
                 "RegistrarBeneficio#registrar(Beneficio, Observacion)",
                 "El alta de un beneficio no se publica todavia: `BeneficioController` es de solo lectura y el contrato no declara POST (NEG-03)");
         SIN_LLAMADOR_CON_MOTIVO.put(
@@ -95,12 +92,6 @@ class CasosDeUsoSinLlamadorTest {
         SIN_LLAMADOR_CON_MOTIVO.put(
                 "MantenerCatalogoDeInfracciones#registrar(CodigoInfraccion, Observacion)",
                 "Por lo mismo que modificar (#632)");
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "ReconstruirPadron#reconstruir(long)",
-                "La red de seguridad de ADR-0006 no tiene proceso que la corra (#630)");
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "ReconstruirSaldo#conciliar(long)",
-                "La conciliacion del saldo contra el libro no tiene proceso que la corra (#630)");
     }
 
     @Test

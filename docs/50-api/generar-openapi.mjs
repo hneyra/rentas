@@ -1125,7 +1125,7 @@ const DESCRIPCIONES = {
     \`CorrerLasCorridasDeValores\` en la ventana de lote (#400): cada candidato sale
     \`GENERADO\` con su valor o \`SIN_DEUDA\`, y el que falla se reintenta en la ventana
     siguiente. Hasta #400 ningún proceso la corría y los candidatos se quedaban \`PENDIENTE\`
-    para siempre. La impresión en lote de lo emitido no tiene ruta.
+    para siempre. La impresión en lote de lo emitido es \`imprimir_corrida_masiva\` (#631).
   `),
   // Infracciones administrativas (#53)
   adm_valores: bloque(`
@@ -4279,6 +4279,41 @@ const OPERACIONES_ADICIONALES = {
       `),
     },
   ],
+  // `valores_masivo` declara «POST /valores/masivo» —la etapa del criterio—; #631 le
+  // añade la tercera etapa de RF-091, la impresión del lote, que `ImprimirCorridaMasiva`
+  // tenía escrita desde #38 y ninguna ruta llamaba.
+  valores_masivo: [
+    {
+      operationId: 'imprimir_corrida_masiva',
+      metodo: 'get',
+      ruta: '/api/v1/valores/masivo/{id}/impresion',
+      descripcionesDeRuta: {
+        id: 'El identificador de la corrida, el que devolvió la generación masiva',
+      },
+      titulo: 'Impresión de una corrida masiva de valores',
+      parametros: [
+        {
+          nombre: 'formato',
+          esquema: '{ type: string, enum: [PDF, XLS, RTF] }',
+          descripcion: 'PDF, XLS o RTF: el de todos los documentos del archivo (RF-132)',
+        },
+      ],
+      descripcion: literal(`
+        La tercera etapa de la generación masiva (#631, RF-091): **un archivo \`.zip\` con un
+        documento por cada valor \`GENERADO\`** de la corrida, en el formato pedido y
+        nombrado con su número. Un documento por valor y no uno con todos dentro: cada valor
+        es su propio acto, se notifica a un contribuyente distinto, y los tres formatos no se
+        pueden coser igual. Los candidatos todavía \`PENDIENTE\` o \`SIN_DEUDA\` no salen.
+
+        No escribe nada —no consume correlativo ni mueve fase—, así que es un \`GET\` sin
+        observación; pide el privilegio de **impresión** de la opción, porque saca del
+        sistema de una vez miles de documentos. Una corrida que no existe en esta
+        municipalidad es **404**, y una sin ningún valor generado todavía —la ventana de lote
+        no la procesó, o ninguno de sus candidatos tenía deuda— es **409**: ninguna de las dos
+        devuelve un archivo vacío.
+      `),
+    },
+  ],
   // `ciiu` declara «GET /licencias/ciiu» como su endpoint —el catálogo—; RF-112
   // exige que sea extensible por el usuario, y extenderlo necesita su verbo.
   ciiu: [
@@ -4362,6 +4397,7 @@ function clavesRepetidas(fuente, tabla) {
  *   resuelve y devolverle un listado sin filtrar, que es el resultado plausible
  *   y equivocado (ADR-0015 §2, #344).
  * - `imprimir_certificado` devuelve **el papel**, no un JSON (RF-132).
+ * - `imprimir_corrida_masiva` devuelve **un archivo con los papeles**, uno por valor (#631).
  * - `permisos_de_la_sesion` es la unica cuya forma la interfaz consume entera:
  *   el guardia dibuja el menu con ella, asi que el contrato la describe hasta el
  *   enum de privilegios (ADR-0013). Y no tiene 422: no recibe cuerpo ni filtros,
@@ -4466,6 +4502,14 @@ const RESPUESTAS = {
     principal: {
       codigo: '200',
       tipoDeContenido: 'application/octet-stream',
+      esquema: '{ type: string, format: binary }',
+    },
+  },
+  imprimir_corrida_masiva: {
+    principal: {
+      codigo: '200',
+      descripcion: 'Un .zip con un documento por valor generado',
+      tipoDeContenido: 'application/zip',
       esquema: '{ type: string, format: binary }',
     },
   },
