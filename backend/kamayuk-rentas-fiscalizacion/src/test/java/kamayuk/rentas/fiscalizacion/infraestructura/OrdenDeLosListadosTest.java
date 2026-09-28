@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import kamayuk.rentas.fiscalizacion.aplicacion.GenerarMuestra;
 import kamayuk.rentas.fiscalizacion.infraestructura.web.LiquidacionController;
 import kamayuk.rentas.fiscalizacion.infraestructura.web.LiquidacionResource;
 import kamayuk.rentas.fiscalizacion.infraestructura.web.MuestraController;
@@ -137,20 +136,6 @@ class OrdenDeLosListadosTest {
                 .contains(ordenPorOmisionDe(ProgramasController.class));
         assertThat(LiquidacionRepositoryJdbc.ORDEN.camposAdmitidos())
                 .contains(ordenPorOmisionDe(LiquidacionController.class));
-    }
-
-    @Test
-    @DisplayName("y el orden con que el SORTEO recorre el padron tambien: no solo el del GET")
-    void elOrdenDelRecorridoDelSorteoEstaAdmitido() {
-        // El hueco que #586 encontro ejecutando. `GenerarMuestra` no es un controlador y por eso
-        // no entraba en la prueba de arriba: recorre el padron por paginas llamando a la MISMA
-        // consulta, y pedia `predio_id`, que #546 saco de la lista blanca —con razon— dejandolo
-        // solo como desempate. Desde ese merge `POST /fiscalizacion/programas/{id}/muestra`
-        // contestaba 422 ORDEN_NO_ADMITIDO para todo programa, y no lo veia nadie porque
-        // `GenerarMuestraTest` habla con un doble que ignora la `Paginacion`.
-        assertThat(DeteccionRepositoryJdbc.ORDEN.camposAdmitidos())
-                .as("el sorteo recorre la deteccion, asi que su orden es de esta lista blanca")
-                .contains(constanteDe(GenerarMuestra.class, "ORDEN_DEL_RECORRIDO"));
     }
 
     @Test

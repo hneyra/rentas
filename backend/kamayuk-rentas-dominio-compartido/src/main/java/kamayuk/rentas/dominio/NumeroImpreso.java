@@ -17,6 +17,12 @@ import java.util.Objects;
  * <p>Es una funcion y no un objeto de valor por cada documento a proposito: la regla es identica y
  * cinco tipos con el mismo cuerpo serian cinco copias. El documento cuya forma deje de ser esta
  * tendra la suya, como la tiene {@link CodigoContribuyente}.
+ *
+ * <p><b>Y los que #515 dejo fuera, anotados (#629)</b>: el expediente del FUE y el numero de su
+ * licencia, el codigo del programa de fiscalizacion, el acta de internamiento y el expediente
+ * coactivo —que en {@code porNumero} solo se recortaba: en minusculas no existia—. Y el codigo CIIU
+ * del catalogo de giros, que no lo imprime la municipalidad pero se teclea para buscarlo igual. El
+ * ejecutor del filtro coactivo no: es un nombre, y se compara contra {@code upper()} en el motor.
  */
 public final class NumeroImpreso {
 

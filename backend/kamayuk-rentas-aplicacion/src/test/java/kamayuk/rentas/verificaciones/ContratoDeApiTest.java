@@ -358,6 +358,8 @@ class ContratoDeApiTest {
                     "POST /transito/descargos",
                     // #412 — resolver un recurso con su propia resolucion: la accion «Resolver».
                     "POST /transito/descargos/{nDeExpediente}/resolucion",
+                    // #629 — y su notificacion, que #412 dejo sin ruta.
+                    "POST /transito/descargos/{nDeExpediente}/resolucion/notificacion",
                     "GET /transito/internamientos",
                     "POST /transito/internamientos",
                     "POST /transito/internamientos/{placa}/liberacion",

@@ -318,6 +318,7 @@ class ElPlazoQueConcedeCadaResolucionJdbcTest {
                                 resoluciones,
                                 diligencias,
                                 papeletas,
+                                new DescargoRepositoryJdbc(jdbc),
                                 directorio,
                                 plazos,
                                 auditoria,

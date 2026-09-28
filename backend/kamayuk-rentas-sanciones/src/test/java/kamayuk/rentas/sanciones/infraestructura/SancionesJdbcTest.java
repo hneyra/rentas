@@ -414,6 +414,7 @@ class SancionesJdbcTest {
                                 resoluciones,
                                 diligencias,
                                 papeletas,
+                                descargos,
                                 padron,
                                 plazos,
                                 auditoria,
@@ -730,6 +731,96 @@ class SancionesJdbcTest {
             assertThat(deudaDe(papeleta, SANCIONADORA_DESDE.plusDays(5)))
                     .as("fundado y sin efecto: la baja se asienta por el mismo camino que siempre")
                     .isEqualTo(Dinero.CERO);
+        }
+
+        @Test
+        @DisplayName(
+                "#412 — y se notifica por su recurso: su diligencia abre el plazo de impugnarla,"
+                        + " el mismo que la sancionadora")
+        void laResolucionDelRecursoSeNotifica() {
+            Papeleta papeleta = papeletaDeTransito("R13");
+            ResolucionDeGerencia ordinaria =
+                    dictar(
+                                    papeleta,
+                                    TipoDeResolucionDeGerencia.ORDINARIA,
+                                    ORDINARIA,
+                                    null,
+                                    null,
+                                    null)
+                            .resolucion();
+            notificarResolucion(ordinaria.numero(), DILIGENCIA, ResultadoDeNotificacion.NOTIFICADO);
+            ResolucionDeGerencia sancionadora =
+                    dictar(
+                                    papeleta,
+                                    TipoDeResolucionDeGerencia.SANCIONADORA,
+                                    SANCIONADORA_DESDE,
+                                    null,
+                                    null,
+                                    null)
+                            .resolucion();
+            enTransaccion(
+                    () ->
+                            registrarDescargo.registrar(
+                                    Familia.TRANSITO,
+                                    papeleta.numero(),
+                                    new RegistrarDescargo.Peticion(
+                                            "EXP-413",
+                                            SANCIONADORA_DESDE.plusDays(1),
+                                            TipoDeRecurso.RECONSIDERACION,
+                                            "La sancionadora no valoro la prueba"),
+                                    PORQUE),
+                    "mesa.partes");
+            ResolucionDeGerencia delRecurso =
+                    enTransaccion(
+                                    () ->
+                                            resolver.resolverRecurso(
+                                                    "EXP-413",
+                                                    SANCIONADORA_DESDE.plusDays(5),
+                                                    SentidoDelFallo.INFUNDADO,
+                                                    EfectoSobreLaMulta.SE_MANTIENE,
+                                                    "No se acredita lo alegado",
+                                                    null,
+                                                    FormatoDeDocumento.PDF,
+                                                    PORQUE),
+                                    "gerente")
+                            .resolucion();
+            LocalDate hoy = SANCIONADORA_DESDE.plusDays(5);
+
+            NotificarResolucionDeGerencia.Diligencia deLaDelRecurso =
+                    enTransaccion(
+                            () ->
+                                    notificar.registrarLaDelRecurso(
+                                            " EXP-413 ",
+                                            new NotificarResolucionDeGerencia.Peticion(
+                                                    hoy,
+                                                    ModalidadDeNotificacion.PERSONAL,
+                                                    ResultadoDeNotificacion.NOTIFICADO,
+                                                    "V. RETO SANTOS",
+                                                    null,
+                                                    "RUIZ INGA, FERNANDO",
+                                                    "DNI 10027723",
+                                                    "REPRESENTANTE",
+                                                    "CARGO-RGR"),
+                                            PORQUE),
+                            "notificador");
+            NotificarResolucionDeGerencia.Diligencia deLaSancionadora =
+                    notificarResolucion(
+                            sancionadora.numero(), hoy, ResultadoDeNotificacion.NOTIFICADO);
+
+            assertThat(deLaDelRecurso.resolucion().numero())
+                    .as("la de tipo RECURSO, buscada por el expediente del recurso")
+                    .isEqualTo(delRecurso.numero());
+            assertThat(deLaDelRecurso.notificacion().numero())
+                    .isEqualTo(delRecurso.numero() + "/1");
+            assertThat(deLaDelRecurso.notificacion().direccion())
+                    .as("sin direccion dada, el domicilio fiscal vigente del obligado")
+                    .isNotBlank();
+            assertThat(deLaDelRecurso.notificacion().exigibleDesde())
+                    .as(
+                            "la resolucion de un recurso concede el plazo para impugnarla"
+                                    + " (PLAZO:RG_RECURSO), como la sancionadora, y no el de pago")
+                    .isNotNull()
+                    .isEqualTo(deLaSancionadora.notificacion().exigibleDesde());
         }
     }
 

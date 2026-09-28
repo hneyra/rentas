@@ -47,6 +47,7 @@ import kamayuk.rentas.sanciones.aplicacion.ResolverConResolucionDeGerencia;
 import kamayuk.rentas.sanciones.dominio.CriterioDePapeleta;
 import kamayuk.rentas.sanciones.dominio.Descargo;
 import kamayuk.rentas.sanciones.dominio.DescargoRepository;
+import kamayuk.rentas.sanciones.dominio.EfectoSobreLaMulta;
 import kamayuk.rentas.sanciones.dominio.EstadoDePapeleta;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.NotificacionDeResolucion;
@@ -55,6 +56,7 @@ import kamayuk.rentas.sanciones.dominio.Papeleta;
 import kamayuk.rentas.sanciones.dominio.PapeletaRepository;
 import kamayuk.rentas.sanciones.dominio.ResolucionDeGerencia;
 import kamayuk.rentas.sanciones.dominio.ResolucionDeGerenciaRepository;
+import kamayuk.rentas.sanciones.dominio.SentidoDelFallo;
 import kamayuk.rentas.sanciones.dominio.TipoDeRecurso;
 import kamayuk.rentas.sanciones.dominio.TipoDeResolucionDeGerencia;
 import kamayuk.rentas.valores.ValoresSobreUnaObligacion;
@@ -117,6 +119,13 @@ class ResolucionesDeGerenciaControllerTest {
 
     private static final String RUTA_DILIGENCIA_ADMINISTRATIVA =
             "/rentas/api/v1/infracciones/administrativas/resoluciones/{id}/notificacion";
+
+    /** La de la resolucion que resuelve un recurso, junto a la ruta que la dicta (#412, #629). */
+    private static final String RUTA_DILIGENCIA_DEL_RECURSO =
+            "/rentas/api/v1/transito/descargos/{nDeExpediente}/resolucion/notificacion";
+
+    /** La resolucion de tipo RECURSO que resuelve {@link #EXPEDIENTE}. */
+    private static final String DEL_RECURSO = "RGR-2026-000001";
 
     private static final String CUERPO_DE_LA_ORDINARIA =
             "{\"papeleta\":\""
@@ -274,6 +283,116 @@ class ResolucionesDeGerenciaControllerTest {
                                 .getResponse()
                                 .getStatus())
                 .isEqualTo(201);
+    }
+
+    // ---------------------------------------- #412: la resolucion de un recurso se notifica
+
+    /**
+     * #412 dejo el recurso con su propia resolucion —tipo {@code RECURSO}, documento {@code RGR}— y
+     * ninguna ruta de diligencia la admitia: la de transito notifica la ordinaria y la
+     * sancionadora, y la administrativa la suya (#415). Dictada y asentada, su notificacion —la que
+     * abre el plazo para impugnarla— no tenia por donde registrarse.
+     */
+    @Test
+    @DisplayName(
+            "#412 — la resolucion de un recurso se diligencia por la ruta del recurso: 201, y es"
+                    + " la suya")
+    void laResolucionDelRecursoSeDiligencia() throws Exception {
+        descargos.conElRecurso(EXPEDIENTE, 1L);
+        resoluciones.sembrarDelRecurso(DEL_RECURSO, 1L);
+
+        MvcResult resultado = diligenciarNoUbicado(RUTA_DILIGENCIA_DEL_RECURSO, EXPEDIENTE);
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"resolucion\":\"" + DEL_RECURSO + "\"")
+                .contains("\"numero\":\"" + DEL_RECURSO + "/1\"")
+                .contains("\"abreElPlazoDeLaSancionadora\":false");
+        assertThat(diligencias.guardadas)
+                .singleElement()
+                .satisfies(
+                        diligencia ->
+                                assertThat(diligencia.resolucionId())
+                                        .isEqualTo(
+                                                resoluciones
+                                                        .porNumero(DEL_RECURSO)
+                                                        .orElseThrow()
+                                                        .identificador()));
+    }
+
+    @Test
+    @DisplayName(
+            "#412 — y el plazo que abre es el de impugnarla: sin PLAZO:RG_RECURSO sellado, 422"
+                    + " nombrandolo")
+    void elPlazoQueAbreEsElDeImpugnarla() throws Exception {
+        descargos.conElRecurso(EXPEDIENTE, 1L);
+        resoluciones.sembrarDelRecurso(DEL_RECURSO, 1L);
+
+        // Este conjunto solo sella el plazo de la ordinaria: si la diligencia contara ese —el
+        // defecto de #410—, saldria 201 con la exigibilidad de una resolucion que ordena pagar.
+        MvcResult resultado =
+                borde(new ParametrosDeMentira())
+                        .perform(
+                                post(RUTA_DILIGENCIA_DEL_RECURSO, EXPEDIENTE)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"fechaDeNotificacion\":\"2026-03-06\","
+                                                        + "\"modalidad\":\"PERSONAL\","
+                                                        + "\"resultado\":\"NOTIFICADO\","
+                                                        + "\"notificador\":\"NOTIFICADOR, PRUEBA\","
+                                                        + "\"direccion\":\"AV. GRAU 100\","
+                                                        + "\"observacion\":\"Se registra la"
+                                                        + " diligencia\"}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(resultado.getResponse().getContentAsString())
+                .isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString()).contains("RG_RECURSO");
+        assertThat(diligencias.guardadas).isEmpty();
+    }
+
+    @Test
+    @DisplayName("#412 — un recurso todavia sin resolver: 404 diciendolo, y nada guardado")
+    void unRecursoSinResolverEs404() throws Exception {
+        descargos.conElRecurso(EXPEDIENTE, 1L);
+
+        MvcResult resultado = diligenciarNoUbicado(RUTA_DILIGENCIA_DEL_RECURSO, EXPEDIENTE);
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(404);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains(EXPEDIENTE)
+                .contains("no tiene resolucion");
+        assertThat(diligencias.guardadas).isEmpty();
+    }
+
+    @Test
+    @DisplayName(
+            "#412 — la del recurso no entra por la ruta de transito, ni la ordinaria por la del"
+                    + " recurso")
+    void cadaUnaPorSuRuta() throws Exception {
+        descargos.conElRecurso(EXPEDIENTE, 1L);
+        resoluciones.sembrarDelRecurso(DEL_RECURSO, 1L);
+
+        assertThat(
+                        diligenciarNoUbicado(RUTA_DILIGENCIA_TRANSITO, DEL_RECURSO)
+                                .getResponse()
+                                .getStatus())
+                .as("la ruta de transito notifica la ordinaria y la sancionadora (#415)")
+                .isEqualTo(404);
+
+        // Un recurso resuelto a la antigua —con la ordinaria que lo nombra en `nDeExpediente`—
+        // tiene su diligencia en la ruta de la ordinaria: por la del recurso no existe.
+        descargos.conElRecurso("EXP-0002", 1L);
+        resoluciones.sembrarQueResuelve(ORDINARIA, TipoDeResolucionDeGerencia.ORDINARIA, 2L);
+        assertThat(
+                        diligenciarNoUbicado(RUTA_DILIGENCIA_DEL_RECURSO, "EXP-0002")
+                                .getResponse()
+                                .getStatus())
+                .isEqualTo(404);
+        assertThat(diligencias.guardadas).isEmpty();
     }
 
     private MvcResult diligenciarNoUbicado(String ruta, String resolucion) throws Exception {
@@ -509,6 +628,7 @@ class ResolucionesDeGerenciaControllerTest {
                                         resoluciones,
                                         diligencias,
                                         papeletas,
+                                        descargos,
                                         padron,
                                         plazos,
                                         (RegistroDeAuditoria registro) -> {},
@@ -696,6 +816,18 @@ class ResolucionesDeGerenciaControllerTest {
 
         /** Una resolucion ya dictada, para poder notificarla sin dictarla por HTTP. */
         void sembrar(String numero, TipoDeResolucionDeGerencia tipo) {
+            sembrarQueResuelve(numero, tipo, null);
+        }
+
+        /** La resolucion de tipo RECURSO que resuelve ese recurso, ya dictada (#412). */
+        void sembrarDelRecurso(String numero, long descargoId) {
+            sembrarQueResuelve(numero, TipoDeResolucionDeGerencia.RECURSO, descargoId);
+        }
+
+        /** Una resolucion de ese tipo que resuelve ese recurso, o ninguno. */
+        void sembrarQueResuelve(
+                String numero, TipoDeResolucionDeGerencia tipo, @Nullable Long descargoId) {
+            boolean conFallo = descargoId != null;
             registradas.add(
                     new ResolucionDeGerencia(
                             siguiente++,
@@ -704,9 +836,9 @@ class ResolucionesDeGerenciaControllerTest {
                             numero,
                             1L,
                             HOY,
-                            null,
-                            null,
-                            null,
+                            descargoId,
+                            conFallo ? SentidoDelFallo.INFUNDADO : null,
+                            conFallo ? EfectoSobreLaMulta.SE_MANTIENE : null,
                             null,
                             null,
                             null,

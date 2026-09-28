@@ -104,19 +104,59 @@ public class DeteccionDeOmisos {
         if (pagina.estaVacia()) {
             return pagina;
         }
+        return new Pagina<>(
+                conTitulares(pagina.contenido(), aLaFecha),
+                pagina.pagina(),
+                pagina.tamano(),
+                pagina.totalElementos());
+    }
 
-        // Una sola lectura de titulares por pagina, no una por fila.
+    /**
+     * Las filas detectadas siguientes a {@code despuesDe}, <b>recorridas por su clave</b>: el
+     * recorrido del sorteo de la muestra (#346, anotado en #629).
+     *
+     * <p>El mismo conjunto que {@link #detectar} y los mismos titulares; lo que cambia es por dónde
+     * se avanza. Una página de la grilla se pide por número porque alguien la mira; el sorteo
+     * examina el padrón entero, y con {@code OFFSET} un alta o una baja entre dos vueltas le
+     * corrían la ventana. El porqué entero está en {@link DeteccionRepository#siguientes}.
+     *
+     * @param despuesDe la clave de la última fila de la vuelta anterior; {@code 0} para empezar
+     * @param cuantas cuántas filas como mucho
+     */
+    @Transactional(readOnly = true)
+    public List<FilaDeOmisos> siguientes(
+            Ejercicio ejercicio,
+            @Nullable String sectorCodigo,
+            @Nullable CondicionFiscalizada condicion,
+            LocalDate aLaFecha,
+            long despuesDe,
+            int cuantas) {
+
+        Objects.requireNonNull(ejercicio, "La deteccion necesita el ejercicio que examina");
+        Objects.requireNonNull(aLaFecha, "Toda lectura del padron indica a que fecha (regla 9)");
+
+        List<FilaDeOmisos> filas =
+                deteccion.siguientes(
+                        new CriterioDeDeteccion(ejercicio, sectorCodigo, condicion, aLaFecha),
+                        despuesDe,
+                        cuantas);
+        return filas.isEmpty() ? filas : conTitulares(filas, aLaFecha);
+    }
+
+    /** Los titulares de las filas: una sola lectura por vuelta, no una por fila. */
+    private List<FilaDeOmisos> conTitulares(List<FilaDeOmisos> filas, LocalDate aLaFecha) {
         Set<Long> predios = new LinkedHashSet<>();
-        for (FilaDeOmisos fila : pagina.contenido()) {
+        for (FilaDeOmisos fila : filas) {
             predios.add(fila.predioId());
         }
         Map<Long, List<TitularDelPredio>> porPredio = titulares.deVarios(predios, aLaFecha);
 
-        List<FilaDeOmisos> filas = new ArrayList<>();
-        for (FilaDeOmisos fila : pagina.contenido()) {
-            filas.add(fila.conTitulares(identificadoresDe(porPredio.get(fila.predioId()))));
+        List<FilaDeOmisos> conSusTitulares = new ArrayList<>();
+        for (FilaDeOmisos fila : filas) {
+            conSusTitulares.add(
+                    fila.conTitulares(identificadoresDe(porPredio.get(fila.predioId()))));
         }
-        return new Pagina<>(filas, pagina.pagina(), pagina.tamano(), pagina.totalElementos());
+        return conSusTitulares;
     }
 
     /**

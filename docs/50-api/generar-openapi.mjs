@@ -2098,6 +2098,26 @@ const OPERACIONES_ADICIONALES = {
         mismo recurso contesta 409.
       `),
     },
+    // #629 — la notificacion de esa resolucion. #412 la dejo dictada y asentada sin ruta de
+    // diligencia: la de transito notifica la ordinaria y la sancionadora, y la administrativa
+    // la suya (#415). Va junto a la ruta que la dicta y con su mismo acceso.
+    {
+      operationId: 'notificar_resolucion_de_recurso',
+      metodo: 'post',
+      ruta: '/api/v1/transito/descargos/{nDeExpediente}/resolucion/notificacion',
+      titulo: 'Notificación de la resolución de un recurso',
+      descripcionesDeRuta: {
+        nDeExpediente: 'El recurso, por el número de expediente con que se registró',
+      },
+      descripcion: bloque(`
+        Cédula de notificación de la resolución que resolvió un recurso —la de tipo \`RECURSO\`,
+        documento \`RGR\`— con su acuse (#412, #629). Se busca por el recurso, y solo la de ese
+        tipo: un recurso resuelto con la ordinaria o la sancionadora se notifica por la ruta de
+        tránsito. La diligencia que surte efecto abre el plazo que esa resolución concede, que es
+        el de impugnarla (\`PLAZO:RG_RECURSO\`), el mismo que la sancionadora. Un recurso que no
+        existe, o que todavía no se resolvió por su ruta, contesta 404.
+      `),
+    },
   ],
   internamiento: [
     {

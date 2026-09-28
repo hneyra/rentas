@@ -3,6 +3,7 @@ package kamayuk.rentas.licencias.dominio;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import org.jspecify.annotations.Nullable;
 
@@ -78,7 +79,7 @@ public record FueDeEdificacion(
         Objects.requireNonNull(registradoEn, "El FUE dice cuando se registro");
         Objects.requireNonNull(observacion, "Sin observacion no se guarda (regla 10, RNF-052)");
 
-        expediente = expediente.strip().toUpperCase(java.util.Locale.ROOT);
+        expediente = NumeroImpreso.formaDeBusqueda(expediente);
         expedienteAnterior = vacioEsNulo(expedienteAnterior);
 
         if (expediente.isEmpty()) {

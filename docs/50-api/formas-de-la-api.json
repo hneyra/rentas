@@ -4541,6 +4541,21 @@
     "resumen": "texto",
     "nombreDeArchivo": "texto"
   },
+  "POST /transito/descargos/{nDeExpediente}/resolucion/notificacion": {
+    "id": "entero",
+    "resolucion": "texto",
+    "numero": "texto",
+    "intento": "entero",
+    "fechaDeNotificacion": "fecha",
+    "modalidad": "texto",
+    "resultado": "texto",
+    "notificador": "texto",
+    "direccion": "texto",
+    "recibidoPor": "texto",
+    "acuse": "texto",
+    "exigibleDesde": "fecha",
+    "abreElPlazoDeLaSancionadora": "booleano"
+  },
   "POST /transito/internamientos": {
     "id": "entero",
     "placa": "texto",

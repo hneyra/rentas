@@ -1,9 +1,9 @@
 package kamayuk.rentas.fiscalizacion.dominio;
 
 import java.time.LocalDate;
-import java.util.Locale;
 import java.util.Objects;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -65,7 +65,7 @@ public record ProgramaFiscalizacion(
 
     public ProgramaFiscalizacion {
         Objects.requireNonNull(codigo, "El programa de fiscalizacion necesita su codigo");
-        codigo = codigo.strip().toUpperCase(Locale.ROOT);
+        codigo = NumeroImpreso.formaDeBusqueda(codigo);
         if (codigo.isEmpty() || codigo.length() > CODIGO_MAXIMO) {
             throw new IllegalArgumentException(
                     "El codigo va de 1 a " + CODIGO_MAXIMO + " caracteres: '" + codigo + "'");

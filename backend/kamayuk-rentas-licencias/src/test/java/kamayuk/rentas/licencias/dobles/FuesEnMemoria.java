@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -12,6 +11,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.licencias.dominio.CriterioDeFue;
 import kamayuk.rentas.licencias.dominio.EstadoALaFecha;
 import kamayuk.rentas.licencias.dominio.EstadoDelFue;
@@ -74,7 +74,7 @@ public final class FuesEnMemoria implements FueRepository {
 
     @Override
     public Optional<FueDeEdificacion> porExpediente(String expediente) {
-        String buscado = expediente == null ? "" : expediente.strip().toUpperCase(Locale.ROOT);
+        String buscado = expediente == null ? "" : NumeroImpreso.formaDeBusqueda(expediente);
         return expedientes.values().stream()
                 .filter(fue -> fue.expediente().equals(buscado))
                 .findFirst();
@@ -94,7 +94,8 @@ public final class FuesEnMemoria implements FueRepository {
 
     @Override
     public Optional<FueDeEdificacion> porNumeroDeLicencia(String numeroDeLicencia) {
-        String buscado = numeroDeLicencia == null ? "" : numeroDeLicencia.strip();
+        String buscado =
+                numeroDeLicencia == null ? "" : NumeroImpreso.formaDeBusqueda(numeroDeLicencia);
         return expedientes.values().stream()
                 .filter(
                         fue ->

@@ -1151,6 +1151,13 @@
     "opcionales": [],
     "enElCuerpo": []
   },
+  "POST /transito/descargos/{nDeExpediente}/resolucion/notificacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
   "POST /transito/internamientos": {
     "obligatorios": [],
     "algunoDeEstos": [],

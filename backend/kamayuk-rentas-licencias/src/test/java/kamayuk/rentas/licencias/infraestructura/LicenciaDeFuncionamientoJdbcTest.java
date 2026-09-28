@@ -831,6 +831,27 @@ class LicenciaDeFuncionamientoJdbcTest {
             }
         }
 
+        /**
+         * #515 dejo fuera, anotada, la copia de la normalizacion del codigo CIIU: la del alta y la
+         * de la lectura por codigo, cada una con su propio {@code strip().toUpperCase()} (#629).
+         */
+        @Test
+        @DisplayName(
+                "#515 — el codigo CIIU se guarda y se busca recortado y en mayusculas, como se"
+                        + " teclea")
+        void elCodigoCiiuSeTecleaComoSeLee() {
+            long giro = giroDelCatalogo("  47x9z ", "GIRO CON LETRA");
+
+            java.util.Optional<Ciiu> leido =
+                    enContexto(() -> transaccion.execute(estado -> catalogo.porCodigo(" 47X9z  ")));
+
+            assertThat(leido)
+                    .as("la misma forma al guardar y al buscar")
+                    .map(Ciiu::codigo)
+                    .contains("47X9Z");
+            assertThat(leido).map(Ciiu::identificador).contains(giro);
+        }
+
         @Test
         @DisplayName(
                 "la grilla filtra por titular, y un titular sin licencias no trae las de otros")

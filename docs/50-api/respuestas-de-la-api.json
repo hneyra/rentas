@@ -157,6 +157,7 @@
   "POST /transito/constancias-libres": ["201", "404", "409"],
   "POST /transito/descargos": ["201", "404", "409"],
   "POST /transito/descargos/{nDeExpediente}/resolucion": ["201", "404", "409"],
+  "POST /transito/descargos/{nDeExpediente}/resolucion/notificacion": ["201", "404"],
   "POST /transito/internamientos": ["201", "404", "409"],
   "POST /transito/internamientos/{placa}/abandono": ["201", "404", "409"],
   "POST /transito/internamientos/{placa}/liberacion": ["201", "404", "409"],

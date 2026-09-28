@@ -139,6 +139,42 @@ class SiembraDeDemostracionTest {
         }
 
         @Test
+        @DisplayName(
+                "#395 — un valor de adquisicion con TRES decimales se rechaza nombrando el campo,"
+                        + " y la fila siguiente entra")
+        void unValorDeAdquisicionConTresDecimalesSeRechaza() {
+            padron.sembrarContribuyente("C-000001", "DEMO Ramirez Chulle Marina");
+
+            InformeDeImportacion informe =
+                    importar.importar(
+                            new StringReader(
+                                    "placa,codigoContribuyente,marca,modelo,categoria,"
+                                            + "anioFabricacion,anioInscripcion,valorAdquisicion,"
+                                            + "fechaAdquisicion\n"
+                                            + "ZLG-701,C-000001,VOLVO,FH 440,CAMION,2019,2019,"
+                                            + "85000.555,2019-03-01\n"
+                                            + "ZLG-702,C-000001,VOLVO,FH 440,CAMION,2019,2019,"
+                                            + "85000.50,2019-03-01\n"),
+                            PORQUE);
+
+            assertThat(informe.rechazadas())
+                    .as(
+                            "valor_adquisicion es `dinero numeric(15,2)`: el tercer decimal lo"
+                                    + " redondeaba la columna, en silencio")
+                    .singleElement()
+                    .satisfies(
+                            rechazada -> {
+                                assertThat(rechazada.fila()).isEqualTo(2);
+                                assertThat(rechazada.motivo())
+                                        .contains("'valorAdquisicion'")
+                                        .contains("3 decimales");
+                            });
+            assertThat(padron.padronVehicular())
+                    .singleElement()
+                    .satisfies(v -> assertThat(v.placa()).isEqualTo(Placa.de("ZLG-702")));
+        }
+
+        @Test
         @DisplayName("sin anio de inscripcion se toma el de fabricacion")
         void sinAnioDeInscripcionSeTomaElDeFabricacion() {
             padron.sembrarContribuyente("C-000001", "DEMO Ramirez Chulle Marina");
@@ -319,6 +355,40 @@ class SiembraDeDemostracionTest {
                     .containsExactly("ESC-DEMO-0002");
         }
 
+        @Test
+        @DisplayName(
+                "#395 — un valor de transferencia con TRES decimales se rechaza nombrando el"
+                        + " campo")
+        void unValorConTresDecimalesSeRechaza() {
+            long segundo = padron.sembrarContribuyente("C-000014", "DEMO Querevalu Eche Segundo");
+            padron.sembrarContribuyente("C-000010", "DEMO Ojeda Rivas Carmen");
+            padron.sembrarPredio(CODIGO_PREDIAL, segundo, LocalDate.of(2026, 1, 1));
+
+            InformeDeImportacion informe =
+                    importar.importar(
+                            new StringReader(
+                                    ENCABEZADO
+                                            + "PREDIO,"
+                                            + CODIGO_PREDIAL
+                                            + ",,C-000014,C-000010,COMPRA_VENTA,2026-03-18,"
+                                            + "54000.005,40.00,true,ESC-DEMO-0002\n"),
+                            PORQUE);
+
+            assertThat(informe.nuevas())
+                    .as(
+                            "valor_transferencia es `dinero numeric(15,2)`: guardaba 54000.01 de"
+                                    + " un acto que el archivo decia 54000.005")
+                    .isZero();
+            assertThat(informe.rechazadas())
+                    .singleElement()
+                    .satisfies(
+                            rechazada ->
+                                    assertThat(rechazada.motivo())
+                                            .contains("'valorTransferencia'")
+                                            .contains("3 decimales"));
+            assertThat(padron.transferenciasRegistradas()).isEmpty();
+        }
+
         /**
          * El archivo tampoco puede inventarse el tipo del acto (#542).
          *
@@ -470,6 +540,36 @@ class SiembraDeDemostracionTest {
                                 assertThat(cargo.vehiculoId()).isEqualTo(vehiculo);
                                 assertThat(cargo.predioId()).isNull();
                             });
+        }
+
+        @Test
+        @DisplayName(
+                "#395 — un monto con TRES decimales se rechaza nombrando el campo, y los ceros de"
+                        + " la derecha no cuentan")
+        void unMontoConTresDecimalesSeRechaza() {
+            padron.sembrarContribuyente("C-000001", "DEMO Ramirez Chulle Marina");
+
+            InformeDeImportacion informe =
+                    importar.importar(
+                            new StringReader(
+                                    ENCABEZADO
+                                            + "C-000001,PREDIAL,2026,0,,,33.333,2026-02-28,X,\n"
+                                            + "C-000001,PREDIAL,2026,4,,,33.330,2026-11-30,X,\n"),
+                            PORQUE);
+
+            assertThat(informe.rechazadas())
+                    .as("el libro guardaba 33.33 de un saldo que el archivo decia 33.333")
+                    .singleElement()
+                    .satisfies(
+                            rechazada -> {
+                                assertThat(rechazada.fila()).isEqualTo(2);
+                                assertThat(rechazada.motivo())
+                                        .contains("'monto'")
+                                        .contains("3 decimales");
+                            });
+            assertThat(padron.cargosAsentados())
+                    .singleElement()
+                    .satisfies(cargo -> assertThat(cargo.monto()).isEqualTo(Dinero.de("33.33")));
         }
 
         @Test

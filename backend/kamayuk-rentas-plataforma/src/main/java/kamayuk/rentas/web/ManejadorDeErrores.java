@@ -196,8 +196,30 @@ public class ManejadorDeErrores {
             }
             return "Alguno de los parametros no admite el valor recibido";
         }
+        // Un objeto de valor del cuerpo que su lectura rechaza —un importe con tres decimales
+        // (#395, #629)— llega envuelto por Jackson y por Spring. El mensaje es nuestro, dice el
+        // campo y lo que trae, y es lo que hay que corregir: «no es JSON valido» seria falso.
+        ProblemaDeNegocio rechazado = problemaDeValidacionDentro(error);
+        if (rechazado != null) {
+            return mensajeDe(rechazado, CodigoDeError.VALIDACION);
+        }
         // El mensaje de Jackson nombra la clase y el campo de Java que esperaba. No sale.
         return "El cuerpo de la peticion no se puede leer: no es JSON valido";
+    }
+
+    /**
+     * El {@link ProblemaDeNegocio} de validacion que una lectura del cuerpo lanzo, si lo hay en la
+     * cadena de causas. Solo el de {@code VALIDACION}: es el unico que puede nacer leyendo un
+     * cuerpo, y cualquier otro seria un defecto que no hay que disfrazar de 422.
+     */
+    private static @Nullable ProblemaDeNegocio problemaDeValidacionDentro(Throwable error) {
+        for (Throwable causa = error.getCause(); causa != null; causa = causa.getCause()) {
+            if (causa instanceof ProblemaDeNegocio problema
+                    && problema.codigo() == CodigoDeError.VALIDACION) {
+                return problema;
+            }
+        }
+        return null;
     }
 
     /**
