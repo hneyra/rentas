@@ -231,6 +231,25 @@ class LaRdSobreUnaRectificacionJdbcTest {
         assertThat(rd.total()).isEqualTo(PREDIAL);
     }
 
+    @Test
+    @DisplayName(
+            "una RD con fecha anterior a la OP viva no vuelve a sacar la deuda de ORDINARIA"
+                    + " (revision del PR #635)")
+    void unaRdConFechaAnteriorALaOpVivaNoDuplica() throws SQLException {
+        long titular = nuevoTitular();
+        cargo(titular, PREDIAL, VENCIMIENTO, "EM-2026-510");
+        emitir(TipoValor.ORDEN_DE_PAGO, titular, DIA_DE_LA_RD);
+
+        Valor rd = emitir(TipoValor.RESOLUCION_DE_DETERMINACION, titular, DIA_DE_LA_OP);
+
+        assertThat(netoPorFase(titular))
+                .as(
+                        "una corrida con fecha de criterio anterior a una OP manual: sin la cota del"
+                                + " libro entero salia ORDINARIA en -500 y VALOR en 1 000")
+                .containsExactly(Map.entry("VALOR", PREDIAL));
+        assertThat(asientosConReferencia(titular, "VALOR-" + rd.numero())).isZero();
+    }
+
     // ==================================================================
     //  Ayudas
     // ==================================================================

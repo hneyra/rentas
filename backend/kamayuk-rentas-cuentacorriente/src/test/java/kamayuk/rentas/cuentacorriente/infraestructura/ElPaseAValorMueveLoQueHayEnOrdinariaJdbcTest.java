@@ -297,6 +297,57 @@ class ElPaseAValorMueveLoQueHayEnOrdinariaJdbcTest {
                 .isEqualTo(PREDIAL);
     }
 
+    /**
+     * La revision independiente del PR #635 midio que el segundo pase con fecha ANTERIOR a la del
+     * primero volvia a sacar la deuda de ORDINARIA: a esa fecha el par del primero todavia no
+     * existe, asi que la cuota «esta en ORDINARIA» y «tiene 500 alli». Pasa con una corrida cuya
+     * fecha de criterio es anterior a una OP manual, o con una corrida que se reanuda dias despues.
+     * Si la cuota ya salio alguna vez de ORDINARIA, el pase se acota ademas por lo que ORDINARIA
+     * tiene HOY en el libro entero: mas que eso, ORDINARIA quedaria en negativo.
+     */
+    @Test
+    @DisplayName(
+            "un segundo pase con fecha anterior al primero no vuelve a sacar de ORDINARIA lo que el"
+                    + " primero ya llevo a VALOR")
+    void unSegundoPaseConFechaAnteriorNoDuplica() throws SQLException {
+        long titular = nuevoTitular();
+        asentar(titular, TipoAsiento.CARGO, Fase.ORDINARIA, PREDIAL, VENCIMIENTO, "EM-2026-510");
+        assertThat(pasarAValor(titular, "OP-2026-000515", DIA_DE_LA_RD)).isEqualTo(PREDIAL);
+
+        Dinero movido = pasarAValor(titular, "RD-2026-000515", DIA_DE_LA_OP);
+
+        assertThat(movido)
+                .as("a su fecha la cuota tenia 500 en ORDINARIA, pero hoy no tiene nada")
+                .isEqualTo(Dinero.CERO);
+        assertThat(netoPorFase(titular))
+                .as("ORDINARIA en -500 y VALOR en 1 000 sobre una deuda de 500 es el defecto")
+                .containsExactly(Map.entry("VALOR", PREDIAL));
+    }
+
+    @Test
+    @DisplayName(
+            "y con lo del primero ya en COACTIVA, un pase con fecha anterior tampoco lo saca otra"
+                    + " vez de ORDINARIA")
+    void conLaDeudaEnCoactivaUnPaseConFechaAnteriorNoDuplica() throws SQLException {
+        long titular = nuevoTitular();
+        asentar(titular, TipoAsiento.CARGO, Fase.ORDINARIA, PREDIAL, VENCIMIENTO, "EM-2026-510");
+        pasarAValor(titular, "OP-2026-000516", DIA_DE_LA_IMPORTACION);
+        enTransaccion(
+                () ->
+                        fases.moverACoactiva(
+                                titular,
+                                EL_PREDIAL,
+                                "VALOR-OP-2026-000516",
+                                DIA_DE_LA_RD,
+                                "EXP-2026-000516",
+                                PORQUE));
+
+        Dinero movido = pasarAValor(titular, "RD-2026-000516", DIA_DE_LA_OP);
+
+        assertThat(movido).isEqualTo(Dinero.CERO);
+        assertThat(netoPorFase(titular)).containsExactly(Map.entry("COACTIVA", PREDIAL));
+    }
+
     @Test
     @DisplayName("un segundo pase sin nada nuevo en ORDINARIA no asienta nada")
     void unSegundoPaseSinNadaNuevoNoAsientaNada() throws SQLException {

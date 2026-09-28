@@ -139,6 +139,16 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
             // incluye lo que la OP ya llevo a VALOR o la importacion a COACTIVA. Acotado por lo
             // que se debe, como el paso a coactiva: el pase no formaliza deuda que no existe.
             Dinero enOrdinaria = netoEn(Fase.ORDINARIA, hastaLaFecha(deLaCuota, fechaValor));
+            // Y si la cuota ya salio alguna vez de ORDINARIA, tampoco mas de lo que ORDINARIA
+            // tiene HOY (revision del PR #635): un pase con fecha anterior a la del primero no ve
+            // su par, ve la cuota en ORDINARIA con todo dentro y la volvia a sacar —ORDINARIA en
+            // -500, VALOR en 1 000 sobre una deuda de 500—. Solo si ya salio: en la primera
+            // formalizacion lo de despues de la fecha es la pregunta abierta de #636, y acotarla
+            // aqui haria que la corrida se cortara con LoMovidoNoEsLoCongelado.
+            if (yaSalioDeOrdinaria(deLaCuota)) {
+                Dinero hoy = netoEn(Fase.ORDINARIA, deLaCuota);
+                enOrdinaria = enOrdinaria.esMayorQue(hoy) ? hoy : enOrdinaria;
+            }
             Dinero debe = calculo.deudaActualizadaA(deLaCuota, fechaValor, redondeo).total();
             Dinero monto = enOrdinaria.esMayorQue(debe) ? debe : enOrdinaria;
             if (!monto.esPositivo()) {
@@ -235,6 +245,11 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
      * un pago posterior dentro, el pase moveria menos de lo que el valor congela a esa fecha, y
      * {@code RegistrarValor} lo rechazaria con {@code LoMovidoNoEsLoCongelado}.
      */
+    /** Si algun asiento de la cuota ya esta en VALOR o en COACTIVA: la formalizo alguien. */
+    private static boolean yaSalioDeOrdinaria(List<Asiento> deLaCuota) {
+        return deLaCuota.stream().anyMatch(asiento -> asiento.fase() != Fase.ORDINARIA);
+    }
+
     private static List<Asiento> hastaLaFecha(List<Asiento> deLaCuota, LocalDate fecha) {
         return deLaCuota.stream().filter(asiento -> !asiento.fechaValor().isAfter(fecha)).toList();
     }
