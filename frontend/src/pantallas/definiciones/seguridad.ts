@@ -83,8 +83,13 @@ export const SEGURIDAD = {
             tipo: 's',
             opciones: ['Todos', 'Rentas', 'Tesorería', 'Catastro', 'Coactiva', 'Seguridad'],
           },
-          { etiqueta: 'Desde', tipo: 'd' },
-          { etiqueta: 'Hasta', tipo: 'd' },
+          // **«Desde» y «Hasta» escriben la ruta** (`kamayuk-lib`#97, #172 por el lado de este
+          // sistema): el dia elegido viaja en ISO a `?desde=` y `?hasta=`, que el conector declara
+          // y manda a `GET /seguridad/auditoria` tal cual lo publica. Recargar la direccion vuelve
+          // a ensenar las dos fechas y vuelve a pedir lo mismo. Los otros cuatro mandos no, y el
+          // motivo de cada uno esta en `datos/conectores/seguridad.ts`.
+          { etiqueta: 'Desde', tipo: 'd', eleccion: { enLaRuta: 'desde' } },
+          { etiqueta: 'Hasta', tipo: 'd', eleccion: { enLaRuta: 'hasta' } },
           { etiqueta: 'Riesgo', tipo: 's', opciones: ['Todos', 'Alto', 'Medio', 'Bajo'] },
           { etiqueta: 'Buscar en el detalle', tipo: '1' },
         ],

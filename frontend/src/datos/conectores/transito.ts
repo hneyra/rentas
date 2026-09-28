@@ -495,7 +495,14 @@ type LoDeTraVeh = readonly [
  *
  * <ul>
  *   <li><b>`0|0` Placa</b> ← `vehiculo.placa`, ya normalizada por el backend. Es lo primero que
- *       hay que poder leer: de quien son las cifras de debajo.</li>
+ *       hay que poder leer: de quien son las cifras de debajo. <b>Y desde #629 es tambien el
+ *       mando que elige el vehiculo</b>: el campo declara `eleccion: { enLaRuta: EL_SUJETO }`, asi
+ *       que lo tecleado —al salir del campo o con Intro— pasa a ser el sujeto de la ruta y esta
+ *       hoja lo pide. Con la ruta puesta, el interprete ensena en el campo lo que dice la ruta
+ *       —lo que se tecleo, que es lo que el backend encontro— y no este valor
+ *       (`valoresDelBloque` de `@kamayuk/ui`: la ruta gana a los datos); este valor es el que se
+ *       ve cuando la pantalla se monta sin `hoja`, y se sigue repartiendo porque es lo que la
+ *       operacion publica.</li>
  *   <li><b>`0|1` Nº de papeleta</b> ← `papeleta` del internamiento **vigente** de esta placa, la que
  *       dispuso la medida preventiva. Llega nulo cuando no hubo ninguna —el internamiento pudo disponerlo otra
  *       cosa—, y entonces el campo se queda sin escribir.</li>
@@ -512,6 +519,28 @@ type LoDeTraVeh = readonly [
  *       la tarifa de verdad espera a <b>D-02b</b>. Estos dos huecos son los que nombran esa
  *       decision abierta; una multiplicacion los taparia.</li>
  * </ul>
+ *
+ * <h2>Los cinco campos que NO escriben la ruta, y por que (#629)</h2>
+ *
+ * `kamayuk-lib`#97 nombraba «los cuatro mandos de `tra-veh`» junto a los de `seg-aud`, y se midio
+ * campo a campo contra lo que `GET /transito/internamientos` admite —`aLaFecha`, `deposito`,
+ * `estado`, `placa` y la ventana—. Solo la placa elige algo que esta hoja pida:
+ *
+ * <ul>
+ *   <li><b>«Nº de papeleta» y «Marca y modelo»</b> — ninguna de las tres lecturas los admite como
+ *       parametro.</li>
+ *   <li><b>«Fecha de internamiento»</b> — `aLaFecha` <b>no es</b> la fecha de ingreso: es el corte
+ *       con que el backend cuenta los dias en deposito. Atar una a la otra haria que elegir el dia
+ *       del internamiento cambiase los dias que la tabla dice de TODO el deposito.</li>
+ *   <li><b>«Deposito»</b> — `deposito` si es un filtro de la grilla, pero sus dos opciones son las
+ *       del artboard —«Deposito municipal 1/2»— y lo que la operacion compara, por igualdad
+ *       exacta (`i.deposito = :deposito`), es el texto libre con que se registro cada ingreso. Mandarlas acotaria la tabla a un nombre que puede no
+ *       existir en la instalacion, y una tabla vacia se lee como «el deposito esta vacio».</li>
+ *   <li><b>«Clase de vehiculo»</b> — la grilla no filtra por clase.</li>
+ * </ul>
+ *
+ * Y el formulario sigue siendo el del ALTA de un internamiento: los cinco se escriben para
+ * registrar, no para buscar, y esa escritura no esta encendida.
  *
  * Y tres que **no** se rellenan aunque algo parecido llegue, porque rellenarlos se veria peor:
  *

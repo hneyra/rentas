@@ -144,18 +144,28 @@ import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVenta
  * este PR abre. Lo que **no** se hace es escribir aqui una paginacion a mano: la libreria ya la
  * tiene, y una segunda en `rentas` seria la que habria que retirar despues.
  *
- * <h2>Lo que la pantalla dibuja y NO se manda: los seis mandos</h2>
+ * <h2>Los seis mandos: dos escriben la ruta y cuatro no, cada uno con su motivo</h2>
  *
- * Y aqui la mitad que falta no es del backend, que los publica casi todos. `GET
- * /seguridad/auditoria` admite `usuario`, `tabla`, `operacion`, `desde`, `hasta`, `ordenarPor`,
- * `pagina`, `tamano` y `direccion`:
+ * `GET /seguridad/auditoria` admite `usuario`, `tabla`, `operacion`, `desde`, `hasta`,
+ * `ordenarPor`, `pagina`, `tamano` y `sentido` (`parametros-de-la-api.json`). La ventana —los
+ * cuatro ultimos— se mueve desde #186 con los mandos de la tabla. De los seis campos del bloque:
  *
  * <ul>
- *   <li><b>«Usuario», «Desde» y «Hasta»</b> — la operacion los publica tal cual (`usuario`,
- *       `desde`, `hasta`). Lo que falta es por donde entrarlos: `Conector.pedir` no recibe lo que
- *       la pantalla sabe. Es el hueco declarado de <b>#172</b>, y este issue no lo cierra. Los
- *       otros cuatro opcionales —`pagina`, `tamano`, `ordenarPor`, `direccion`— ya no son de
- *       #172: desde `kamayuk-lib`#87 tienen mecanismo, y esta escrito arriba lo que cuesta.</li>
+ *   <li><b>«Desde» y «Hasta»</b> — <b>escriben la ruta desde #629</b>. La operacion los publica
+ *       tal cual, como `LocalDate`, y lo que faltaba era por donde entrarlos: hasta `kamayuk-lib`#97
+ *       lo elegido en un campo se quedaba en el estado de la pantalla. Hoy los dos declaran
+ *       `eleccion: { enLaRuta }`, el calendario deja el dia en ISO en `?desde=` y `?hasta=`
+ *       —`#/seg-aud?desde=2026-03-01&hasta=2026-03-31`—, este conector los declara en
+ *       `parametros` y los manda. Elegir uno vuelve a la primera pagina en el mismo movimiento, y
+ *       recargar la direccion vuelve a ensenar las dos fechas y a pedir lo mismo. Es el camino que
+ *       estreno la caja de `aut-cat` (#172).</li>
+ *   <li><b>«Usuario»</b> — la operacion tambien lo publica (`usuario`, el nombre de la cuenta),
+ *       y <b>no se enciende</b>: sus seis opciones son las del artboard —«jquispe», «jcardenas»,
+ *       «mrios»…—, cuentas de un ejemplo que en una instalacion no existen, y la de verdad
+ *       —`administrador`, la medida— no esta entre ellas. Mandarlas acotaria la bitacora a
+ *       cuentas inventadas y la tabla saldria vacia, que se lee como «esta cuenta no hizo nada».
+ *       La lista de verdad seria el padron de cuentas, y desde ADR-0039 ese padron es de
+ *       `identidad`: ninguna operacion de este sistema lo publica para llenar un desplegable.</li>
  *   <li><b>«Modulo»</b> — sus seis opciones son modulos del sistema («Rentas», «Tesoreria»,
  *       «Catastro»…) y lo que la operacion filtra es <b>`tabla`</b>, que es una tabla de la base.
  *       Traducir una en otra aqui seria inventar la misma tabla de equivalencias que «Acto»
@@ -219,15 +229,39 @@ function detalleDelMovimiento(movimiento: MovimientoDeLaBitacora): string {
  * Un cero no es un ejercicio valido —el backend admite de 1990 a 2100— asi que si algun dia se
  * alcanzara, lo que llegaria seria un 422 ruidoso y no una pagina de otro ano.
  */
+/** La operacion que pide `seg-aud`, escrita una vez: la ventana y los extremos viajan a ella. */
+const AUDITORIA = 'GET /seguridad/auditoria';
+
+/**
+ * **Los dos extremos del periodo, por el nombre con que viajan** (#629). Son a la vez el sitio de la
+ * ruta donde los dejan «Desde» y «Hasta» —su `eleccion.enLaRuta`— y el parametro de la operacion:
+ * que las dos cosas digan lo mismo lo vigila `verificaciones/la-ruta-de-la-hoja-llega-al-conector`.
+ */
+const LOS_EXTREMOS = ['desde', 'hasta'] as const;
+
 const SEG_AUD: Conector = {
   clave: ['seg-aud', 'auditoria'],
   exigeEjercicio: true,
-  // La ventana de «Movimientos». El `ejercicio` NO esta aqui y no puede estarlo: sale de la
-  // sesion, no de la ruta. Ver el javadoc de `Conector.exigeEjercicio`.
-  parametros: laVentanaDe('GET /seguridad/auditoria'),
+  // La ventana de «Movimientos» y los dos extremos del periodo (#629). El `ejercicio` NO esta
+  // aqui y no puede estarlo: sale de la sesion, no de la ruta. Ver el javadoc de
+  // `Conector.exigeEjercicio`.
+  parametros: [
+    ...laVentanaDe(AUDITORIA),
+    ...LOS_EXTREMOS.map((nombre) => ({ nombre, operacion: AUDITORIA })),
+  ],
   pedir: ({ senal, ejercicio, enLaRuta }) =>
     pedirPagina<MovimientoDeLaBitacora>(
-      RUTAS.bitacoraDe(ejercicio ?? 0, laVentanaQueSePide('seg-aud', 'movimientos', enLaRuta)),
+      RUTAS.bitacoraDe(ejercicio ?? 0, {
+        ...laVentanaQueSePide('seg-aud', 'movimientos', enLaRuta),
+        // Lo elegido en «Desde» y «Hasta», cuando la ruta lo trae. Sin el, no se manda nada: la
+        // bitacora entera del ejercicio, que es lo que habia antes de #629.
+        ...Object.fromEntries(
+          LOS_EXTREMOS.flatMap((nombre) => {
+            const valor = enLaRuta[nombre];
+            return valor === undefined ? [] : [[nombre, valor] as const];
+          }),
+        ),
+      }),
       senal,
     ),
   repartir: (pagina: Paginado<MovimientoDeLaBitacora>): Reparto => ({

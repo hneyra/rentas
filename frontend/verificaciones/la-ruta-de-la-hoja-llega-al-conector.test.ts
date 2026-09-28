@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import type { DefinicionDeTabla } from '@kamayuk/ui';
+import { EL_SUJETO, eleccionDe, type DefinicionDeTabla } from '@kamayuk/ui';
 
 import { CONECTORES } from '../src/datos/conectores.ts';
 import { YA_SERVIDAS } from '../src/datos/servidas.ts';
@@ -98,6 +98,21 @@ function tablasDe(clave: ClaveDeHoja): readonly (DefinicionDeTabla & { readonly 
       ? []
       : [tabla as DefinicionDeTabla & { readonly clave: string }];
   });
+}
+
+/**
+ * **Los sitios de la ruta que los CAMPOS de una hoja escriben** (#172, #629): los que declaran
+ * `eleccion.enLaRuta` (`kamayuk-lib`#97). Van aparte de los de las tablas porque uno de ellos puede
+ * ser el SUJETO —la placa de `tra-veh`—, que no es un parametro sino el tramo del camino, y lo lee
+ * el conector por su `sujeto` y no por `parametros`.
+ */
+function sitiosQueEscribenLosCampos(clave: ClaveDeHoja): readonly string[] {
+  return bloquesDe(pantallaDe(clave)).flatMap((bloque) =>
+    bloque.campos.flatMap((campo) => {
+      const eleccion = eleccionDe(campo);
+      return eleccion === undefined ? [] : [eleccion.enLaRuta];
+    }),
+  );
 }
 
 /** Los sitios de la ruta que las tablas de una hoja ESCRIBEN. */
@@ -202,6 +217,38 @@ describe('una tabla que mueve la ruta tiene quien la lea (#186, AC1; #187, AC3)'
         '  El mando se dibuja, se pulsa, la direccion cambia y **nadie vuelve a pedir**: la tabla\n' +
         '  sigue dibujando la pagina 0 con el rotulo de la 3. Una paginacion que no pagina es\n' +
         '  peor que ninguna, porque parece que funciona.',
+    ).toEqual([]);
+  });
+
+  it('EL CENTINELA DE #629: hay campos que escriben la ruta, y uno de ellos escribe el SUJETO', () => {
+    // Sin esto, la de abajo recorreria una lista vacia: `seg-aud` escribe sus dos fechas, `aut-cat`
+    // su buscador y `tra-veh` su placa, que es el sujeto.
+    const todos = CLAVES_DE_HOJA.flatMap((clave) => sitiosQueEscribenLosCampos(clave));
+    expect(
+      todos.length,
+      'escriben la ruta menos campos que los cuatro de hoy: las dos fechas de `seg-aud`, el buscador de `aut-cat` y la placa de `tra-veh`',
+    ).toBeGreaterThanOrEqual(4);
+    expect(todos, 'ningun campo escribe el sujeto de la ruta').toContain(EL_SUJETO);
+  });
+
+  it('todo sitio que un CAMPO escribe lo lee el conector de su hoja: el parametro en `parametros`, el sujeto en `sujeto`', () => {
+    const huerfanos: string[] = [];
+    for (const clave of CLAVES_DE_HOJA) {
+      const conector = CONECTORES[clave];
+      const declarados = new Set((conector?.parametros ?? []).map((parametro) => parametro.nombre));
+      for (const sitio of sitiosQueEscribenLosCampos(clave)) {
+        const loLee = sitio === EL_SUJETO ? conector?.sujeto !== undefined : declarados.has(sitio);
+        if (!loLee) huerfanos.push(`  ${clave} escribe «${sitio}» desde un campo y su conector no lo lee`);
+      }
+    }
+    expect(
+      huerfanos,
+      'Un campo escribe en la ruta un sitio que el conector de su hoja no lee:\n' +
+        `${huerfanos.join('\n')}\n\n` +
+        '  Se elige, la direccion cambia y **nadie vuelve a pedir**: el marco tira con aviso el\n' +
+        '  parametro que el destino no declara —el destino lo deriva del conector en `catalogo.ts`—,\n' +
+        '  asi que el filtro se ve puesto y la lista sigue entera. Un filtro que no filtra es peor\n' +
+        '  que ninguno, porque parece que funciona.',
     ).toEqual([]);
   });
 

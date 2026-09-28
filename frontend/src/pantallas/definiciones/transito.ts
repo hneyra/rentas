@@ -1,6 +1,6 @@
 import type { ClaveDeHoja } from '../arbol.ts';
 import { EN_LA_RUTA, hayMasDe, paginasDe } from '../tablas.ts';
-import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
+import { EL_SUJETO, type DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
 
 /**
  * Las cuatro pantallas de **Tránsito** (UI-5, #85, AC2).
@@ -112,7 +112,12 @@ export const TRANSITO = {
         titulo: 'Internamiento en depósito',
         nota: 'La custodia se tasa por día y la paga el titular al retirar.',
         campos: [
-          { etiqueta: 'Placa', tipo: '' },
+          // **La placa escrita aqui es la que se abre** (`kamayuk-lib`#97, #629): al salir del campo
+          // o con Intro, lo tecleado pasa a ser el SUJETO de la ruta —`#/tra-veh/T2G-418`—, que es
+          // lo que el conector ya pedia. Hasta #629 la unica forma de elegir un vehiculo era
+          // escribir la direccion a mano. Los otros cinco campos no escriben la ruta, y el motivo
+          // esta en `datos/conectores/transito.ts`.
+          { etiqueta: 'Placa', tipo: '', eleccion: { enLaRuta: EL_SUJETO } },
           { etiqueta: 'Nº de papeleta', tipo: '' },
           { etiqueta: 'Fecha de internamiento', tipo: 'd' },
           {
