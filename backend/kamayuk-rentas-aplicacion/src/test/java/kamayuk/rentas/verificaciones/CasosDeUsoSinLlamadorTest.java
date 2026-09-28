@@ -92,12 +92,6 @@ class CasosDeUsoSinLlamadorTest {
         SIN_LLAMADOR_CON_MOTIVO.put(
                 "MantenerCatalogoDeInfracciones#registrar(CodigoInfraccion, Observacion)",
                 "Por lo mismo que modificar (#632)");
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "ReconstruirPadron#reconstruir(long)",
-                "La red de seguridad de ADR-0006 no tiene proceso que la corra (#630)");
-        SIN_LLAMADOR_CON_MOTIVO.put(
-                "ReconstruirSaldo#conciliar(long)",
-                "La conciliacion del saldo contra el libro no tiene proceso que la corra (#630)");
     }
 
     @Test
