@@ -87,6 +87,7 @@
   "GET /transito/reportes/resumen-por-placa": ["200"],
   "GET /transito/reportes/resumen-recaudacion": ["200"],
   "GET /valores": ["200"],
+  "GET /valores/masivo/{id}/impresion": ["200", "404", "409"],
   "PATCH /coactiva/expedientes/{numero}/direccion-referencial": ["200", "404", "409"],
   "PATCH /coactiva/expedientes/{numero}/estados": ["200", "404", "409"],
   "PATCH /fiscalizacion/liquidaciones/{numero}/estados": ["200", "404", "409"],

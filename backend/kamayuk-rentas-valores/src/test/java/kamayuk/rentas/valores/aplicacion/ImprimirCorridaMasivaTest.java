@@ -32,6 +32,7 @@ import kamayuk.rentas.valores.dominio.CriterioDeConsultaDeValores;
 import kamayuk.rentas.valores.dominio.CriterioDeValor;
 import kamayuk.rentas.valores.dominio.EstadoDeItemMasivo;
 import kamayuk.rentas.valores.dominio.EstadoDeValor;
+import kamayuk.rentas.valores.dominio.OrigenDeCriterio;
 import kamayuk.rentas.valores.dominio.SelectorDeObligacion;
 import kamayuk.rentas.valores.dominio.TipoValor;
 import kamayuk.rentas.valores.dominio.Valor;
@@ -232,9 +233,24 @@ class ImprimirCorridaMasivaTest {
             throw new UnsupportedOperationException();
         }
 
+        /**
+         * La corrida existe: desde #631 imprimir una que no existe es un error, no un lote vacio.
+         */
         @Override
         public Optional<ValorMasivo> porId(long id) {
-            return Optional.empty();
+            return Optional.of(
+                    new ValorMasivo(
+                            id,
+                            TipoValor.ORDEN_DE_PAGO,
+                            null,
+                            new Ejercicio(2026),
+                            new Ejercicio(2026),
+                            PROYECTADO_A,
+                            OrigenDeCriterio.SELECCION,
+                            items.size(),
+                            "prueba",
+                            null,
+                            OBSERVACION));
         }
 
         @Override

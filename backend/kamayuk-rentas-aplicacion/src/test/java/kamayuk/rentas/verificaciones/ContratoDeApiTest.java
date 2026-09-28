@@ -285,6 +285,9 @@ class ContratoDeApiTest {
                     "POST /valores",
                     "GET /valores",
                     "POST /valores/masivo",
+                    // #631 — la tercera etapa de RF-091: la impresion del lote que la corrida
+                    // genero. `ImprimirCorridaMasiva` existia desde #38 y ninguna ruta la llamaba.
+                    "GET /valores/masivo/{id}/impresion",
                     "POST /valores/{nro}/notificacion",
                     "POST /coactiva/prescripcion",
                     // #674: la relacion de prescripciones declaradas. La decision de ese

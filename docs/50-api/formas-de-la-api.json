@@ -2816,6 +2816,7 @@
     "totalPaginas": "entero",
     "hayMas": "booleano"
   },
+  "GET /valores/masivo/{id}/impresion": "archivo",
   "PATCH /coactiva/expedientes/{numero}/direccion-referencial": {
     "numero": "texto",
     "ejercicio": "entero",
