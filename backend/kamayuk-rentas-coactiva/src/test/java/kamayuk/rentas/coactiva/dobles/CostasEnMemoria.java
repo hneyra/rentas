@@ -74,9 +74,10 @@ public final class CostasEnMemoria implements LiquidacionDeCostasRepository {
 
     @Override
     public Optional<LiquidacionDeCostas> porNumero(String numero) {
-        return porId.values().stream()
-                .filter(l -> l.numero().equals(NumeroImpreso.formaDeBusqueda(numero)))
-                .findFirst();
+        // La forma se calcula ANTES del recorrido, como el adaptador: con un numero nulo los dos
+        // fallan en el acto, y no solo cuando hay alguna liquidacion que comparar.
+        String buscado = NumeroImpreso.formaDeBusqueda(numero);
+        return porId.values().stream().filter(l -> l.numero().equals(buscado)).findFirst();
     }
 
     @Override
