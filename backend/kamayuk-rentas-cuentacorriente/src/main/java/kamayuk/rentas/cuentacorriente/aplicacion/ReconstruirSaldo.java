@@ -35,7 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
  * cache desde una fuente que no se toca. Por eso tampoco pide {@code Observacion}: la regla 10
  * gobierna las modificaciones de datos, y aqui el unico dato que existe —el libro— queda intacto.
  * Si esto exigiera observacion, la exigiria un proceso automatico de madrugada, que no tiene
- * ninguna que dar.
+ * ninguna que dar. Lo mismo vale para {@link #ponerACeroSinLibro} (#641), que es la reconstruccion
+ * de quien no tiene libro: lo que el libro dice de el es cero.
  *
  * <p><b>Ese proceso es {@link CorrerLaConciliacionDelSaldo}</b> (#630), que el {@code CronJob}
  * {@code kamayuk-rentas-conciliacion-del-saldo} lanza cada noche: concilia el padron de cada
@@ -112,13 +113,54 @@ public class ReconstruirSaldo {
         // Y al reves: una fila proyectada de una obligacion que el libro no tiene. Pasa
         // si alguien escribio en la proyeccion algo que nunca se asento, y es tan
         // divergencia como la otra —el libro dice cero y la fila dice otra cosa—.
+        //
+        // Pero solo si dice OTRA cosa (#641). Una fila a cero de una obligacion sin asientos
+        // dice lo mismo que el libro, y es justo como la deja `ponerACeroSinLibro`, que no
+        // puede borrarla. Contarla haria de cada fila reparada una divergencia para siempre
+        // el dia que su contribuyente estrenara libro con otra obligacion.
         proyectados.forEach(
                 (clave, proyectado) -> {
-                    if (!segunElLibro.containsKey(clave)) {
+                    if (!segunElLibro.containsKey(clave) && !proyectado.esCero()) {
                         divergencias.add(new Divergencia(clave, proyectado, Dinero.CERO));
                     }
                 });
 
         return List.copyOf(divergencias);
+    }
+
+    /**
+     * Pone a cero la proyeccion de un contribuyente que <b>no tiene ningun asiento</b>, y devuelve
+     * cuantas filas cambio (#641).
+     *
+     * <p>Es la reparacion que {@link #deContribuyente} no puede hacer: esa reescribe las
+     * obligaciones que el libro tiene, y de un contribuyente sin libro no reescribe nada. Y no se
+     * puede borrar la fila —{@code kamayuk_app} no tiene {@code DELETE} sobre {@code
+     * saldo_proyectado}, y la regla 4 no se negocia—, asi que se deja diciendo lo que dice el
+     * libro: cero.
+     *
+     * <h4>Por que a cero basta para que cuadre</h4>
+     *
+     * <p>{@link #conciliar} compara solo el insoluto, y el de una obligacion sin asientos es cero.
+     * Una fila a cero de una obligacion que el libro no tiene <b>no</b> es una divergencia: dice lo
+     * mismo que el libro. Asi lo cuentan los dos recorridos de {@link ReconstruirPadron} —el cursor
+     * de los contribuyentes sin libro no los devuelve, y {@link #conciliar} no los informa—, y por
+     * eso la fila reparada no vuelve a salir ni aunque su contribuyente estrene libro con otra
+     * obligacion. La fase y el ultimo asiento de la fila se quedan como estaban: no hay ningun
+     * asiento del que sacarlos, y la conciliacion no los mira.
+     *
+     * <h4>{@code REPEATABLE READ}, por el primer asiento que llegue a la vez</h4>
+     *
+     * <p>La sentencia comprueba ella misma que el contribuyente sigue sin asientos. Con {@code READ
+     * COMMITTED} eso no basta: si otra transaccion asienta su primer cargo y reproyecta la fila
+     * <b>mientras</b> el {@code UPDATE} espera su candado, PostgreSQL vuelve a evaluar el {@code
+     * WHERE} sobre la fila nueva pero con la instantanea de antes, en la que el asiento no existe,
+     * y pone a cero un saldo que el libro ya respalda. Con una sola instantanea para toda la
+     * transaccion, esa fila cambiada despues de tomarla hace fallar la escritura con {@code 40001}
+     * en vez de pisarla: la municipalidad sale como no conciliada, y la siguiente pasada la ve con
+     * su asiento.
+     */
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    public int ponerACeroSinLibro(long contribuyenteId) {
+        return saldos.ponerACeroSinLibro(contribuyenteId, reloj.instant());
     }
 }

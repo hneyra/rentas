@@ -2,6 +2,8 @@ package kamayuk.rentas.cuentacorriente.infraestructura;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,11 @@ import org.springframework.stereotype.Repository;
  * columnas a secas PostgreSQL no reconoce el indice y el {@code INSERT} falla por conflicto no
  * resuelto —dos nulos nunca colisionan en un indice unico ordinario, que es justo por lo que V2 lo
  * escribio asi—.
+ *
+ * <p>Y {@link #ponerACeroSinLibro} es la otra escritura, y la unica que no pasa por {@link
+ * #proyectar} (#641): no reproyecta una obligacion desde sus asientos —no tiene ninguno—, sino que
+ * deja a cero lo que ningun asiento respalda. Con {@code UPDATE}, porque {@code kamayuk_app} no
+ * tiene {@code DELETE} sobre esta tabla.
  */
 @Repository
 public class SaldoRepositoryJdbc extends RepositorioJdbc implements SaldoRepository {
@@ -49,6 +56,16 @@ public class SaldoRepositoryJdbc extends RepositorioJdbc implements SaldoReposit
                     + "   AND ejercicio = :ejercicio"
                     + "   AND COALESCE(predio_id, 0) = :predio"
                     + "   AND COALESCE(vehiculo_id, 0) = :vehiculo";
+
+    /**
+     * Que el contribuyente de la fila {@code s} no tenga <b>ningun</b> asiento (#641). Lo usan el
+     * cursor y la puesta a cero, y tiene que ser el mismo texto en los dos: si difirieran, la
+     * reparacion podria poner a cero lo que el cursor no le dio, o no poder con lo que si.
+     */
+    private static final String SIN_LIBRO =
+            "   AND NOT EXISTS (SELECT 1 FROM cuenta_corriente_asiento a"
+                    + "        WHERE a.municipalidad_id = s.municipalidad_id"
+                    + "          AND a.contribuyente_id = s.contribuyente_id)";
 
     public SaldoRepositoryJdbc(JdbcClient jdbc) {
         super(jdbc);
@@ -128,6 +145,41 @@ public class SaldoRepositoryJdbc extends RepositorioJdbc implements SaldoReposit
         parametros.put("predio", obligacion.predioId() == null ? 0L : obligacion.predioId());
         parametros.put("vehiculo", obligacion.vehiculoId() == null ? 0L : obligacion.vehiculoId());
         return parametros;
+    }
+
+    /**
+     * El {@code NOT EXISTS} contra el libro llega a {@code asiento_deudor_ix}, que empieza por
+     * {@code (municipalidad_id, contribuyente_id)}: una sonda por contribuyente, no un recorrido
+     * del libro.
+     */
+    @Override
+    public List<Long> contribuyentesConSaldoSinLibro(long despuesDe, int cuantos) {
+        return jdbc().sql(
+                        "SELECT DISTINCT s.contribuyente_id FROM saldo_proyectado s"
+                                + " WHERE s.contribuyente_id > :desde"
+                                + "   AND s.insoluto_saldo <> 0"
+                                + SIN_LIBRO
+                                + " ORDER BY s.contribuyente_id"
+                                + " LIMIT :cuantos")
+                .param("desde", despuesDe)
+                .param("cuantos", cuantos)
+                // Mapeo explicito, como en `contribuyentesConAsientos`: la columna es NOT NULL y
+                // `query(Long.class)` devuelve List<@Nullable Long>.
+                .query((fila, numeroDeFila) -> fila.getLong("contribuyente_id"))
+                .list();
+    }
+
+    @Override
+    public int ponerACeroSinLibro(long contribuyenteId, Instant calculadoEn) {
+        return jdbc().sql(
+                        "UPDATE saldo_proyectado s"
+                                + " SET insoluto_saldo = 0, fecha_calculo = :calculadoEn"
+                                + " WHERE s.contribuyente_id = :contribuyente"
+                                + "   AND s.insoluto_saldo <> 0"
+                                + SIN_LIBRO)
+                .param("contribuyente", contribuyenteId)
+                .param("calculadoEn", Timestamp.from(calculadoEn))
+                .update();
     }
 
     @Override

@@ -144,6 +144,16 @@ class OrdenDeLosCandadosDelCobroTest {
         public void proyectar(SaldoProyectado saldo) {
             throw new UnsupportedOperationException("con el libro vacio no se proyecta nada");
         }
+
+        @Override
+        public List<Long> contribuyentesConSaldoSinLibro(long despuesDe, int cuantos) {
+            throw new UnsupportedOperationException("el cobro no recorre el padron");
+        }
+
+        @Override
+        public int ponerACeroSinLibro(long contribuyenteId, Instant calculadoEn) {
+            throw new UnsupportedOperationException("el cobro no repara la proyeccion");
+        }
     }
 
     /** Un colaborador que el camino probado no llega a usar: si lo usara, la prueba lo dice. */

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -13,6 +14,14 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
@@ -42,6 +51,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
@@ -57,6 +67,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * municipalidades y junto a contribuyentes que si cuadran. Con una sola municipalidad, un runner
  * que fijara el contexto una vez pasaria igual; sin uno que cuadre, uno que informara a todos
  * tambien.
+ *
+ * <p>Y desde #641 se siembra tambien lo que el cursor del libro no ve: una fila de {@code
+ * saldo_proyectado} de un contribuyente <b>sin ningun asiento</b>, escrita a mano con un {@code
+ * INSERT} que ningun escritor del sistema haria, junto a una municipalidad limpia.
  *
  * <p><b>Aqui no hay ninguna cifra tributaria.</b> Los importes son de relleno: lo que se prueba es
  * el mecanismo, no cuanto se debe (D-02).
@@ -100,7 +114,7 @@ class ConciliacionDelSaldoJdbcTest {
         reconstruir = envolver(new ReconstruirSaldo(asientos, saldos, RELOJ));
         // El padron NO se envuelve: es como lo llama el proceso batch, fuera de toda transaccion,
         // y cada contribuyente atraviesa el proxy de `reconstruir` para abrir la suya.
-        padron = new ReconstruirPadron(asientos, reconstruir, gestor);
+        padron = new ReconstruirPadron(asientos, saldos, reconstruir, gestor);
         registro = new RecorridoPorMunicipalidades(jdbc, gestor);
     }
 
@@ -188,6 +202,211 @@ class ConciliacionDelSaldoJdbcTest {
                     .isEqualTo(Dinero.de(1000));
             assertThat(runner.sinCuadrar()).isEmpty();
             assertThat(runner.getExitCode()).isZero();
+        }
+    }
+
+    @Nested
+    @DisplayName("#641 — el contribuyente con proyeccion y sin ningun asiento")
+    class ElContribuyenteSinLibro {
+
+        /**
+         * La prueba que el issue pide: una fila sembrada a mano de un contribuyente sin asientos
+         * sale en el informe, en SU municipalidad y no en la limpia, y no se repara.
+         */
+        @Test
+        @DisplayName(
+                "sale en el informe con su municipalidad, NO se repara, y el proceso sale distinto"
+                        + " de cero")
+        void saleEnElInforme() throws SQLException {
+            long sucia = crearMunicipalidad("641101", "Municipalidad con restos de #641");
+            long limpia = crearMunicipalidad("641102", "Municipalidad limpia de #641");
+            long sinLibro = crearContribuyente(sucia, "H-641101", "64110101");
+            long conLibro = crearContribuyente(sucia, "L-641101", "64110102");
+            asentar(sucia, conLibro, "500.00");
+            asentar(limpia, crearContribuyente(limpia, "L-641102", "64110201"), "500.00");
+            sembrarSaldoSinLibro(sucia, sinLibro, 1, "300.00");
+
+            CorrerLaConciliacionDelSaldo runner =
+                    new CorrerLaConciliacionDelSaldo(registro, padron, false);
+            runner.run(null);
+
+            assertThat(lineasDe(runner.informe(), sucia, limpia))
+                    .as(
+                            "una linea para el contribuyente sin libro, en SU municipalidad; ninguna"
+                                    + " del que cuadra ni de la municipalidad limpia")
+                    .singleElement()
+                    .satisfies(
+                            linea ->
+                                    assertThat(linea)
+                                            .startsWith(
+                                                    "municipalidad "
+                                                            + sucia
+                                                            + ", contribuyente "
+                                                            + sinLibro
+                                                            + ": tiene saldo proyectado y ningun"
+                                                            + " asiento en el libro")
+                                            .contains("el libro dice 0 y la proyeccion 300.00"));
+            assertThat(insolutosDe(sucia, sinLibro))
+                    .as("la conciliacion informa; reparar es un acto aparte y explicito")
+                    .containsExactly(Dinero.de("300.00"));
+            assertThat(runner.getExitCode())
+                    .as("una cifra que el libro no respalda no deja el CronJob en verde")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName(
+                "con reconstruir pedido, sus filas quedan a cero SIN borrarse, el proceso sale con 0"
+                        + " y la pasada siguiente no informa nada")
+        void conReconstruirPedidoQuedanACero() throws SQLException {
+            long municipalidad = crearMunicipalidad("641103", "Municipalidad que repara #641");
+            long sinLibro = crearContribuyente(municipalidad, "H-641103", "64110301");
+            sembrarSaldoSinLibro(municipalidad, sinLibro, 1, "300.00");
+            // Un saldo a favor tambien es una cifra que el libro no respalda.
+            sembrarSaldoSinLibro(municipalidad, sinLibro, 2, "-40.00");
+
+            CorrerLaConciliacionDelSaldo runner =
+                    new CorrerLaConciliacionDelSaldo(registro, padron, true);
+            runner.run(null);
+
+            assertThat(lineasDe(runner.informe(), municipalidad))
+                    .as("lo que encontro se sigue diciendo: es la pista de la fila sin asiento")
+                    .singleElement()
+                    .satisfies(
+                            linea ->
+                                    assertThat(linea)
+                                            .contains("la proyeccion 300.00")
+                                            .contains("la proyeccion -40.00"));
+            assertThat(insolutosDe(municipalidad, sinLibro))
+                    .as(
+                            "a cero y las dos filas siguen ahi: kamayuk_app no tiene DELETE sobre"
+                                    + " saldo_proyectado, y la regla 4 no se negocia")
+                    .containsExactly(Dinero.CERO, Dinero.CERO);
+            assertThat(runner.sinCuadrar()).isEmpty();
+            assertThat(runner.getExitCode()).isZero();
+
+            CorrerLaConciliacionDelSaldo siguiente =
+                    new CorrerLaConciliacionDelSaldo(registro, padron, false);
+            siguiente.run(null);
+            assertThat(lineasDe(siguiente.informe(), municipalidad))
+                    .as("una fila a cero dice lo mismo que el libro de quien no tiene asientos")
+                    .isEmpty();
+            assertThat(siguiente.getExitCode()).isZero();
+        }
+
+        /**
+         * La coherencia de los dos recorridos: la fila que la reparacion dejo a cero —y que no
+         * puede borrar— no vuelve a salir cuando su contribuyente estrena libro con OTRA obligacion
+         * y pasa a ser cosa del primer recorrido.
+         */
+        @Test
+        @DisplayName(
+                "la fila puesta a cero no vuelve como divergencia cuando su contribuyente estrena"
+                        + " libro con otra obligacion")
+        void laFilaACeroNoVuelveAlEstrenarLibro() throws SQLException {
+            long municipalidad = crearMunicipalidad("641104", "Municipalidad que estrena libro");
+            long contribuyente = crearContribuyente(municipalidad, "H-641104", "64110401");
+            sembrarSaldoSinLibro(municipalidad, contribuyente, 2, "300.00");
+            new CorrerLaConciliacionDelSaldo(registro, padron, true).run(null);
+
+            asentar(municipalidad, contribuyente, "500.00");
+
+            CorrerLaConciliacionDelSaldo runner =
+                    new CorrerLaConciliacionDelSaldo(registro, padron, false);
+            runner.run(null);
+            assertThat(lineasDe(runner.informe(), municipalidad))
+                    .as(
+                            "la cuota 2 no tiene asientos y su fila dice cero: cuadra, tenga el"
+                                    + " contribuyente libro o no")
+                    .isEmpty();
+            assertThat(insolutosDe(municipalidad, contribuyente))
+                    .containsExactly(Dinero.de("500.00"), Dinero.CERO);
+        }
+
+        /**
+         * La puesta a cero comprueba ella misma que el contribuyente no tiene asientos: entre el
+         * cursor que lo dio y la escritura puede llegarle el primero.
+         */
+        @Test
+        @DisplayName(
+                "no pone a cero nada de un contribuyente que ya tiene libro, aunque se le pida por"
+                        + " su identificador")
+        void noTocaAQuienTieneLibro() throws SQLException {
+            long municipalidad = crearMunicipalidad("641105", "Municipalidad con libro de #641");
+            long contribuyente = crearContribuyente(municipalidad, "L-641105", "64110501");
+            asentar(municipalidad, contribuyente, "500.00");
+            sembrarSaldoSinLibro(municipalidad, contribuyente, 2, "300.00");
+            try {
+                TenantContext.fijar(new MunicipalidadId(municipalidad));
+                assertThat(reconstruir.ponerACeroSinLibro(contribuyente))
+                        .as("ninguna fila: el contribuyente tiene asientos")
+                        .isZero();
+                TenantContext.limpiar();
+                assertThat(insolutosDe(municipalidad, contribuyente))
+                        .containsExactly(Dinero.de("500.00"), Dinero.de("300.00"));
+            } finally {
+                // La base es de toda la clase, y una fila distinta de cero que el libro no tiene
+                // no la repara nadie: dejarla haria rojo el codigo de salida de las demas.
+                ponerACeroAMano(municipalidad, contribuyente, 2);
+            }
+        }
+
+        /**
+         * El primer asiento que llega MIENTRAS la puesta a cero espera el candado de la fila.
+         *
+         * <p>El escritor asienta y reproyecta la cuota en una transaccion que no confirma; la
+         * reparacion, en otro hilo, se queda esperando su candado; y solo entonces el escritor
+         * confirma. Lo que se afirma es el desenlace: la fila dice lo que dice el libro.
+         */
+        @Test
+        @DisplayName(
+                "un primer asiento que se confirma mientras la reparacion espera su candado no se"
+                        + " pisa con un cero")
+        void unPrimerAsientoConcurrenteNoSePisa() throws Exception {
+            long municipalidad = crearMunicipalidad("641106", "Municipalidad del asiento a la vez");
+            long contribuyente = crearContribuyente(municipalidad, "H-641106", "64110601");
+            sembrarSaldoSinLibro(municipalidad, contribuyente, 1, "300.00");
+
+            ExecutorService hilo = Executors.newSingleThreadExecutor();
+            Throwable desenlace = null;
+            try (Connection escritor = base.conexion(BaseDeDatosDePrueba.APP)) {
+                ContextoDeTenant.fijar(escritor, municipalidad);
+                asentarSinConfirmar(escritor, contribuyente, "1000.00");
+
+                Future<Integer> reparacion =
+                        hilo.submit(
+                                () -> {
+                                    TenantContext.fijar(new MunicipalidadId(municipalidad));
+                                    try {
+                                        return reconstruir.ponerACeroSinLibro(contribuyente);
+                                    } finally {
+                                        TenantContext.limpiar();
+                                    }
+                                });
+                esperarAQueEspereUnCandadoOTermine(reparacion);
+                escritor.commit();
+
+                try {
+                    reparacion.get(30, TimeUnit.SECONDS);
+                } catch (ExecutionException fallo) {
+                    desenlace = fallo.getCause();
+                }
+            } finally {
+                hilo.shutdownNow();
+            }
+            assertThat(insolutosDe(municipalidad, contribuyente))
+                    .as("el libro ya respalda 1000.00 y nadie lo pisa con un cero")
+                    .containsExactly(Dinero.de("1000.00"));
+            assertThat(desenlace)
+                    .as(
+                            "con una sola instantanea, la fila cambiada despues de tomarla hace"
+                                    + " fallar la escritura en vez de pisarla; el runner la cuenta"
+                                    + " como municipalidad sin conciliar")
+                    .isInstanceOf(ConcurrencyFailureException.class)
+                    .rootCause()
+                    .isInstanceOf(SQLException.class)
+                    .extracting(causa -> ((SQLException) causa).getSQLState())
+                    .isEqualTo("40001");
         }
     }
 
@@ -353,6 +572,140 @@ class ConciliacionDelSaldoJdbcTest {
                             }
                             return leido;
                         });
+    }
+
+    /** Las lineas del informe de estas municipalidades, y de ninguna otra de la base. */
+    private static List<String> lineasDe(List<String> informe, long... municipalidades) {
+        return informe.stream()
+                .filter(
+                        linea ->
+                                Arrays.stream(municipalidades)
+                                        .anyMatch(
+                                                id ->
+                                                        linea.startsWith(
+                                                                "municipalidad " + id + ",")))
+                .toList();
+    }
+
+    /**
+     * Una fila de saldo sin ningun asiento detras, como ningun escritor del sistema la haria: es lo
+     * que deja una migracion, o una proyeccion escrita sin su asiento (#641).
+     */
+    private static void sembrarSaldoSinLibro(
+            long municipalidad, long titular, int periodo, String importe) throws SQLException {
+        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(app, municipalidad);
+            try (PreparedStatement sentencia =
+                    app.prepareStatement(
+                            "INSERT INTO saldo_proyectado (municipalidad_id, contribuyente_id,"
+                                    + " tributo, ejercicio, periodo, predio_id, insoluto_saldo)"
+                                    + " VALUES (?, ?, 'PREDIAL', ?, ?, ?, ?)")) {
+                sentencia.setLong(1, municipalidad);
+                sentencia.setLong(2, titular);
+                sentencia.setInt(3, EJERCICIO.valor());
+                sentencia.setInt(4, periodo);
+                sentencia.setLong(5, PREDIO);
+                sentencia.setBigDecimal(6, new BigDecimal(importe));
+                assertThat(sentencia.executeUpdate()).isEqualTo(1);
+            }
+            app.commit();
+        }
+    }
+
+    private static void ponerACeroAMano(long municipalidad, long titular, int periodo)
+            throws SQLException {
+        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(app, municipalidad);
+            try (PreparedStatement sentencia =
+                    app.prepareStatement(
+                            "UPDATE saldo_proyectado SET insoluto_saldo = 0"
+                                    + " WHERE contribuyente_id = ? AND periodo = ?")) {
+                sentencia.setLong(1, titular);
+                sentencia.setInt(2, periodo);
+                sentencia.executeUpdate();
+            }
+            app.commit();
+        }
+    }
+
+    /**
+     * Lo que hace {@code RegistrarAsiento} —el asiento y su proyeccion en la misma transaccion
+     * (ADR-0006)—, a mano y SIN confirmar, para que la prueba decida cuando.
+     */
+    private static void asentarSinConfirmar(Connection escritor, long titular, String importe)
+            throws SQLException {
+        try (PreparedStatement asiento =
+                escritor.prepareStatement(
+                        "INSERT INTO cuenta_corriente_asiento (municipalidad_id, ejercicio,"
+                                + " contribuyente_id, tributo, concepto, tipo, fase, periodo,"
+                                + " predio_id, monto, fecha_valor, documento_origen, usuario_id)"
+                                + " VALUES (current_setting('app.municipalidad_id')::bigint, ?,"
+                                + " ?, 'PREDIAL', 'INSOLUTO', 'CARGO', 'ORDINARIA', 1, ?, ?, ?,"
+                                + " 'EM-2026-641', 'prueba-641')")) {
+            asiento.setInt(1, EJERCICIO.valor());
+            asiento.setLong(2, titular);
+            asiento.setLong(3, PREDIO);
+            asiento.setBigDecimal(4, new BigDecimal(importe));
+            asiento.setObject(5, FECHA);
+            asiento.executeUpdate();
+        }
+        try (PreparedStatement saldo =
+                escritor.prepareStatement(
+                        "UPDATE saldo_proyectado SET insoluto_saldo = ?"
+                                + " WHERE contribuyente_id = ? AND periodo = 1")) {
+            saldo.setBigDecimal(1, new BigDecimal(importe));
+            saldo.setLong(2, titular);
+            assertThat(saldo.executeUpdate()).isEqualTo(1);
+        }
+    }
+
+    /**
+     * Hasta que alguien espere un candado de ESTA base sin conseguirlo, o hasta que la reparacion
+     * termine. Se mira {@code pg_locks} y no un reloj, como en {@code AplicacionDeRecibosJdbcTest};
+     * y como superusuario, porque es el catalogo y no una tabla de tenant.
+     */
+    private static void esperarAQueEspereUnCandadoOTermine(Future<?> reparacion)
+            throws SQLException {
+        long limite = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        try (Connection admin = base.conexionAdmin();
+                PreparedStatement consulta =
+                        admin.prepareStatement(
+                                "SELECT count(*) FROM pg_locks l"
+                                        + " JOIN pg_stat_activity a ON a.pid = l.pid"
+                                        + " WHERE NOT l.granted"
+                                        + "   AND a.datname = current_database()")) {
+            while (System.nanoTime() < limite) {
+                if (reparacion.isDone()) {
+                    return;
+                }
+                try (ResultSet fila = consulta.executeQuery()) {
+                    fila.next();
+                    if (fila.getLong(1) > 0) {
+                        return;
+                    }
+                }
+                Thread.onSpinWait();
+            }
+        }
+        throw new AssertionError("La reparacion ni termino ni llego a esperar el candado en 30 s");
+    }
+
+    /** Los insolutos proyectados de un contribuyente, cuota a cuota. */
+    private static List<Dinero> insolutosDe(long municipalidad, long titular) {
+        TenantContext.fijar(new MunicipalidadId(municipalidad));
+        try {
+            return new TransactionTemplate(gestor)
+                    .execute(
+                            estado ->
+                                    saldos.deContribuyente(titular).stream()
+                                            .sorted(
+                                                    Comparator.comparingInt(
+                                                            saldo -> saldo.clave().periodo()))
+                                            .map(SaldoProyectado::insolutoSaldo)
+                                            .toList());
+        } finally {
+            TenantContext.limpiar();
+        }
     }
 
     @SuppressWarnings("unchecked")

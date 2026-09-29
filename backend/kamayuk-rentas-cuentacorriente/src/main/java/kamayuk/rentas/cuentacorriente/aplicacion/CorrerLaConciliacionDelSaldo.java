@@ -54,6 +54,17 @@ import org.springframework.stereotype.Component;
  * #RECONSTRUIR}{@code =true}: entonces reconstruye el padron de las municipalidades que no
  * cuadraron y vuelve a conciliarlo, y lo que siga sin cuadrar lo dice.
  *
+ * <h2>Y el contribuyente sin libro (#641)</h2>
+ *
+ * <p>Un contribuyente con filas en la proyeccion y <b>ningun</b> asiento no lo ve el cursor del
+ * libro. {@link ReconstruirPadron#conciliar} lo busca en un segundo recorrido y lo devuelve aparte,
+ * y aqui sale con su propia frase —«tiene saldo proyectado y ningun asiento en el libro»—, porque
+ * lo que hay que buscar es otra cosa: no un escritor que desvio un saldo, sino una fila que nunca
+ * tuvo asiento. Cuenta igual para el codigo de salida. Y se repara distinto: reconstruir no
+ * reescribe nada de quien no tiene libro, asi que con {@value #RECONSTRUIR}{@code =true} sus filas
+ * se ponen a cero con {@link ReconstruirPadron#ponerACeroSinLibro}, que es lo que el libro dice de
+ * el, y no se borran, porque {@code kamayuk_app} no puede.
+ *
  * <h2>Sale distinto de cero si algo queda sin cuadrar, y al reves que la anti-entropia</h2>
  *
  * <p>{@code CorrerLaAntiEntropia} sale con 0 aunque encuentre discrepancias, porque las suyas se
@@ -161,18 +172,34 @@ public class CorrerLaConciliacionDelSaldo implements ApplicationRunner, ExitCode
                 pendientes.addAll(lineas);
                 return;
             }
-            long ultimo = padron.reconstruir(0L);
+            // Cada reparacion solo si hace falta: reconstruir el padron entero de una
+            // municipalidad cuyo unico problema es un contribuyente sin libro no repara nada.
+            if (!antes.divergencias().isEmpty()) {
+                long ultimo = padron.reconstruir(0L);
+                log.warn(
+                        "Municipalidad {}: padron reconstruido desde el libro hasta el contribuyente"
+                                + " {}",
+                        municipalidad.id(),
+                        ultimo);
+            }
+            if (!antes.sinLibro().isEmpty()) {
+                long puestas = padron.ponerACeroSinLibro();
+                log.warn(
+                        "Municipalidad {}: {} fila(s) de saldo de contribuyentes sin ningun asiento"
+                                + " puestas a cero, que es lo que dice el libro",
+                        municipalidad.id(),
+                        puestas);
+            }
             ReconstruirPadron.Conciliacion despues = padron.conciliar();
             log.warn(
-                    "Municipalidad {}: padron reconstruido desde el libro hasta el contribuyente {};"
-                            + " quedan {} contribuyente(s) sin cuadrar",
+                    "Municipalidad {}: quedan {} contribuyente(s) sin cuadrar",
                     municipalidad.id(),
-                    ultimo,
-                    despues.divergencias().size());
+                    despues.divergencias().size() + despues.sinLibro().size());
             for (String linea : lineasDe(municipalidad, despues)) {
-                // Lo que ni reconstruyendo cuadra es otra cosa —una fila de una obligacion que el
-                // libro no tiene, que la reconstruccion no reescribe—, y se dice aparte.
-                String sigue = "sigue sin cuadrar tras reconstruir: " + linea;
+                // Lo que ni reparando cuadra es otra cosa —una fila distinta de cero de una
+                // obligacion que el libro de un contribuyente CON asientos no tiene, que ni la
+                // reconstruccion ni la puesta a cero reescriben—, y se dice aparte.
+                String sigue = "sigue sin cuadrar tras reparar: " + linea;
                 log.error("{}", sigue);
                 pendientes.add(sigue);
             }
@@ -205,6 +232,15 @@ public class CorrerLaConciliacionDelSaldo implements ApplicationRunner, ExitCode
                             + ", contribuyente "
                             + suyas.getKey()
                             + ": el saldo proyectado no cuadra con el libro: "
+                            + suyas.getValue());
+        }
+        for (Map.Entry<Long, List<Divergencia>> suyas : conciliacion.sinLibro().entrySet()) {
+            lineas.add(
+                    "municipalidad "
+                            + municipalidad.id()
+                            + ", contribuyente "
+                            + suyas.getKey()
+                            + ": tiene saldo proyectado y ningun asiento en el libro: "
                             + suyas.getValue());
         }
         return lineas;

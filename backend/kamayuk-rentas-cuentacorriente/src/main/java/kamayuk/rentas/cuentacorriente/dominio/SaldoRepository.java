@@ -1,5 +1,6 @@
 package kamayuk.rentas.cuentacorriente.dominio;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -83,6 +84,42 @@ public interface SaldoRepository {
         }
         return bloqueadas;
     }
+
+    /**
+     * Los contribuyentes con alguna fila de la proyeccion <b>distinta de cero</b> y <b>ningun</b>
+     * asiento en el libro, en orden de identificador, desde {@code despuesDe} y como mucho {@code
+     * cuantos} (#641).
+     *
+     * <p>Es el padron que {@link AsientoRepository#contribuyentesConAsientos} no puede dar: el de
+     * una proyeccion que ningun asiento respalda —restos de una migracion, o una fila escrita sin
+     * su asiento—. Tiene la misma forma, cursor por identificador y no {@code OFFSET}, por el mismo
+     * motivo.
+     *
+     * <p>Las filas que ya estan a cero no lo hacen salir: el libro de un contribuyente sin asientos
+     * dice cero, y una fila a cero dice lo mismo. Es solo una preseleccion; quien decide si cuadra
+     * es la conciliacion de cada contribuyente, que vuelve a leer el libro y la proyeccion en una
+     * sola instantanea.
+     */
+    List<Long> contribuyentesConSaldoSinLibro(long despuesDe, int cuantos);
+
+    /**
+     * Pone a cero el insoluto de las filas de un contribuyente que <b>no tiene ningun asiento</b>,
+     * y devuelve cuantas cambio (#641).
+     *
+     * <p>Es un {@code UPDATE} y no un {@code DELETE}, y no por gusto: {@code kamayuk_app} no tiene
+     * {@code DELETE} sobre {@code saldo_proyectado} (V1), y la regla 4 no se negocia. La fila se
+     * queda, diciendo lo que dice el libro: cero.
+     *
+     * <p>Que el contribuyente no tenga libro se comprueba <b>en la misma sentencia</b>, y no se da
+     * por supuesto porque saliera en {@link #contribuyentesConSaldoSinLibro}: entre el cursor y
+     * esta escritura puede llegarle su primer asiento, y entonces sus filas ya no son un resto sino
+     * un cache con quien lo respalde. Solo toca {@code insoluto_saldo} y {@code fecha_calculo}: la
+     * fase y el ultimo asiento de una obligacion que el libro no tiene no se pueden sacar del
+     * libro, y la conciliacion no los compara.
+     *
+     * @param calculadoEn lo que queda en {@code fecha_calculo}: cuando se dejo a cero
+     */
+    int ponerACeroSinLibro(long contribuyenteId, Instant calculadoEn);
 
     /**
      * Deja la fila con exactamente este contenido: la inserta si no estaba y la reemplaza si
