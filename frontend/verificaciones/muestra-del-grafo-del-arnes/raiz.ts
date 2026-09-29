@@ -9,30 +9,35 @@
 // que cada archivo tenga una que lo reclame; es el motivo por el que existen `muestra-del-arnes/` y
 // `muestra-de-rutas/`.
 
-// ── Las que la guarda DEJA PASAR: la transpilacion las borra y Node no carga nada ──
+// ── Las que la guarda DEJA PASAR: `import type` y `export type`, que borra cualquier cargador ──
 
 // (a) El `import` entero de tipos.
 import type { DefinicionDePantalla } from '@kamayuk/ui';
-// (b) Todos los especificadores con `type`. Medido en el arnes: se borra entero.
-import { type DatoConNombre, type TonoDeInsignia } from '@kamayuk/ui';
-// (c) El espacio de nombres, de tipos.
+// (b) El espacio de nombres, de tipos.
 import type * as Ui from '@kamayuk/ui';
-// (d) Un relativo SOLO de tipos no se sigue: lo de detras no lo carga nadie.
+// (c) Un relativo de `import type` no se sigue: lo de detras no lo carga nadie.
 import type { SoloPorTipo } from './solo-por-tipo.ts';
 
 // Y un relativo de VALOR, que si se sigue: las formas malas de alli cuentan.
 import { ALCANZADO } from './alcanzado.ts';
 
-// ── Y la que la guarda SENALA aqui ──
+// ── Y las que la guarda SENALA aqui ──
 
 // (1) La de #635, tal como la escribio #172 en `transito.ts`: un valor entre los tipos.
 import { EL_SUJETO, type DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
+// (2) TODOS los especificadores con `type`, pero sin `import type`. El Babel de Playwright 1.63 la
+//     borra entera; con `verbatimModuleSyntax` —lo que declara `tsconfig.base.json`— se queda en
+//     `import {} from` y carga. Medido con el cargador de Node 24.21: carga.
+import { type DatoConNombre, type TonoDeInsignia } from '@kamayuk/ui';
+// Y lo mismo con un relativo: por eso mismo SE SIGUE, y la forma (17) esta detras de este.
+import { type PorTiposEntreLlaves } from './por-tipos-entre-llaves.ts';
 
-// (e) Re-exportar tipos tampoco carga nada: `export type` y todos los especificadores con `type`.
+// (d) Re-exportar tipos con `export type` tampoco carga nada.
 export type { NombreDeIcono } from '@kamayuk/ui';
+// (3) Pero `export { type X } from` es la (2) por la otra puerta: se queda en `export {} from`.
 export { type Catalogo } from '@kamayuk/shell';
 
-// (f) `typeof import(…)` en posicion de tipo, que es el remedio de #635: no es una llamada.
+// (e) `typeof import(…)` en posicion de tipo, que es el remedio de #635: no es una llamada.
 export const SUJETO = 'sujeto' satisfies typeof import('@kamayuk/ui').EL_SUJETO;
 
 export type DeLaMuestra = [
@@ -42,6 +47,7 @@ export type DeLaMuestra = [
   typeof Ui.EL_SUJETO,
   SoloPorTipo,
   Pantalla,
+  PorTiposEntreLlaves,
 ];
 
 export const DE_VALOR = [ALCANZADO, EL_SUJETO];

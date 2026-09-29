@@ -6,6 +6,7 @@
 
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
@@ -41,31 +42,46 @@ import { RAIZ } from './artboards.ts';
  * <h2>La regla, entera</h2>
  *
  * Desde cada raiz del arnes —`playwright.config.ts`, que Playwright carga antes que nada, y todo
- * `e2e/`— se sigue cada referencia RELATIVA que carga su modulo: un `import` de valor o de efecto,
- * un `export … from` y un `import()` con el especificador escrito. Y en todo lo alcanzado, una
- * referencia a `@kamayuk/*` sale roja si no es solo de tipos, con el archivo, la linea, el
- * especificador, lo que trae como valor y el camino por el que el arnes llega hasta ella.
+ * `e2e/`— se sigue cada referencia que es una RUTA y carga su modulo: un `import` de valor o de
+ * efecto, un `export … from` y un `import()` con el especificador escrito, sea relativo, absoluto
+ * o una URL `file:` —medido con Node 24.21, las tres cargan el archivo igual—. Y en todo lo
+ * alcanzado, una referencia a `@kamayuk/*` sale roja si no es solo de tipos, con el archivo, la
+ * linea, el especificador, lo que trae como valor y el camino por el que el arnes llega hasta ella.
  *
- * Tambien sale rojo un relativo que **no resuelve**, o que resuelve **fuera de `frontend/`**: el
- * primero deja el recorrido sin saber que se carga, y el segundo llega a un arbol cuyas
- * dependencias resuelven contra otro `node_modules` —el clon hermano alcanzado por su ruta en vez
- * de por `@kamayuk/*` es el mismo defecto por otra puerta—. Hoy no hay ninguno de los dos.
+ * Tambien sale roja una ruta que **no resuelve**, o que resuelve **fuera de `frontend/`**: la
+ * primera deja el recorrido sin saber que se carga, y la segunda llega a un arbol cuyas
+ * dependencias resuelven contra otro `node_modules` —el clon hermano alcanzado por su ruta, sea
+ * relativa o absoluta, en vez de por `@kamayuk/*` es el mismo defecto por otra puerta—. Hoy no hay
+ * ninguna de las dos.
  *
- * <h2>Lo que pasa, y esta medido en el arnes</h2>
+ * <h2>Solo de tipos es `import type` o `export type`, y nada mas</h2>
  *
- * Cada forma se escribio en `transito.ts` y se corrio `npx playwright test --list` con el clon sin
- * `node_modules`. **Cargan la libreria** (0 caminos): el valor entre tipos de #635,
- * `import {} from`, `export { X } from` y `export {} from`. **No la cargan** (81 caminos):
- * `import type`, `import { type X }` con TODOS los especificadores marcados, `import type * as`,
- * `export type { X } from`, `export { type X } from` y `export type * from`. La transpilacion del
- * arnes borra lo que es solo de tipos, y por eso pasa aqui aunque `tsc` con
- * `verbatimModuleSyntax` dejaria `import { type X }` como un `import {}`: quien carga es
- * Playwright, no `tsc`.
+ * La regla sigue a `verbatimModuleSyntax`, que es lo que declara `tsconfig.base.json`: se borra
+ * entera la declaracion marcada con `type`, y de una lista se borran solo los especificadores que
+ * lo llevan. Asi que `import { type X } from 'x'`, con `type` en TODOS, se queda en
+ * `import {} from 'x'`, y `export { type X } from 'x'` en `export {} from 'x'`: las dos CARGAN el
+ * modulo. Cuentan como carga —rojas si son de `@kamayuk/*`, y seguidas si son rutas—, y el
+ * remedio que dice el rojo es `import type` o `export type`.
  *
- * **Y por eso tampoco se siguen los relativos de tipos**, y no es una omision. Medido en el arbol:
- * `e2e/el-403-del-catalogo.spec.ts` importa SOLO un tipo de `src/datos/useCatalogoPermitido.ts`,
- * que llega por `src/catalogo.ts` a `import { ICONOS } from '@kamayuk/ui'`, y el arnes carga sus
- * caminos. Siguiendo tambien los `import type`, esta guarda daria ese rojo, y seria falso.
+ * **No sigue a lo que hace HOY el cargador del arnes, y es a proposito.** Medido en el arnes, cada
+ * forma escrita en `transito.ts` y `npx playwright test --list` con el clon sin `node_modules`:
+ * cargan la libreria (0 caminos) el valor entre tipos de #635, `import {} from`,
+ * `export { X } from` y `export {} from`; y no la cargan (81 caminos) `import type`,
+ * `import type * as`, `export type { X } from` y `export type * from` —y tampoco
+ * `import { type X }` ni `export { type X } from`, porque Playwright 1.63 transpila con el
+ * `preset-typescript` de Babel, que por omision (`onlyRemoveTypeImports: false`) las borra
+ * enteras—. Pero medido con el cargador nativo de Node 24.21, que quita los tipos con la semantica
+ * de `verbatimModuleSyntax`: `import { type T } from './a.ts'` y `export { type T } from './a.ts'`
+ * CARGAN `a.ts`, e `import type` no. Una guarda que siguiera a Babel dejaria pasar en verde, el
+ * dia que Playwright cambie de transpilador, justo lo que carga la libreria. Y hoy no cuesta nada:
+ * medido el 2026-09-29, en los 199 archivos de codigo de `frontend/` que no son la muestra no
+ * habia ni una lista asi.
+ *
+ * **Y por eso no se siguen las rutas de `import type`**, y no es una omision: esas las borra
+ * cualquier cargador. Medido en el arbol: `e2e/el-403-del-catalogo.spec.ts` importa con
+ * `import type` un tipo de `src/datos/useCatalogoPermitido.ts`, que llega por `src/catalogo.ts` a
+ * `import { ICONOS } from '@kamayuk/ui'`, y el arnes carga sus caminos. Siguiendo tambien los
+ * `import type`, esta guarda daria ese rojo, y seria falso.
  *
  * <h2>Por que TODO `@kamayuk/*`, y no solo los paquetes que hoy tienen dependencias</h2>
  *
@@ -84,10 +100,12 @@ import { RAIZ } from './artboards.ts';
  * <h2>Lo que NO cubre, dicho</h2>
  *
  * Un `import()` cuyo especificador no es un literal —una plantilla con sustituciones, una
- * variable—, porque seguirlo es seguir datos y no sintaxis. `require` y `createRequire`: el arnes
- * es ESM, y el unico `createRequire` alcanzado —el de `verificaciones/especificadores.ts`— solo
- * RESUELVE rutas con `require.resolve`, que no carga nada. Y lo que un paquete de `node_modules`
- * que no es de la libreria haga dentro: ese resuelve contra este arbol, que si lo tiene instalado.
+ * variable—, porque seguirlo es seguir datos y no sintaxis. Un especificador que no es ni ruta ni
+ * paquete —`#…`, los `imports` de `package.json`, que este no declara; o una URL `data:`—: el
+ * recorrido no lo sigue, y hoy no hay ninguno. `require` y `createRequire`: el arnes es ESM, y el
+ * unico `createRequire` alcanzado —el de `verificaciones/especificadores.ts`— solo RESUELVE rutas
+ * con `require.resolve`, que no carga nada. Y lo que un paquete de `node_modules` que no es de la
+ * libreria haga dentro: ese resuelve contra este arbol, que si lo tiene instalado.
  */
 
 /** La raiz del frontend por su ruta REAL: lo alcanzado se compara con ella tras seguir enlaces. */
@@ -103,7 +121,7 @@ const CODIGO = /\.(?:[cm]?[jt]s|[jt]sx)$/;
 
 const DE_LA_LIBRERIA = /^@kamayuk\//;
 
-/** Como se prueba un especificador relativo, en el orden en que se prueba. */
+/** Como se prueba una ruta sin extension, en el orden en que se prueba. */
 const EXTENSIONES = ['.ts', '.tsx', '.mts', '.js', '.mjs'] as const;
 
 const aRelativa = (ruta: string): string => relative(FRONTEND, ruta).split(sep).join('/');
@@ -124,44 +142,66 @@ interface Referencia {
   readonly especificador: string;
   /**
    * Lo que hace que Node cargue el modulo, dicho como se escribio —`EL_SUJETO`, `* as ui`,
-   * `de efecto`—, o `undefined` si es SOLO de tipos y la transpilacion del arnes lo borra.
+   * `de efecto`—, o `undefined` si es SOLO de tipos: un `import type` o un `export type`, que se
+   * borran enteros con cualquier cargador. Y nada mas lo es: ver la cabecera.
    */
   readonly valor: string | undefined;
 }
 
+type Especificadores = ts.NodeArray<ts.ImportSpecifier> | ts.NodeArray<ts.ExportSpecifier>;
+
 /** Los nombres de valor de una lista de especificadores: los que no llevan `type` delante. */
-const deValor = (
-  especificadores: ts.NodeArray<ts.ImportSpecifier> | ts.NodeArray<ts.ExportSpecifier>,
-): readonly string[] =>
+const deValor = (especificadores: Especificadores): readonly string[] =>
   especificadores.filter((e) => !e.isTypeOnly).map((e) => (e.propertyName ?? e.name).text);
+
+/**
+ * Lo que carga una lista NO vacia, sin nada al lado: sus nombres de valor. Y si todos llevan
+ * `type`, la declaracion NO se borra: con `verbatimModuleSyntax` se borran los especificadores y
+ * queda `import {} from 'x'`, que carga. El remedio es marcar la declaracion, no los nombres.
+ */
+function deLaLista(palabra: 'import' | 'export', especificadores: Especificadores): string {
+  const valores = deValor(especificadores);
+  if (valores.length > 0) return valores.join(', ');
+  const escrita = especificadores.map((e) => e.getText()).join(', ');
+  return (
+    `de efecto (\`${palabra} { ${escrita} }\` se queda en \`${palabra} {}\` con ` +
+    `verbatimModuleSyntax: escribe \`${palabra} type\`)`
+  );
+}
 
 function loQueImporta(clausula: ts.ImportClause | undefined): string | undefined {
   // `import 'x'` no trae nombres, y justo por eso se carga: es su unica razon de ser.
   if (clausula === undefined) return 'de efecto';
+  // Lo UNICO que se deja pasar: `import type`, que se borra entero con cualquier cargador.
   if (clausula.isTypeOnly) return undefined;
   const enlaces = clausula.namedBindings;
+  if (clausula.name === undefined && enlaces !== undefined && ts.isNamedImports(enlaces)) {
+    // `import {} from 'x'` se queda como `import 'x'`. Medido: carga la libreria entera.
+    if (enlaces.elements.length === 0) return 'de efecto (`{}`)';
+    return deLaLista('import', enlaces.elements);
+  }
   const valores: string[] = [];
   if (clausula.name !== undefined) valores.push(`${clausula.name.text} (por omision)`);
   if (enlaces !== undefined && ts.isNamespaceImport(enlaces)) {
     valores.push(`* as ${enlaces.name.text}`);
   }
+  // `import X, { type Y }`: carga por `X`, y de la lista solo cuentan los nombres de valor.
   if (enlaces !== undefined && ts.isNamedImports(enlaces)) {
-    // `import {} from 'x'` se queda como `import 'x'`. Medido: carga la libreria entera.
-    if (enlaces.elements.length === 0 && clausula.name === undefined) return 'de efecto (`{}`)';
     valores.push(...deValor(enlaces.elements));
   }
-  return valores.length === 0 ? undefined : valores.join(', ');
+  // Con `X` o con `* as` nunca queda vacia; y si quedara, lo que no es `import type` carga.
+  return valores.length === 0 ? 'de efecto' : valores.join(', ');
 }
 
 function loQueReexporta(declaracion: ts.ExportDeclaration): string | undefined {
+  // Lo UNICO que se deja pasar: `export type`, como `import type`.
   if (declaracion.isTypeOnly) return undefined;
   const clausula = declaracion.exportClause;
   if (clausula === undefined) return 'export *';
   if (ts.isNamespaceExport(clausula)) return `export * as ${clausula.name.text}`;
   // `export {} from 'x'`, como `import {}`. Medido: tambien carga.
   if (clausula.elements.length === 0) return 'de efecto (`export {}`)';
-  const valores = deValor(clausula.elements);
-  return valores.length === 0 ? undefined : valores.join(', ');
+  return deLaLista('export', clausula.elements);
 }
 
 function parsear(ruta: string): ts.SourceFile {
@@ -215,9 +255,28 @@ function referenciasDe(arbol: ts.SourceFile): readonly Referencia[] {
   return halladas;
 }
 
-/** El archivo al que apunta un relativo, por su ruta real; o `undefined` si no hay ninguno. */
-function resolverRelativo(desde: string, especificador: string): string | undefined {
-  const base = resolve(dirname(desde), especificador);
+/**
+ * Lo que Node resuelve como RUTA y no contra `node_modules`: un relativo, una ruta absoluta o una
+ * URL `file:`. Medido con Node 24.21: `import '/…/a.ts'` e `import 'file:///…/a.ts'` cargan `a.ts`
+ * igual que `import './a.ts'`, asi que el clon hermano por su ruta entra por las tres puertas.
+ */
+const ES_RUTA = /^(?:\.|\/|file:)/;
+
+/**
+ * El archivo al que apunta una ruta, por su ruta real; o `undefined` si no hay ninguno. Una URL
+ * `file:` Node la toma entera y sin base —`new URL(especificador)`—, asi que es absoluta siempre.
+ */
+function resolverRuta(desde: string, especificador: string): string | undefined {
+  let base: string;
+  if (especificador.startsWith('file:')) {
+    try {
+      base = fileURLToPath(new URL(especificador));
+    } catch {
+      return undefined;
+    }
+  } else {
+    base = resolve(dirname(desde), especificador);
+  }
   const candidatos = [
     base,
     ...EXTENSIONES.map((extension) => `${base}${extension}`),
@@ -266,10 +325,10 @@ function recorrer(raices: readonly string[]): Recorrido {
         else rojos.push({ que: `${donde} carga la libreria: ${valor}`, camino });
         continue;
       }
-      // Lo que no es relativo —`node:fs`, `@playwright/test`— resuelve contra este `node_modules`,
-      // que si esta instalado. Y un relativo de tipos no lo carga nadie: no se sigue.
-      if (!especificador.startsWith('.') || valor === undefined) continue;
-      const destino = resolverRelativo(ruta, especificador);
+      // Lo que no es una ruta —`node:fs`, `@playwright/test`— resuelve contra este `node_modules`,
+      // que si esta instalado. Y una ruta de `import type` no la carga nadie: no se sigue.
+      if (!ES_RUTA.test(especificador) || valor === undefined) continue;
+      const destino = resolverRuta(ruta, especificador);
       if (destino === undefined) {
         rojos.push({ que: `${donde} no resuelve: el recorrido no sabe que carga`, camino });
       } else if (!destino.startsWith(FRONTEND + sep)) {
@@ -347,8 +406,9 @@ describe('#643 — lo que el arnes carga en Node solo importa tipos de `@kamayuk
         'clon hermano, que en la CI no tiene dependencias: un valor de `@kamayuk/*` puede dejar\n' +
         'la corrida en «Total: 0 tests in 0 files» (#635), y `yarn verificar` no lo ve.\n' +
         `${mostrar(ARNES.rojos)}\n\n` +
-        '  Importa solo el tipo —`import type { … }`— y, si hace falta el valor, atalo por el\n' +
-        '  tipo sin cargarlo, como `definiciones/transito.ts` desde #635:\n' +
+        '  Importa solo el tipo —`import type { … }`, y no `import { type … }`, que con\n' +
+        '  `verbatimModuleSyntax` se queda en `import {}` y carga— y, si hace falta el valor,\n' +
+        '  atalo por el tipo sin cargarlo, como `definiciones/transito.ts` desde #635:\n' +
         "    const EL_SUJETO = 'sujeto' satisfies typeof import('@kamayuk/ui').EL_SUJETO;",
     ).toEqual([]);
   });
@@ -357,27 +417,39 @@ describe('#643 — lo que el arnes carga en Node solo importa tipos de `@kamayuk
 describe('#643 — la regla muerde: la muestra que la viola', () => {
   const MUESTRA_RECORRIDA = recorrer([join(MUESTRA, 'raiz.ts')]);
   const muestra = aRelativa(MUESTRA);
-  /** Lo que la forma (8) alcanza fuera de `frontend/`: el `.nvmrc` de la raiz del repositorio. */
+  /** Lo que la forma (10) alcanza fuera de `frontend/`: el `.nvmrc` de la raiz del repositorio. */
   const FUERA = resolve(FRONTEND, '..', '.nvmrc');
 
   it('senala cada forma mala, con archivo, linea y especificador, y ninguna de las buenas', () => {
     // La lista entera, y no su tamano: una guarda que marcara todo `@kamayuk/*` daria mas —las
-    // cinco buenas de `raiz.ts` y la de `solo-por-tipo.ts`—, y una que no siguiera los relativos,
-    // una sola. Las lineas son las de la muestra; si se edita, se reescriben aqui mirandola.
+    // tres buenas de `raiz.ts` y la de `solo-por-tipo.ts`—, y una que no siguiera los relativos,
+    // tres. Las lineas son las de la muestra; si se edita, se reescriben aqui mirandola.
+    const noResuelve = 'no resuelve: el recorrido no sabe que carga';
+    const clon = 'no-existe-en-ningun-puesto/kamayuk-lib/paquetes/ui/index.ts';
     expect(MUESTRA_RECORRIDA.rojos.map((rojo) => rojo.que)).toEqual([
-      `${muestra}/raiz.ts:29 — '@kamayuk/ui' carga la libreria: EL_SUJETO`,
-      `${muestra}/alcanzado.ts:7 — '@kamayuk/ui' carga la libreria: * as ui`,
-      `${muestra}/alcanzado.ts:9 — '@kamayuk/shell' carga la libreria: de efecto`,
-      `${muestra}/alcanzado.ts:11 — '@kamayuk/ui' carga la libreria: de efecto (\`{}\`)`,
-      `${muestra}/alcanzado.ts:14 — '@kamayuk/formato' carga la libreria: formato (por omision)`,
-      `${muestra}/alcanzado.ts:16 — '@kamayuk/formato' carga la libreria: sumarImportes`,
-      `${muestra}/alcanzado.ts:18 — './no-existe.ts' no resuelve: el recorrido no sabe que carga`,
-      `${muestra}/alcanzado.ts:22 — '../../../.nvmrc' sale de frontend/ (${FUERA})`,
-      `${muestra}/alcanzado.ts:25 — '@kamayuk/ui' carga la libreria: EL_SUJETO`,
-      `${muestra}/alcanzado.ts:27 — '@kamayuk/formato' carga la libreria: export *`,
-      `${muestra}/alcanzado.ts:28 — '@kamayuk/api' carga la libreria: export * as api`,
-      `${muestra}/alcanzado.ts:30 — '@kamayuk/ui' carga la libreria: de efecto (\`export {}\`)`,
-      `${muestra}/alcanzado.ts:37 — '@kamayuk/ui' carga la libreria: import() dinamico`,
+      `${muestra}/raiz.ts:27 — '@kamayuk/ui' carga la libreria: EL_SUJETO`,
+      `${muestra}/raiz.ts:31 — '@kamayuk/ui' carga la libreria: de efecto ` +
+        '(`import { type DatoConNombre, type TonoDeInsignia }` se queda en `import {}` ' +
+        'con verbatimModuleSyntax: escribe `import type`)',
+      `${muestra}/raiz.ts:38 — '@kamayuk/shell' carga la libreria: de efecto ` +
+        '(`export { type Catalogo }` se queda en `export {}` ' +
+        'con verbatimModuleSyntax: escribe `export type`)',
+      `${muestra}/alcanzado.ts:8 — '@kamayuk/ui' carga la libreria: * as ui`,
+      `${muestra}/alcanzado.ts:10 — '@kamayuk/shell' carga la libreria: de efecto`,
+      `${muestra}/alcanzado.ts:12 — '@kamayuk/ui' carga la libreria: de efecto (\`{}\`)`,
+      `${muestra}/alcanzado.ts:15 — '@kamayuk/formato' carga la libreria: formato (por omision)`,
+      `${muestra}/alcanzado.ts:17 — '@kamayuk/formato' carga la libreria: sumarImportes`,
+      `${muestra}/alcanzado.ts:19 — './no-existe.ts' ${noResuelve}`,
+      `${muestra}/alcanzado.ts:23 — '../../../.nvmrc' sale de frontend/ (${FUERA})`,
+      `${muestra}/alcanzado.ts:28 — '/${clon}' ${noResuelve}`,
+      `${muestra}/alcanzado.ts:30 — 'file:///${clon}' ${noResuelve}`,
+      `${muestra}/alcanzado.ts:33 — '@kamayuk/ui' carga la libreria: EL_SUJETO`,
+      `${muestra}/alcanzado.ts:35 — '@kamayuk/formato' carga la libreria: export *`,
+      `${muestra}/alcanzado.ts:36 — '@kamayuk/api' carga la libreria: export * as api`,
+      `${muestra}/alcanzado.ts:38 — '@kamayuk/ui' carga la libreria: de efecto (\`export {}\`)`,
+      `${muestra}/alcanzado.ts:45 — '@kamayuk/ui' carga la libreria: import() dinamico`,
+      `${muestra}/por-tipos-entre-llaves.ts:9 — '@kamayuk/formato' carga la libreria: ` +
+        'sumarImportes',
       `${muestra}/por-reexportacion.ts:7 — '@kamayuk/formato' carga la libreria: mismosCentimos`,
     ]);
   });
@@ -390,10 +462,26 @@ describe('#643 — la regla muerde: la muestra que la viola', () => {
     ]);
   });
 
-  it('lo que solo se importa por su tipo no se recorre', () => {
+  it('lo que solo se importa con `import type` no se recorre', () => {
     expect([...MUESTRA_RECORRIDA.alcanzados]).not.toContain(`${muestra}/solo-por-tipo.ts`);
-    // Cinco referencias: (a), (b), (c) y las dos de (e). La (f) no es una referencia sino un
-    // tipo, y la (d) es relativa.
-    expect(MUESTRA_RECORRIDA.soloDeTipos, 'las formas buenas de `raiz.ts`').toBe(5);
+    // Tres referencias: (a), (b) y (d). La (e) no es una referencia sino un tipo, y la (c) es
+    // relativa. Las (2) y (3) llevan `type` en cada especificador y no cuentan: cargan.
+    expect(MUESTRA_RECORRIDA.soloDeTipos, 'las formas buenas de `raiz.ts`').toBe(3);
+  });
+
+  it('pero con `type` en cada especificador SI: `verbatimModuleSyntax` lo deja cargando', () => {
+    expect(
+      MUESTRA_RECORRIDA.rojos.find((rojo) => rojo.que.startsWith(`${muestra}/por-tipos-entre`))
+        ?.camino,
+    ).toEqual([`${muestra}/raiz.ts`, `${muestra}/por-tipos-entre-llaves.ts`]);
+  });
+
+  it('una ruta absoluta y una URL `file:` se resuelven como un relativo, y se ve si salen', () => {
+    // Las (11) y (12) de la muestra no existen en ningun puesto —una ruta del puesto no se puede
+    // escribir alli—, asi que ahi solo se ve que no se saltan. Que se RESUELVEN, y que lo resuelto
+    // es lo que se compara con `frontend/`, se mide aqui con el archivo de fuera de la (10).
+    const desde = join(MUESTRA, 'raiz.ts');
+    expect(resolverRuta(desde, FUERA)).toBe(FUERA);
+    expect(resolverRuta(desde, pathToFileURL(FUERA).href)).toBe(FUERA);
   });
 });
