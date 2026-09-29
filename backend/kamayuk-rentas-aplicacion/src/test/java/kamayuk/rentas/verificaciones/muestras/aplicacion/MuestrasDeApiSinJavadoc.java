@@ -1,6 +1,7 @@
 package kamayuk.rentas.verificaciones.muestras.aplicacion;
 
 import java.util.Locale;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,9 +24,20 @@ public final class MuestrasDeApiSinJavadoc {
 
     public static final class TipoAcusado {}
 
-    // Privado de paquete: javadoc no lo publica, asi que no se mira ni el ni lo que tenga dentro.
+    // Protegido: javadoc lo publica igual que lo publico.
+    protected static final class TipoProtegidoAcusado {}
+
+    // Privado de paquete: javadoc no lo publica, asi que no se mira ni el ni lo que tenga dentro,
+    // aunque lo de dentro sea publico.
     static final class TipoQueNoSePublica {
         public void tampocoSePublica() {}
+
+        public static final class PublicoDentroDeUnoQueNoSePublica {}
+
+        public interface InterfazDentroDeUnoQueNoSePublica {
+
+            void tampocoSeMira();
+        }
     }
 
     /** El caso de uso: un {@code @Service} de un paquete {@code ..aplicacion..}. */
@@ -50,6 +62,11 @@ public final class MuestrasDeApiSinJavadoc {
         public void conJavadocVacioAcusado() {}
 
         public static void estaticoAcusado() {}
+
+        // La firma nombra un tipo anidado con su dueno: Map.Entry, y no lo que quede de quitarle
+        // el paquete a java.util.Map.Entry.
+        public void conArgumentosAnidadosAcusado(
+                Fila fila, Map.Entry<String, Fila> par, Fila[] filas, long numero) {}
 
         void dePaqueteNoSePublica() {}
 
