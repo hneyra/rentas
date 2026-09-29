@@ -42,6 +42,10 @@ public class ConsultaDeLaCorridaMasiva {
         this.corridas = corridas;
     }
 
+    /**
+     * La cabecera de la corrida, en su propia transaccion corta. Vacio si no existe o es de otra
+     * municipalidad.
+     */
     @Transactional(readOnly = true)
     public Optional<ValorMasivo> porId(long corridaId) {
         return corridas.porId(corridaId);

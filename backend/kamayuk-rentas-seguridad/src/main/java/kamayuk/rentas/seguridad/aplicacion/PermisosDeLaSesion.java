@@ -34,6 +34,11 @@ public class PermisosDeLaSesion {
         this.reloj = reloj;
     }
 
+    /**
+     * Los privilegios que el usuario de la sesion tiene hoy, por codigo de acceso: la matriz
+     * efectiva de {@link LecturaDeLaCopiaLocal#permisosEfectivosDe}. Un acceso que no aparece es
+     * uno que no puede abrir.
+     */
     @Transactional(readOnly = true)
     public Map<String, Set<Privilegio>> efectivos() {
         return permisos.permisosEfectivosDe(OrigenContext.actual().usuario(), LocalDate.now(reloj));

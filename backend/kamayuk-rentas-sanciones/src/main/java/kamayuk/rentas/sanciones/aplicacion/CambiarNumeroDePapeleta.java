@@ -34,6 +34,15 @@ public class CambiarNumeroDePapeleta {
         this.auditoria = auditoria;
     }
 
+    /**
+     * Pone el número nuevo a la papeleta de tránsito que lleva {@code numeroActual}, y audita el
+     * viejo y el nuevo bajo su identificador, que no cambia.
+     *
+     * @throws PapeletaInexistente si no hay ninguna papeleta de tránsito con ese número
+     * @throws PapeletaRepository.NumeroDePapeletaEnUso si el nuevo ya lo lleva otra papeleta de
+     *     tránsito: {@code papeleta_numero_uq} es por familia, y una administrativa con ese número
+     *     no choca
+     */
     @Transactional
     public Papeleta cambiar(String numeroActual, String numeroNuevo, Observacion observacion) {
         Papeleta anterior =

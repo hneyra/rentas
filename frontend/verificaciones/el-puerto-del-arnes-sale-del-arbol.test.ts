@@ -79,17 +79,95 @@ afterEach(async () => {
   );
 });
 
-/** Abre un servidor en una sola cara de localhost y devuelve el puerto que le toco. */
+/**
+ * Abre un servidor en una sola cara de localhost y devuelve el puerto que le toco.
+ *
+ * Si no puede abrir, **rechaza con el error de `listen`**. Sin el `once('error')`, un `listen`
+ * que falla no resuelve nunca: la prueba agota su tope de 5 s y el error sale aparte, como
+ * «Uncaught Exception», lejos de la prueba que lo provoco (#639).
+ */
 async function servidorEn(host: string): Promise<number> {
   const servidor = createServer();
   abiertos.push(servidor);
-  return await new Promise((listo) => {
+  return await new Promise((listo, rechazar) => {
+    servidor.once('error', rechazar);
     servidor.listen(0, host, () => {
       const direccion = servidor.address();
       listo(typeof direccion === 'object' && direccion !== null ? direccion.port : 0);
     });
   });
 }
+
+/**
+ * **Si este puesto puede escuchar en `::1`**, medido y no supuesto (#639).
+ *
+ * `vite preview` escucha en `[::1]`, y la prueba de abajo lo imita. En un puesto sin IPv6 —un
+ * contenedor sin la cara `::1` en `lo`— ese `listen` no puede abrir, y lo que la prueba decia
+ * entonces era `Test timed out in 5000ms` mas un `listen EAFNOSUPPORT: address family not
+ * supported ::1` suelto: un rojo que no nombra la causa y que se aprende a ignorar.
+ */
+type CaraIPv6 = { puede: true } | { puede: false; codigo: string };
+
+/**
+ * Los codigos con que `listen` dice «esta maquina no tiene la cara IPv6 de localhost».
+ *
+ * `EAFNOSUPPORT` es el MEDIDO, el de los contenedores de la tanda del 2026-09-28: el nucleo
+ * no ofrece la familia. `EADDRNOTAVAIL` es el que `estaOcupado` ya nombraba —la familia existe
+ * pero `::1` no esta en `lo`—, y ese no se midio aqui. **Cualquier otro codigo no es falta de
+ * IPv6**, y sale como el error que es.
+ */
+const SIN_LA_CARA = new Set(['EAFNOSUPPORT', 'EADDRNOTAVAIL']);
+
+/** Abre y cierra un servidor en `::1` para saber si se puede. */
+async function medirLaCaraIPv6(): Promise<CaraIPv6> {
+  const servidor = createServer();
+  return await new Promise((listo, rechazar) => {
+    servidor.once('error', (error: NodeJS.ErrnoException) => {
+      if (error.code !== undefined && SIN_LA_CARA.has(error.code))
+        listo({ puede: false, codigo: error.code });
+      else rechazar(error);
+    });
+    servidor.listen(0, '::1', () => servidor.close(() => listo({ puede: true })));
+  });
+}
+
+/** Lo que hace el caso de `[::1]` con lo medido. */
+type QueHacer = { accion: 'correr' } | { accion: 'saltar' | 'fallar'; motivo: string };
+
+/**
+ * **La decision, pura**: la medida y si esto es la CI entran como argumento.
+ *
+ * - Con IPv6, el caso corre como siempre.
+ * - Sin IPv6 y en un puesto, se SALTA diciendo por que, y el motivo sale en la salida de
+ *   vitest junto al nombre de la prueba (`↓ … [motivo]`). No es un verde: es un «aqui no se
+ *   puede medir» con la causa escrita.
+ * - **Sin IPv6 y en la CI, ROJO.** Alli el caso tiene que correr —los runners tienen IPv6, y
+ *   es el unico sitio que lo mide en cada PR—, asi que un runner que lo perdiera no puede
+ *   convertir la salvedad del puesto en un verde que no midio nada. Es el centinela.
+ *
+ * «En la CI» es `CI` puesta, con el mismo criterio que `puerto-del-arnes.mjs`.
+ */
+function queHacerConElCasoDeIPv6({ cara, ci }: { cara: CaraIPv6; ci: boolean }): QueHacer {
+  if (cara.puede) return { accion: 'correr' };
+  const medido = `\`listen(0, '::1')\` fallo con ${cara.codigo}`;
+  if (ci)
+    return {
+      accion: 'fallar',
+      motivo:
+        'en la CI el caso de `[::1]` tiene que correr, y este puesto no tiene IPv6 ' +
+        `(${medido}). Saltarlo aqui seria un verde que no midio lo que \`vite preview\` hace: ` +
+        'escuchar en `[::1]`.',
+    };
+  return {
+    accion: 'saltar',
+    motivo:
+      'este puesto no tiene IPv6: no se puede comprobar el caso de `vite preview` ' +
+      `(${medido})`,
+  };
+}
+
+/** Si esto es la CI: `CI` puesta, como en `puerto-del-arnes.mjs`. */
+const EN_LA_CI = process.env.CI !== undefined;
 
 describe('el puerto del arnes', () => {
   it('EL CENTINELA: `playwright.config.ts` no escribe NINGUN puerto a mano', () => {
@@ -180,7 +258,14 @@ describe('el puerto del arnes', () => {
 });
 
 describe('la comprobacion de que el puerto esta libre', () => {
-  it('ve un servidor que solo escucha en `[::1]`, que es como escucha `vite preview`', async () => {
+  it('ve un servidor que solo escucha en `[::1]`, que es como escucha `vite preview`', async ({
+    skip,
+  }) => {
+    // Primero se MIDE si este puesto puede escuchar en `::1` (#639): sin IPv6 el caso no se
+    // puede comprobar, y se dice —o, en la CI, se pone rojo— en vez de agotar el tope.
+    const decision = queHacerConElCasoDeIPv6({ cara: await medirLaCaraIPv6(), ci: EN_LA_CI });
+    if (decision.accion === 'fallar') throw new Error(decision.motivo);
+    if (decision.accion === 'saltar') skip(decision.motivo);
     // ESTE es el rojo que importa: mirando solo 127.0.0.1, `estaOcupado` devuelve `false` de
     // un puerto en el que `vite preview` no va a poder abrir. Medido con `ss -ltnp`: los tres
     // `preview` vivos de esta maquina estaban en `[::1]`, ninguno en `127.0.0.1`.
@@ -201,5 +286,45 @@ describe('la comprobacion de que el puerto esta libre', () => {
     });
     await new Promise((cerrado) => servidor.close(cerrado));
     expect(await estaOcupado(puerto)).toBe(false);
+  });
+});
+
+describe('el caso de `[::1]` en un puesto sin IPv6 (#639)', () => {
+  const CON_IPV6: CaraIPv6 = { puede: true };
+  const SIN_IPV6: CaraIPv6 = { puede: false, codigo: 'EAFNOSUPPORT' };
+
+  it('con IPv6 corre, este o no en la CI', () => {
+    expect(queHacerConElCasoDeIPv6({ cara: CON_IPV6, ci: false })).toEqual({ accion: 'correr' });
+    expect(queHacerConElCasoDeIPv6({ cara: CON_IPV6, ci: true })).toEqual({ accion: 'correr' });
+  });
+
+  it('sin IPv6 y fuera de la CI se salta DICIENDO la causa, con el codigo que se midio', () => {
+    const decision = queHacerConElCasoDeIPv6({ cara: SIN_IPV6, ci: false });
+    expect(decision.accion).toBe('saltar');
+    expect(decision).toHaveProperty(
+      'motivo',
+      expect.stringContaining(
+        'este puesto no tiene IPv6: no se puede comprobar el caso de `vite preview`',
+      ),
+    );
+    expect(decision).toHaveProperty('motivo', expect.stringContaining('EAFNOSUPPORT'));
+  });
+
+  it('EL CENTINELA: sin IPv6 y EN la CI sale rojo, porque alli el caso tiene que correr', () => {
+    const decision = queHacerConElCasoDeIPv6({ cara: SIN_IPV6, ci: true });
+    expect(decision.accion).toBe('fallar');
+    expect(decision).toHaveProperty(
+      'motivo',
+      expect.stringContaining('en la CI el caso de `[::1]` tiene que correr'),
+    );
+  });
+
+  it('y el codigo que se nombra es el que se midio, no uno escrito', () => {
+    const decision = queHacerConElCasoDeIPv6({
+      cara: { puede: false, codigo: 'EADDRNOTAVAIL' },
+      ci: false,
+    });
+    expect(decision).toHaveProperty('motivo', expect.stringContaining('EADDRNOTAVAIL'));
+    expect(decision).toHaveProperty('motivo', expect.not.stringContaining('EAFNOSUPPORT'));
   });
 });

@@ -546,7 +546,6 @@ public class TransferirARentas {
         }
     }
 
-    /** Falta el papel que respalda el acto, o el contraste todavia no es definitivo (AC 3). */
     /**
      * Ninguna linea de la liquidacion acusa diferencia (#345): la fiscalizacion hallo la unidad
      * conforme, o no la ubico, y no hay determinacion de oficio que emitir.
@@ -569,6 +568,7 @@ public class TransferirARentas {
         }
     }
 
+    /** Falta el papel que respalda el acto, o el contraste todavia no es definitivo (AC 3). */
     public static final class SinSustentoDocumental extends RuntimeException {
 
         @java.io.Serial private static final long serialVersionUID = 1L;

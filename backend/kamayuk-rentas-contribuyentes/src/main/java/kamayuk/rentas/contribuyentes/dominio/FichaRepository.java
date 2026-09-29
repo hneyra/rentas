@@ -38,12 +38,25 @@ public interface FichaRepository {
     /** Todo el historial, del mas reciente al mas antiguo. Nunca se pierde nada. */
     List<Domicilio> historialDeDomicilios(long contribuyenteId);
 
+    /**
+     * Abre el domicilio si es nuevo, o lo cierra si ya existe: de un domicilio guardado solo cambia
+     * su fin de vigencia, porque mudarse es abrir otro. Cerrar uno que ya estaba cerrado falla, y
+     * asi dos cierres simultaneos no se pisan.
+     */
     Domicilio guardar(Domicilio domicilio);
 
     // ---------- Contactos ----------
 
+    /**
+     * Los contactos del contribuyente por tipo; con {@code soloVigentes}, sin los dados de baja. Un
+     * contacto no tiene vigencia con fechas, asi que aqui no se pregunta a una fecha.
+     */
     List<Contacto> contactosDe(long contribuyenteId, boolean soloVigentes);
 
+    /**
+     * Registra el contacto si es nuevo, o reescribe sus datos si ya existe. Darlo de baja es
+     * guardarlo no vigente: no se borra (regla 4).
+     */
     Contacto guardar(Contacto contacto);
 
     // ---------- Responsables solidarios ----------
@@ -54,5 +67,9 @@ public interface FichaRepository {
     /** De quien responde este contribuyente en esa fecha. La consulta inversa. */
     List<ResponsableSolidario> responsabilidadesDe(long responsableId, LocalDate fecha);
 
+    /**
+     * Abre el vinculo si es nuevo, o lo cierra si ya existe, igual que un domicilio: lo unico que
+     * cambia de un vinculo guardado es su fin de vigencia.
+     */
     ResponsableSolidario guardar(ResponsableSolidario responsable);
 }

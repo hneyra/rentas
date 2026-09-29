@@ -535,6 +535,10 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   // conector —una escritura no pinta una pantalla—; que sea la que la hoja declara, que la sirva el
   // contrato y que su acto lleve la observacion lo vigila `verificaciones/el-acto-escribe-lo-que-la-hoja-declara.test.ts`.
   { metodo: 'POST', ruta: '/licencias/edificacion/{expediente}/anulacion' },
+  // #638. **La tercera escritura, y el segundo ACTO del interprete**: registrar la diligencia de la
+  // resolucion que resolvio un recurso de transito, desde `tra-pap`. La pide `datos/actos.ts`, como
+  // la de arriba; la misma guarda vigila que sea la que la hoja declara y que el contrato la publique.
+  { metodo: 'POST', ruta: '/transito/descargos/{nDeExpediente}/resolucion/notificacion' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */

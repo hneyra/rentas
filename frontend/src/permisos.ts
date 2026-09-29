@@ -86,6 +86,22 @@ export const ANULAR_LA_LICENCIA_DE_EDIFICACION = {
 } as const;
 
 /**
+ * **La opcion con que se notifica la resolucion de un recurso, y el privilegio que pide** (#638).
+ *
+ * Es lo que declara `POST /transito/descargos/{nDeExpediente}/resolucion/notificacion` en
+ * `ResolucionesDeGerenciaController`: `@RequiereAcceso(acceso = ACCESO_DESCARGOS, privilegio =
+ * Privilegio.REGISTRO)`, con `ACCESO_DESCARGOS = "transito_descargos"` —la accion «Resolver» de la
+ * pantalla de descargos: la resolucion de un recurso se notifica con el acceso de la accion que la
+ * dicta (#629)—. Sin el, el boton del acto de `tra-pap` sale impedido y nombra la opcion. Lo vigila
+ * la misma guarda que a `ANULAR_LA_LICENCIA_DE_EDIFICACION`.
+ */
+export const NOTIFICAR_LA_RESOLUCION_DEL_RECURSO = {
+  codigo: 'transito_descargos',
+  privilegio: PRIVILEGIO_REGISTRO,
+  nombre: 'Descargos y reclamos de papeletas',
+} as const;
+
+/**
  * **Si la cuenta tiene `privilegio` sobre `codigo`**, leido de `GET /seguridad/sesion/permisos`.
  *
  * Es el unico sitio donde se lee esa matriz, y lo usan los tres que la necesitan: el catalogo, que

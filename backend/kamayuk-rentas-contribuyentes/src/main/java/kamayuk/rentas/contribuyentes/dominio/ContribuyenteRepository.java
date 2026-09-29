@@ -18,6 +18,7 @@ import kamayuk.rentas.dominio.DocumentoIdentidad;
  */
 public interface ContribuyenteRepository {
 
+    /** Un contribuyente por su identificador. Vacio si no existe o es de otra municipalidad. */
     Optional<Contribuyente> findById(long id);
 
     /**
@@ -29,8 +30,16 @@ public interface ContribuyenteRepository {
      */
     List<Contribuyente> findAllById(Collection<Long> ids);
 
+    /**
+     * Un contribuyente por su codigo <b>entero</b>, el que sale en los recibos. Buscar por un trozo
+     * del codigo es {@link #buscar}, que lo lee como prefijo.
+     */
     Optional<Contribuyente> findByCodigo(CodigoContribuyente codigo);
 
+    /**
+     * Un contribuyente por su documento de identidad, tipo y numero. Hay a lo sumo uno: lo asegura
+     * {@code contribuyente_documento_uq} en la base.
+     */
     Optional<Contribuyente> findByDocumento(DocumentoIdentidad documento);
 
     /**
@@ -40,5 +49,12 @@ public interface ContribuyenteRepository {
      */
     Pagina<Contribuyente> buscar(CriterioDeBusqueda criterio, Paginacion paginacion);
 
+    /**
+     * Da de alta al contribuyente si es nuevo —y lo devuelve con su identificador—, o reescribe su
+     * ficha si ya existe. No comprueba repetidos: eso lo hace {@code RegistrarContribuyente} antes,
+     * con {@link #findByCodigo} y {@link #findByDocumento}, y lo que dos altas simultaneas cuelen
+     * entre esa consulta y el {@code INSERT} lo para la base con {@code contribuyente_codigo_uq} y
+     * {@code contribuyente_documento_uq}, que llega como {@code DuplicateKeyException}.
+     */
     Contribuyente save(Contribuyente contribuyente);
 }

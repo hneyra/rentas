@@ -26,6 +26,11 @@ public interface ValorRepository {
      */
     Valor insertar(Valor valor, List<ValorDetalle> detalle);
 
+    /**
+     * El valor de ese tipo con ese numero, comparado tal como llega: a diferencia de {@link
+     * #porNumero(String)}, este no pasa por {@code NumeroImpreso}. El ejercicio no filtra —la
+     * unicidad es {@code (municipalidad_id, tipo, numero)}, y el numero ya lo lleva escrito—.
+     */
     Optional<Valor> porNumero(TipoValor tipo, Ejercicio ejercicio, String numero);
 
     /**
@@ -51,6 +56,11 @@ public interface ValorRepository {
     /** El detalle de un valor ya guardado, en el orden en que se congelo. */
     List<ValorDetalle> detalleDe(long valorId);
 
+    /**
+     * Los valores que cumplen el criterio ({@code valores_busqueda}, RF-092), paginados. Lee {@code
+     * valor} y nada mas: lo que la grilla de consulta cruza con el detalle, la notificacion y los
+     * movimientos es {@link #consultar}.
+     */
     Pagina<Valor> buscar(CriterioDeValor criterio, Paginacion paginacion);
 
     /**

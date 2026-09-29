@@ -16,6 +16,7 @@ import kamayuk.rentas.dominio.Ejercicio;
  */
 public interface DeclaracionJuradaRepository {
 
+    /** Una declaracion por su identificador. Vacio si no existe o es de otra municipalidad. */
     Optional<DeclaracionJurada> findById(long id);
 
     /**

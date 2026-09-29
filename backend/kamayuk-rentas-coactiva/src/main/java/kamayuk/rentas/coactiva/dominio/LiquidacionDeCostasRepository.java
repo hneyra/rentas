@@ -44,6 +44,11 @@ public interface LiquidacionDeCostasRepository {
      */
     LiquidacionDeCostas registrar(LiquidacionDeCostas liquidacion);
 
+    /**
+     * Una liquidacion por su numero impreso, con sus lineas. Como se escriba —con espacios, en
+     * minusculas— lo normaliza el adaptador con {@code NumeroImpreso} (#637): quien llama no lo
+     * copia. Vacio si no existe o es de otra municipalidad.
+     */
     Optional<LiquidacionDeCostas> porNumero(String numero);
 
     /** Las liquidaciones del expediente, de la primera a la ultima. */

@@ -44,6 +44,15 @@ public class CambiarPlaca {
         this.auditoria = auditoria;
     }
 
+    /**
+     * Pone la placa nueva y audita la vieja y la nueva bajo el identificador del vehiculo.
+     *
+     * @throws ProblemaDeNegocio {@code NO_ENCONTRADO} si el vehiculo no existe en esta
+     *     municipalidad, y {@code CONFLICTO} si ya tenia esa placa —con o sin guion—: reescribir el
+     *     mismo dato dejaria en la auditoria un cambio que no cambia nada
+     * @throws VehiculoRepository.PlacaRepetida si la nueva ya la lleva otro vehiculo; lo decide
+     *     {@code vehiculo_placa_uq} al guardar, no una consulta previa (#611)
+     */
     @Transactional
     public Vehiculo cambiar(long vehiculoId, Placa nueva, Observacion observacion) {
         Vehiculo actual =

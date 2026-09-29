@@ -78,26 +78,47 @@ public interface FueRepository {
      */
     TerrenoDelFue guardarTerreno(TerrenoDelFue terreno);
 
+    /**
+     * Guarda la siguiente version del proyecto, con la regla de {@link #guardarTerreno}: la version
+     * la calcula el repositorio, y quien llama tomo antes {@link #bloquear}.
+     */
     ProyectoDelFue guardarProyecto(ProyectoDelFue proyecto);
 
     /** Guarda la valorizacion completa como una version nueva, con todas sus lineas. */
     List<EstructuraDelProyecto> guardarValorizacion(
             long fueId, List<EstructuraDelProyecto> estructuras);
 
+    /**
+     * Guarda los profesionales responsables como una version nueva, la lista entera: el que ya no
+     * esta en ella no pasa a la version siguiente, y la anterior se queda como estaba. Mismo
+     * candado que {@link #guardarTerreno}.
+     */
     List<ProfesionalDelFue> guardarProfesionales(long fueId, List<ProfesionalDelFue> profesionales);
 
+    /**
+     * Guarda los requisitos presentados como una version nueva de la lista entera, igual que los
+     * profesionales.
+     */
     List<RequisitoDelFue> guardarRequisitos(long fueId, List<RequisitoDelFue> requisitos);
 
     // ---------- Lectura de la version vigente de cada seccion ----------
 
+    /** La ultima version del terreno. Vacio si la seccion no se completo nunca. */
     Optional<TerrenoDelFue> terrenoVigente(long fueId);
 
+    /** La ultima version del proyecto. Vacio si la seccion no se completo nunca. */
     Optional<ProyectoDelFue> proyectoVigente(long fueId);
 
+    /**
+     * Las lineas de la ultima version de la valorizacion, por piso y partida. Vacia solo si no se
+     * valorizo nunca: {@code CompletarSeccionDelFue} no deja guardar una valorizacion sin lineas.
+     */
     List<EstructuraDelProyecto> valorizacionVigente(long fueId);
 
+    /** Los profesionales de la ultima version de la lista, por tipo. */
     List<ProfesionalDelFue> profesionalesVigentes(long fueId);
 
+    /** Los requisitos de la ultima version de la lista, por nombre del requisito. */
     List<RequisitoDelFue> requisitosVigentes(long fueId);
 
     /**

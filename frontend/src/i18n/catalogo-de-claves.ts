@@ -15,6 +15,7 @@ import { ARBOL } from '../pantallas/arbol.ts';
 import { bloquesDe } from '../pantallas/bloques.ts';
 import { PANTALLAS } from '../pantallas/definiciones/index.ts';
 import type { Modulo } from '../pantallas/tipos.ts';
+import { ACTOS_DE_LAS_HOJAS } from '../datos/actos.ts';
 import { CONECTORES } from '../datos/conectores.ts';
 import { PALABRAS_DE_HUECO } from '../datos/palabrasDeHueco.ts';
 import * as laPantallaQuePide from '../datos/useDatosDeLaHoja.ts';
@@ -283,6 +284,23 @@ function deLasAusencias(): readonly string[] {
 }
 
 /**
+ * **Lo que dice un acto cuando su escritura contesta 404** (#638), derivado del registro de
+ * `datos/actos.ts`.
+ *
+ * `alRechazarElActo` las pasa por `t()` en lugar del titulo y el remedio del peldano
+ * `no-encontrado`, asi que son claves. No son una `Ausencia` ni un peldano —son dos frases sueltas
+ * de una escritura—, y por eso ni la derivacion de las ausencias ni la de la escalera las alcanzan:
+ * se recorre el registro entero, y la siguiente escritura que diga su 404 entra sola.
+ */
+function deLosActos(): readonly string[] {
+  return Object.values(ACTOS_DE_LAS_HOJAS).flatMap((actos) =>
+    Object.values(actos ?? {}).flatMap((escritura) =>
+      escritura.noEncontrado === undefined ? [] : [escritura.noEncontrado.titulo, escritura.noEncontrado.remedio],
+    ),
+  );
+}
+
+/**
  * **Lo que dice el MARCO, derivado de lo que `textosDelMarco.ts` exporta** (#133, #246).
  *
  * Aquel archivo tenia su propia `clavesDelMarco()`, que juntaba los tres sacos **y nombraba a mano
@@ -323,6 +341,7 @@ export function catalogoDeClaves(): readonly string[] {
     ...delArbol(),
     ...deLasAusencias(),
     ...deLosPeldanos(),
+    ...deLosActos(),
     ...delMarco(),
     ...deLaVuelta(),
   ]);

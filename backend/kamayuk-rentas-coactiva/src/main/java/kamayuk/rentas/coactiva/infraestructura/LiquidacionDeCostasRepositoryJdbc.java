@@ -24,6 +24,7 @@ import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
@@ -175,7 +176,7 @@ public class LiquidacionDeCostasRepositoryJdbc extends RepositorioJdbc
     @Override
     public Optional<LiquidacionDeCostas> porNumero(String numero) {
         return jdbc().sql("SELECT " + COLUMNAS + " FROM liquidacion_costas WHERE numero = :numero")
-                .param("numero", numero.strip())
+                .param("numero", NumeroImpreso.formaDeBusqueda(numero))
                 .query(LiquidacionDeCostasRepositoryJdbc::mapear)
                 .optional()
                 .map(this::conSusLineas);

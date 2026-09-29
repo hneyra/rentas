@@ -39,6 +39,10 @@ public class ConsultaDeLaCorridaDeValores {
         this.corridas = corridas;
     }
 
+    /**
+     * La cabecera de la corrida, en su propia transacción corta. Vacío si no existe o es de otra
+     * municipalidad.
+     */
     @Transactional(readOnly = true)
     public Optional<CorridaDeValores> porId(long corridaId) {
         return corridas.porId(corridaId);

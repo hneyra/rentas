@@ -38,6 +38,11 @@ public interface PagoRecibidoRepository {
      */
     Recepcion recibirRechazado(PagoRecibido pago, String motivo);
 
+    /**
+     * El pago del buzon por el identificador que le puso la caja, sea cual sea su estado: es por el
+     * que una anulacion nombra el cobro que deshace, y por el que se relee el pago recien aplicado.
+     * Vacio si no llego o es de otra municipalidad.
+     */
     Optional<PagoRecibido> porPagoId(UUID pagoId);
 
     /**

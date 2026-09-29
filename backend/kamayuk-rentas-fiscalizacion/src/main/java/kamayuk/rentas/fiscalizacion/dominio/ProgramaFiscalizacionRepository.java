@@ -4,6 +4,13 @@ import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 
+/**
+ * Los programas de fiscalizacion (RF-050). Ningun metodo recibe la municipalidad (regla 2): la
+ * filtra la politica RLS.
+ *
+ * <p>Se insertan y se cierran, y nada mas: reprogramar es un programa nuevo con su propio codigo, y
+ * desde {@code V30} {@code kamayuk_app} solo puede mover {@code estado}.
+ */
 public interface ProgramaFiscalizacionRepository {
 
     /**
@@ -15,6 +22,7 @@ public interface ProgramaFiscalizacionRepository {
      */
     ProgramaFiscalizacion insertar(ProgramaFiscalizacion programa);
 
+    /** Un programa por su identificador. Vacio si no existe o es de otra municipalidad. */
     Optional<ProgramaFiscalizacion> findById(long id);
 
     /**

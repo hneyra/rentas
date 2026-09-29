@@ -15,6 +15,10 @@ import kamayuk.rentas.compartido.Paginacion;
  */
 public interface CodigoInfraccionRepository {
 
+    /**
+     * Una versión del código por su identificador, esté vigente o cerrada. Vacío si no existe o es
+     * de otra municipalidad.
+     */
     Optional<CodigoInfraccion> findById(long id);
 
     /**
@@ -22,8 +26,16 @@ public interface CodigoInfraccionRepository {
      */
     Optional<CodigoInfraccion> vigenteA(Familia familia, String codigo, LocalDate fecha);
 
+    /**
+     * El catálogo de una familia, paginado; sin {@code vigenteA} trae también las versiones
+     * cerradas, que son las que explican las papeletas de antes.
+     */
     Pagina<CodigoInfraccion> buscar(CriterioDeCodigoInfraccion criterio, Paginacion paginacion);
 
+    /**
+     * Inserta una versión del código y la devuelve con su identificador: la primera, o la que
+     * sucede a la que se acaba de cerrar con {@link #actualizar}.
+     */
     CodigoInfraccion insertar(CodigoInfraccion codigoInfraccion);
 
     /** Guarda el cierre de una versión: la única escritura que admite un código ya guardado. */

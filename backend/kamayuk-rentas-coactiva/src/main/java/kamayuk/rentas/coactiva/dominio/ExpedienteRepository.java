@@ -41,8 +41,16 @@ public interface ExpedienteRepository {
      */
     long siguienteCorrelativo(Ejercicio ejercicio);
 
+    /**
+     * Un expediente por el numero que lleva impreso. Como se escriba —con espacios, en minusculas—
+     * lo normaliza el adaptador con {@code NumeroImpreso} (#515): quien llama no lo copia. Vacio si
+     * no existe o es de otra municipalidad.
+     */
     Optional<ExpedienteCoactivo> porNumero(String numero);
 
+    /**
+     * Un expediente por su identificador interno. Vacio si no existe o es de otra municipalidad.
+     */
     Optional<ExpedienteCoactivo> porId(long id);
 
     /**

@@ -6,7 +6,11 @@ import { describe, expect, it } from 'vitest';
 import { RAIZ } from './artboards.ts';
 import { ACCESOS_MEDIDOS } from '../src/datos/seguridadMedida.ts';
 import { OPCIONES_QUE_LEEN_EL_CATALOGO } from '../src/datos/useCatalogoPermitido.ts';
-import { ANULAR_LA_LICENCIA_DE_EDIFICACION, CAMBIAR_EL_EJERCICIO } from '../src/permisos.ts';
+import {
+  ANULAR_LA_LICENCIA_DE_EDIFICACION,
+  CAMBIAR_EL_EJERCICIO,
+  NOTIFICAR_LA_RESOLUCION_DEL_RECURSO,
+} from '../src/permisos.ts';
 
 /**
  * **Las dos opciones que la pantalla del 403 nombra son las que el backend pide y siembra** (#311).
@@ -46,6 +50,12 @@ const CONTROLADOR_DE_LA_SESION = join(
 const CONTROLADOR_DE_EDIFICACION = join(
   RAIZ,
   '../backend/kamayuk-rentas-licencias/src/main/java/kamayuk/rentas/licencias/infraestructura/web/EdificacionController.java',
+);
+
+/** Donde vive `POST /transito/descargos/{nDeExpediente}/resolucion/notificacion`, el acto de `tra-pap` (#638). */
+const CONTROLADOR_DE_LAS_RESOLUCIONES = join(
+  RAIZ,
+  '../backend/kamayuk-rentas-sanciones/src/main/java/kamayuk/rentas/sanciones/infraestructura/web/ResolucionesDeGerenciaController.java',
 );
 
 function leer(ruta: string): string {
@@ -172,6 +182,45 @@ describe('la opcion que anula una licencia de edificacion (#629)', () => {
     );
     expect(ACCESOS_MEDIDOS.find((a) => a.codigo === ANULAR_LA_LICENCIA_DE_EDIFICACION.codigo)?.nombre).toBe(
       ANULAR_LA_LICENCIA_DE_EDIFICACION.nombre,
+    );
+  });
+});
+
+/**
+ * **La opcion con que se notifica la resolucion de un recurso es la que el `POST` pide** (#638).
+ *
+ * El boton del acto de `tra-pap` sale impedido si la cuenta no tiene
+ * `NOTIFICAR_LA_RESOLUCION_DEL_RECURSO.privilegio` sobre `.codigo`. Las mismas fuentes que la de la
+ * anulacion: el codigo esta en una constante del controlador (`ACCESO_DESCARGOS`), y se resuelve.
+ * Y aqui importa mas que en ninguna: la ruta comparte controlador con otras seis, con CINCO accesos
+ * distintos, y NO pide el de la otra notificacion de transito —`transito_rg_ordinaria`— sino el de
+ * la accion que dicta la resolucion del recurso (#629). Leer el acceso de la ruta de al lado daria
+ * otro boton.
+ */
+describe('la opcion que notifica la resolucion de un recurso (#638)', () => {
+  const controlador = leer(CONTROLADOR_DE_LAS_RESOLUCIONES);
+  const catalogo = leer(CATALOGO_DE_OPCIONES);
+
+  it('`POST /transito/descargos/{nDeExpediente}/resolucion/notificacion` pide el codigo y el privilegio que el boton pregunta', () => {
+    const patron =
+      /@PostMapping\("\/transito\/descargos\/\{nDeExpediente\}\/resolucion\/notificacion"\)\s*@ResponseStatus\([^)]*\)\s*@RequiereAcceso\(acceso\s*=\s*([A-Z_]+),\s*privilegio\s*=\s*Privilegio\.([A-Z]+)\)/;
+    const casa = patron.exec(controlador);
+    expect(casa, 'el patron ya no encuentra la notificacion del recurso en `ResolucionesDeGerenciaController`').not.toBeNull();
+    const constante = new RegExp(`static final String ${casa?.[1] ?? '—'} = "([a-z_]+)";`).exec(controlador);
+    expect(constante?.[1], 'la notificacion del recurso ya no pide ese codigo').toBe(
+      NOTIFICAR_LA_RESOLUCION_DEL_RECURSO.codigo,
+    );
+    expect(casa?.[2]?.toLowerCase(), 'la notificacion del recurso ya no pide ese privilegio').toBe(
+      NOTIFICAR_LA_RESOLUCION_DEL_RECURSO.privilegio,
+    );
+  });
+
+  it('y su nombre es el que se siembra y el que contesto la instalacion', () => {
+    expect(nombreEnElCatalogo(catalogo, NOTIFICAR_LA_RESOLUCION_DEL_RECURSO.codigo)).toBe(
+      NOTIFICAR_LA_RESOLUCION_DEL_RECURSO.nombre,
+    );
+    expect(ACCESOS_MEDIDOS.find((a) => a.codigo === NOTIFICAR_LA_RESOLUCION_DEL_RECURSO.codigo)?.nombre).toBe(
+      NOTIFICAR_LA_RESOLUCION_DEL_RECURSO.nombre,
     );
   });
 });

@@ -149,7 +149,7 @@ class SaldoYMovimientosTest {
                                 TITULARES_DE_LA_UNIDAD),
                         gestor);
         reconstruir = envolver(new ReconstruirSaldo(asientos, saldos, RELOJ), gestor);
-        padron = new ReconstruirPadron(asientos, reconstruir, gestor);
+        padron = new ReconstruirPadron(asientos, saldos, reconstruir, gestor);
         transaccion = new org.springframework.transaction.support.TransactionTemplate(gestor);
     }
 

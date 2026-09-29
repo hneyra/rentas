@@ -39,8 +39,17 @@ tasks.withType<Test>().configureEach {
 // `@param` de un record escritos en la clase de al lado— y no lo veia nadie, porque ni la CI ni
 // `build` lo corren. Con doclint en `javac` el mismo analisis corre en cada compilacion, sin tarea
 // nueva que recordar. `all/protected` mira lo que javadoc publica —lo publico y lo protegido—, y
-// `-missing` deja fuera los comentarios que faltan: son avisos de javadoc, no errores, y exigirlos
-// seria otro issue. Solo `src/main`: las pruebas no publican javadoc.
+// `-missing` deja fuera los comentarios que faltan. Solo `src/main`: las pruebas no publican
+// javadoc.
+//
+// `-missing` se queda, y lo que falta se exige en otro sitio (#642): `ApiPublicaSinJavadocTest`,
+// en `verificarArquitectura`, pide el comentario de todo tipo publico, de todo metodo publico de un
+// caso de uso y de todo metodo de interfaz. Aqui no se puede, medido: el grupo `missing` trae con
+// el comentario las etiquetas —7 601 avisos en `src/main`: 1 525 comentarios que faltan y 6 032
+// `@param`/`@return`/`@throws` de comentarios que ya existen; los 1 448 de `./gradlew javadoc`
+// eran catorce modulos parados en el tope de cien—; `-Xdoclint/package:` acota TODO doclint, asi
+// que fuera de esos paquetes apagaria lo de arriba; y lo que falta son avisos, que solo paran la
+// compilacion con `-Werror`, que haria fatal tambien cada aviso de `-Xlint:all`.
 tasks.named<JavaCompile>("compileJava") {
     options.compilerArgs.add("-Xdoclint:all/protected,-missing")
 }

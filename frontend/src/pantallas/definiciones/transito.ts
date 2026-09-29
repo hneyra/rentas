@@ -1,6 +1,15 @@
 import type { ClaveDeHoja } from '../arbol.ts';
+import {
+  FORMAS_DE_NOTIFICACION,
+  LARGO_DE_LA_OBSERVACION,
+  LO_QUE_CONTESTO_LA_DILIGENCIA,
+  NOTIFICAR_LA_RESOLUCION,
+  RESULTADOS_DE_LA_DILIGENCIA,
+  opcionQueLoPide,
+  puedeHacerlo,
+} from '../actos.ts';
 import { EN_LA_RUTA, hayMasDe, paginasDe } from '../tablas.ts';
-import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
+import type { DefinicionDePantalla as Pantalla, PiezaDeLaPantalla as Pieza } from '@kamayuk/ui';
 
 /**
  * El nombre del sujeto en la ruta: el mismo `EL_SUJETO` de `@kamayuk/ui`, atado por el TIPO y no
@@ -112,6 +121,105 @@ export const TRANSITO = {
           columnaDeInsignia: 4,
           nota: 'Una papeleta no notificada dentro del plazo caduca: existe, y ya no se puede cobrar.',
         },
+        // **La resolucion de un recurso se notifica desde aqui** (#638). El backend la sirve desde
+        // #629 —`POST /transito/descargos/{nDeExpediente}/resolucion/notificacion`— y ninguna
+        // pantalla la ofrecia. Esta es la hoja que dibuja el recurso: declara `/transito/descargos`
+        // y su tabla son los actos de la papeleta, con la resolucion que lo resuelve. Sin el
+        // privilegio de registro sobre los descargos sale IMPEDIDO y dice por que —nunca
+        // `disabled`—: no se ofrece una puerta que contesta 403.
+        acciones: [
+          {
+            // No se llama como el acto, por lo mismo que el de `aut-sol`: dos botones con el mismo
+            // nombre a la vista no se distinguen con un lector de pantalla.
+            rotulo: 'Notificar la resolución de un recurso',
+            abre: NOTIFICAR_LA_RESOLUCION,
+            impedida: [
+              {
+                si: { dato: puedeHacerlo(NOTIFICAR_LA_RESOLUCION), hay: false },
+                motivo: {
+                  plantilla: `Notificar la resolución de un recurso pide el privilegio de registro sobre «{${opcionQueLoPide(NOTIFICAR_LA_RESOLUCION)}}», que esta cuenta no tiene.`,
+                },
+              },
+            ],
+          },
+        ],
+      },
+      /**
+       * **El acto de notificar la resolucion de un recurso** (#638). No es un bloque del artboard, y
+       * por eso `pantallas-del-artboard` no lo compara: el artboard declara la operacion —en
+       * `const ARBOL`, junto a esta hoja— y el acto es lo que la ofrece. Es la forma del de
+       * `aut-sol` (#455, #629).
+       *
+       * · **Pide lo que la peticion pide, y como lo pide**: `PeticionDeNotificacionDeResolucion`
+       *   exige la fecha, la forma, el resultado y el notificador, y admite en blanco la direccion,
+       *   quien recibio, su documento, su vinculo y el acuse. Aqui son obligatorios los mismos cuatro
+       *   —el interprete no deja enviar sin ellos— y opcionales los mismos cinco.
+       * · **La forma y el resultado se leen con sus rotulos y viajan con el nombre del enumerado**:
+       *   las opciones salen de los mapas de `pantallas/actos.ts`, de los que `datos/actos.ts` saca
+       *   lo que manda.
+       * · **La observacion es obligatoria EN EL TIPO** (regla 10), con el largo del backend.
+       * · **No se corrige**, y por eso lleva `advertencia`: cada diligencia es un intento con su
+       *   numero, sin `UPDATE` ni `DELETE`, y si surte efecto abre el plazo para impugnar.
+       * · **Lo hecho dice si el plazo corre**, segun el `resultado` que contesto el backend: solo
+       *   «No ubicado» lo deja sin abrir. La cifra del plazo no se escribe: vive en el conjunto
+       *   sellado (regla 5).
+       */
+      {
+        tipo: 'acto',
+        clave: NOTIFICAR_LA_RESOLUCION,
+        titulo: 'Registrar la diligencia',
+        nota: 'Registra la diligencia de la resolución que resolvió un recurso. Si surte efecto, abre el plazo para impugnarla.',
+        campos: [
+          { nombre: 'expediente', etiqueta: 'Expediente del recurso', tipo: '' },
+          { nombre: 'fechaDeNotificacion', etiqueta: 'Fecha de notificación', tipo: 'd' },
+          {
+            nombre: 'modalidad',
+            etiqueta: 'Forma de notificación',
+            tipo: 's',
+            opciones: Object.keys(FORMAS_DE_NOTIFICACION),
+          },
+          {
+            nombre: 'resultado',
+            etiqueta: 'Resultado',
+            tipo: 's',
+            opciones: Object.keys(RESULTADOS_DE_LA_DILIGENCIA),
+            ayuda: 'Solo «No ubicado» deja el plazo sin abrir: la negativa a recibir también surte efecto.',
+          },
+          { nombre: 'notificador', etiqueta: 'Notificador', tipo: '' },
+          {
+            nombre: 'direccion',
+            etiqueta: 'Dirección',
+            tipo: '1',
+            opcional: true,
+            ayuda: 'Sin ella, el domicilio fiscal vigente del obligado a la fecha de la diligencia.',
+          },
+          { nombre: 'recibidoPor', etiqueta: 'Recibido por', tipo: '', opcional: true },
+          { nombre: 'documentoDelReceptor', etiqueta: 'Documento del receptor', tipo: '', opcional: true },
+          { nombre: 'vinculo', etiqueta: 'Vínculo con el administrado', tipo: '', opcional: true },
+          { nombre: 'acuse', etiqueta: 'Acuse', tipo: '', opcional: true, ayuda: 'La constancia del cargo.' },
+        ],
+        observacion: {
+          etiqueta: 'Observación',
+          ayuda: 'Por qué se registra. Queda en la auditoría, con la cuenta que la registró.',
+          largo: LARGO_DE_LA_OBSERVACION,
+        },
+        advertencia:
+          'La diligencia no se corrige ni se borra: queda como un intento más de la resolución, y si surte efecto abre el plazo para impugnarla.',
+        errores: 'trasElPrimerIntento',
+        hecho: {
+          titulo: {
+            segun: LO_QUE_CONTESTO_LA_DILIGENCIA.resultado,
+            casos: {
+              NOTIFICADO: 'Resolución notificada: corre el plazo para impugnarla',
+              RECHAZADO: 'Negativa a recibir certificada: corre el plazo para impugnarla',
+              NO_UBICADO: 'No se ubicó a nadie: el plazo no corre, y hay que volver a diligenciar',
+            },
+            otro: 'Diligencia registrada',
+          },
+          texto: {
+            plantilla: `Diligencia {${LO_QUE_CONTESTO_LA_DILIGENCIA.numero}} de la resolución {${LO_QUE_CONTESTO_LA_DILIGENCIA.resolucion}}, en {${LO_QUE_CONTESTO_LA_DILIGENCIA.direccion}}.`,
+          },
+        },
       },
     ],
   },
@@ -218,4 +326,4 @@ export const TRANSITO = {
       },
     ],
   },
-} satisfies Partial<Record<ClaveDeHoja, Pantalla>>;
+} satisfies Partial<Record<ClaveDeHoja, Pantalla<Pieza>>>;

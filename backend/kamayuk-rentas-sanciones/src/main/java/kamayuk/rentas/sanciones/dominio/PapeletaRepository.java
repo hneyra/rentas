@@ -4,10 +4,28 @@ import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 
+/**
+ * Las papeletas de las dos familias, tránsito y administrativa, en una sola tabla. Ningún método
+ * recibe la municipalidad (regla 2): la filtra la política RLS.
+ *
+ * <p><b>No hay {@code actualizar} ni {@code borrar}.</b> Desde {@code V20} {@code kamayuk_app} solo
+ * puede escribir {@code numero} y {@code estado}: lo que el inspector escribió en la calle no se
+ * corrige en la base, y las dos únicas escrituras sobre una papeleta guardada son {@link
+ * #cambiarNumero} y {@link #anular}.
+ */
 public interface PapeletaRepository {
 
+    /**
+     * Registra la papeleta y la devuelve con su identificador. Quien la registra no es un
+     * parámetro: lo resuelve la implementación desde {@link
+     * kamayuk.rentas.auditoria.OrigenContext}.
+     */
     Papeleta insertar(Papeleta papeleta);
 
+    /**
+     * La papeleta de <b>tránsito</b> con ese número impreso, normalizado con {@code NumeroImpreso}
+     * (#515). Solo tránsito: la de otra familia se pide con {@link #porNumero(Familia, String)}.
+     */
     Optional<Papeleta> porNumero(String numero);
 
     /**
@@ -22,8 +40,14 @@ public interface PapeletaRepository {
      */
     Optional<Papeleta> porNumero(Familia familia, String numero);
 
+    /** Una papeleta por su identificador. Vacío si no existe o es de otra municipalidad. */
     Optional<Papeleta> porId(long id);
 
+    /**
+     * Las papeletas de <b>una</b> familia que cumplen el criterio, paginadas: {@link
+     * CriterioDePapeleta#familia} nunca es opcional, para que ninguna consulta cruce tránsito con
+     * administrativa por accidente.
+     */
     Pagina<Papeleta> buscar(CriterioDePapeleta criterio, Paginacion paginacion);
 
     /**

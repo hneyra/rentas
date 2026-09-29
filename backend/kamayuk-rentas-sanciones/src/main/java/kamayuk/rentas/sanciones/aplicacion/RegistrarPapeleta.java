@@ -78,6 +78,14 @@ public class RegistrarPapeleta {
         this.auditoria = auditoria;
     }
 
+    /**
+     * Registra una papeleta de tránsito con los importes del acta y asienta su cargo por {@code
+     * importeAPagar} contra {@code contribuyenteObligadoId}, en el ejercicio y con la fecha valor
+     * de la infracción. Todavía no tiene ruta: {@code PapeletasController} es de solo lectura.
+     *
+     * @throws CodigoNoVigente si el código no está en el catálogo de tránsito vigente el día de la
+     *     infracción
+     */
     @Transactional
     public Papeleta registrarTransito(
             String numero,
@@ -134,6 +142,13 @@ public class RegistrarPapeleta {
                 observacion);
     }
 
+    /**
+     * Registra una papeleta administrativa y asienta su cargo, igual que {@link
+     * #registrarTransito}; el cargo cuelga del predio, si lo hay, y no de un vehículo.
+     *
+     * @throws CodigoNoVigente si el código no está en el catálogo administrativo vigente el día de
+     *     la infracción
+     */
     @Transactional
     public Papeleta registrarAdministrativa(
             String numero,

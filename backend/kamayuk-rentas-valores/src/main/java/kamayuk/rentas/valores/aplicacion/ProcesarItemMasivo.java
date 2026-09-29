@@ -63,6 +63,11 @@ public class ProcesarItemMasivo {
         SIN_DEUDA
     }
 
+    /**
+     * Emite un valor con las obligaciones pendientes del candidato que caen en el tributo y el
+     * ejercicio de la corrida —su deuda a la fecha de criterio de la corrida, no a la de hoy— y
+     * marca el item generado; si no le queda ninguna, lo marca sin deuda. Todo en una transaccion.
+     */
     @Transactional
     public Resultado procesar(ValorMasivo corrida, ValorMasivoItem item, Observacion observacion) {
         long itemId = Objects.requireNonNull(item.id(), "Un item leido de la base ya tiene su id");

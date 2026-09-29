@@ -67,6 +67,11 @@ public class ImportarTransferencias {
         this.referencias = referencias;
     }
 
+    /**
+     * Registra una transferencia por fila, en el orden del archivo, y devuelve cuantas entraron y
+     * por que se rechazo cada una de las demas. El orden importa: una fila puede transferir lo que
+     * otra anterior acaba de adquirir.
+     */
     public InformeDeImportacion importar(Reader archivo, Observacion observacion) {
         List<FilaCsv> filas = leer(archivo);
         List<FilaRechazada> rechazadas = new ArrayList<>();

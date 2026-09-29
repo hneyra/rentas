@@ -1,7 +1,7 @@
 // @vitest-environment node
 //
-// Lee el contrato y `Observacion.java` del disco, y recorre las definiciones como dato. No hay DOM
-// que necesitar.
+// Lee el contrato, `Observacion.java` y los dos enumerados de la notificacion del disco, y recorre
+// las definiciones como dato. No hay DOM que necesitar.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,7 +12,14 @@ import type { DefinicionDeActo, DefinicionDePantalla, PiezaDeLaPantalla } from '
 import { RAIZ } from './artboards.ts';
 import { ACTOS_DE_LAS_HOJAS } from '../src/datos/actos.ts';
 import { YA_SERVIDAS } from '../src/datos/servidas.ts';
-import { LARGO_DE_LA_OBSERVACION, puedeHacerlo } from '../src/pantallas/actos.ts';
+import {
+  FORMAS_DE_NOTIFICACION,
+  LARGO_DE_LA_OBSERVACION,
+  LO_QUE_CONTESTO_LA_DILIGENCIA,
+  NOTIFICAR_LA_RESOLUCION,
+  RESULTADOS_DE_LA_DILIGENCIA,
+  puedeHacerlo,
+} from '../src/pantallas/actos.ts';
 import { CLAVES_DE_HOJA, hojaDe, type ClaveDeHoja } from '../src/pantallas/arbol.ts';
 import { bloquesDe } from '../src/pantallas/bloques.ts';
 import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
@@ -49,6 +56,14 @@ import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
  * atendido y no dibujado, una operacion que la hoja no declara y un boton sin impedimento— tiene que
  * devolver las cinco —la operacion ajena falta dos veces: ni la hoja la declara ni esta servida—.
  * Una guarda que no puede fallar no vigila nada.
+ *
+ * <h2>Y desde #638, el vocabulario de lo que se elige</h2>
+ *
+ * El segundo acto —notificar la resolucion de un recurso, en `tra-pap`— trae dos desplegables cuyo
+ * rotulo no es lo que el backend lee: la forma y el resultado viajan con el NOMBRE de su enumerado.
+ * Los mapas de `pantallas/actos.ts` son la unica traduccion, y aqui se comprueba contra los `.java`
+ * que sus valores sean exactamente los del enumerado: uno de mas contesta 422 al elegirlo, y uno de
+ * menos es una forma de notificar que la pantalla no deja registrar.
  */
 
 const CONTRATO = join(RAIZ, '../docs/50-api/formas-de-la-api.json');
@@ -56,6 +71,10 @@ const OBSERVACION = join(
   RAIZ,
   '../backend/kamayuk-rentas-dominio-compartido/src/main/java/kamayuk/rentas/dominio/Observacion.java',
 );
+
+/** Donde viven los dos enumerados de la diligencia (#638): del dominio compartido desde #41. */
+const ENUMERADO = (nombre: string) =>
+  join(RAIZ, `../backend/kamayuk-rentas-dominio-compartido/src/main/java/kamayuk/rentas/dominio/${nombre}.java`);
 
 function leer(ruta: string): string {
   if (!existsSync(ruta)) {
@@ -181,8 +200,10 @@ describe('#629 — un acto escribe lo que su hoja declara', () => {
   it('EL CENTINELA: hay al menos un acto dibujado y atendido, y el contrato se pudo leer', () => {
     // Sin esto, la de abajo recorreria cuarenta hojas sin actos y pasaria en verde sobre nada.
     const conActos = LAS_HOJAS.filter((hoja) => actosDe(hoja.definicion).length > 0);
-    expect(conActos.map((hoja) => hoja.clave)).toContain('aut-sol');
+    expect(conActos.map((hoja) => hoja.clave)).toEqual(expect.arrayContaining(['aut-sol', 'tra-pap']));
     expect(Object.keys(ACTOS_DE_LAS_HOJAS['aut-sol'] ?? {})).toEqual(['anular-licencia-de-edificacion']);
+    // #638: notificar la resolucion de un recurso, desde la hoja que dibuja los actos de la papeleta.
+    expect(Object.keys(ACTOS_DE_LAS_HOJAS['tra-pap'] ?? {})).toEqual(['notificar-resolucion-del-recurso']);
     expect(PUBLICADAS.size, 'el contrato llego vacio').toBeGreaterThan(50);
   });
 
@@ -218,6 +239,43 @@ describe('#629 — lo que la tarjeta de lo hecho ensena, la respuesta lo publica
     const forma = formas['POST /licencias/edificacion/{expediente}/anulacion'] ?? {};
     expect(Object.keys(forma)).toEqual(expect.arrayContaining(['nroExpediente', 'nroLicencia', 'resolucion']));
     expect(Object.keys((forma.resolucion ?? {}) as Record<string, unknown>)).toContain('numero');
+  });
+
+  it('#638: la diligencia contesta `numero`, `resolucion`, `direccion` y `resultado`, que es lo que se ensena', () => {
+    // Lo que `datos/actos.ts` lee de `DiligenciaDeUnaResolucion` para la tarjeta de lo hecho: el
+    // titulo sale del `resultado` y el texto nombra la cedula, la resolucion y donde se diligencio.
+    const formas = JSON.parse(leer(CONTRATO)) as Record<string, Record<string, unknown>>;
+    const forma = formas['POST /transito/descargos/{nDeExpediente}/resolucion/notificacion'] ?? {};
+    const leidos = Object.values(LO_QUE_CONTESTO_LA_DILIGENCIA).map((nombre) => nombre.replace(/^diligencia\./, ''));
+    expect(Object.keys(forma)).toEqual(expect.arrayContaining(leidos));
+  });
+});
+
+describe('#638 — la forma y el resultado viajan con el nombre del enumerado del backend', () => {
+  /** Las constantes de un `enum` de Java, en su orden. */
+  const constantesDe = (nombre: string): readonly string[] => {
+    const cuerpo = /public enum \w+ \{([\s\S]*?)(;|\})/.exec(leer(ENUMERADO(nombre)))?.[1] ?? '';
+    return [...cuerpo.replace(/\/\*\*[\s\S]*?\*\//g, '').matchAll(/\b([A-Z][A-Z_]+)\b/g)].map((c) => c[1] ?? '');
+  };
+
+  it('EL CENTINELA: los dos `.java` se leen y traen constantes', () => {
+    // Sin esto, un patron que dejara de casar compararia dos listas vacias y pasaria en verde.
+    expect(constantesDe('ModalidadDeNotificacion')).toContain('PERSONAL');
+    expect(constantesDe('ResultadoDeNotificacion')).toContain('NO_UBICADO');
+  });
+
+  it('`FORMAS_DE_NOTIFICACION` manda exactamente las de `ModalidadDeNotificacion`', () => {
+    expect([...Object.values(FORMAS_DE_NOTIFICACION)].sort()).toEqual([...constantesDe('ModalidadDeNotificacion')].sort());
+  });
+
+  it('`RESULTADOS_DE_LA_DILIGENCIA` manda exactamente las de `ResultadoDeNotificacion`, y lo hecho dice las tres', () => {
+    const delBackend = [...constantesDe('ResultadoDeNotificacion')].sort();
+    expect([...Object.values(RESULTADOS_DE_LA_DILIGENCIA)].sort()).toEqual(delBackend);
+    // El titulo de lo hecho sale `segun` el resultado que contesto el backend: un caso de menos lo
+    // diria con el `otro` generico, y el que decide si el plazo corre es justo ese.
+    const acto = actosDe(pantallaDe('tra-pap')).find((a) => a.clave === NOTIFICAR_LA_RESOLUCION);
+    const titulo = acto?.hecho?.titulo;
+    expect(typeof titulo === 'object' && 'casos' in titulo ? Object.keys(titulo.casos).sort() : []).toEqual(delBackend);
   });
 });
 

@@ -161,7 +161,8 @@ export async function estaOcupado(puerto) {
     const ocupado = await new Promise((resolver) => {
       const servidor = createServer();
       servidor.once('error', (/** @type {NodeJS.ErrnoException} */ error) => {
-        // `EADDRNOTAVAIL`: esta maquina no tiene esa cara de localhost. No es ocupacion.
+        // `EADDRNOTAVAIL` o `EAFNOSUPPORT`: esta maquina no tiene esa cara de localhost —el
+        // segundo es el medido en un contenedor sin IPv6 (#639)—. No es ocupacion.
         resolver(error.code === 'EADDRINUSE');
       });
       servidor.listen(puerto, host, () => servidor.close(() => resolver(false)));

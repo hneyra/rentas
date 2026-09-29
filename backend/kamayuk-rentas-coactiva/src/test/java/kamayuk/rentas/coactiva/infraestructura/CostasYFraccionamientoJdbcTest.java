@@ -18,6 +18,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -1865,6 +1866,31 @@ class CostasYFraccionamientoJdbcTest {
             assertThat(despues.liquidacion().total())
                     .as("y lo liquidado sigue congelado: es de otra fecha")
                     .isEqualTo(ARANCEL_REC1);
+        }
+
+        /**
+         * {@code porNumero} <b>solo recortaba</b>, y quedo fuera de las listas de #515 y de #629:
+         * «lc-2026-000001» tecleado como se lee no existia (#637). La grilla si la encontraba:
+         * {@code CriterioDeLiquidaciones} sube el numero a mayusculas.
+         */
+        @Test
+        @DisplayName(
+                "#637 — la liquidacion se busca por su numero como se teclea: recortado y en"
+                        + " minusculas")
+        void elNumeroSeBuscaComoSeTeclea() {
+            String numero = liquidarTodo(expedienteConRec1("CONS-8")).numero();
+            String tecleado = "  " + numero.toLowerCase(Locale.ROOT) + " ";
+
+            assertThat(numero)
+                    .as(
+                            "se guarda en su forma de busqueda —la compone `LiquidacionDeCostas`,"
+                                    + " en mayusculas—: si no, normalizar lo tecleado no la"
+                                    + " encontraria")
+                    .isEqualTo(numero.strip().toUpperCase(Locale.ROOT));
+            assertThat(enTransaccion(() -> liquidaciones.porNumero(tecleado)))
+                    .map(LiquidacionDeCostas::numero)
+                    .as("porNumero recortaba y comparaba en crudo: en minusculas no la encontraba")
+                    .contains(numero);
         }
 
         @Test

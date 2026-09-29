@@ -14,6 +14,10 @@ public final class Recursos {
 
     private Recursos() {}
 
+    /**
+     * Un modulo del catalogo, como lo publica {@code GET /seguridad/modulos}. {@code orden} es el
+     * del menu; un modulo retirado sale con {@code activo} falso, no desaparece.
+     */
     public record ModuloResource(long id, String codigo, String nombre, int orden, boolean activo) {
         public static ModuloResource de(Modulo modulo) {
             return new ModuloResource(
@@ -25,6 +29,11 @@ public final class Recursos {
         }
     }
 
+    /**
+     * Un acceso del catalogo, como lo publica {@code GET /seguridad/accesos}: {@code codigo} es el
+     * que un controlador declara en {@code @RequiereAcceso}, y el que la interfaz cruza con la
+     * matriz de la sesion para saber que ofrecer.
+     */
     public record AccesoResource(
             long id, long moduloId, String tipo, String codigo, String nombre, boolean activo) {
         public static AccesoResource de(Acceso acceso) {

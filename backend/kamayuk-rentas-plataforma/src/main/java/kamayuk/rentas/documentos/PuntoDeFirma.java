@@ -21,5 +21,9 @@ public interface PuntoDeFirma {
     /** Mientras D-05 siga abierta. Devuelve el documento sin tocar. */
     PuntoDeFirma SIN_FIRMA = (documento, formato) -> documento;
 
+    /**
+     * Los bytes del documento ya generado, firmados en ese formato. Recibe el documento entero y no
+     * un flujo: una firma se calcula sobre todo el contenido.
+     */
     byte[] firmar(byte[] documento, FormatoDeDocumento formato);
 }

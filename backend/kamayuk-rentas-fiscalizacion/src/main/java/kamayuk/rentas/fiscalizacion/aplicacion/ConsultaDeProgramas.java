@@ -29,6 +29,7 @@ public class ConsultaDeProgramas {
         this.programas = programas;
     }
 
+    /** Una página de los programas de la municipalidad que cumplen el criterio. */
     @Transactional(readOnly = true)
     public Pagina<ProgramaFiscalizacion> buscar(
             CriterioDeProgramas criterio, Paginacion paginacion) {

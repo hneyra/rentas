@@ -46,6 +46,10 @@ public class ConsultaDeActas {
         this.actas = actas;
     }
 
+    /**
+     * Una página de la grilla de actas, cada una con su lado declarado resuelto en la misma
+     * transacción: una lectura por página y no una por acta.
+     */
     @Transactional(readOnly = true)
     public Pagina<ActaConLoDeclarado> buscar(Paginacion paginacion) {
         Pagina<ActaFiscalizacion> pagina = actas.consultar(paginacion);

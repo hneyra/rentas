@@ -14,6 +14,11 @@ import java.util.Optional;
  */
 public interface NotificacionDeResolucionRepository {
 
+    /**
+     * Registra una diligencia —un intento de notificar la resolución— y la devuelve con su
+     * identificador. Solo una nueva: la que no halló a nadie se queda, y se diligencia otra vez con
+     * el intento siguiente.
+     */
     NotificacionDeResolucion insertar(NotificacionDeResolucion notificacion);
 
     /** Las diligencias de una resolución, por intento. */

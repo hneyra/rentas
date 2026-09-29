@@ -220,6 +220,16 @@ class FiltroDeConveniosTest {
         public void proyectar(SaldoProyectado saldo) {
             throw new UnsupportedOperationException("la consulta no escribe");
         }
+
+        @Override
+        public List<Long> contribuyentesConSaldoSinLibro(long despuesDe, int cuantos) {
+            throw new UnsupportedOperationException("la consulta no recorre el padron");
+        }
+
+        @Override
+        public int ponerACeroSinLibro(long contribuyenteId, Instant calculadoEn) {
+            throw new UnsupportedOperationException("la consulta no escribe");
+        }
     }
 
     /** Solo resuelve el codigo del contribuyente: es lo unico que esta lectura le pide. */

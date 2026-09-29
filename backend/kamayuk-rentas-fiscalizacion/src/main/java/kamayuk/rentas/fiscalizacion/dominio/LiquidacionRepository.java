@@ -26,6 +26,11 @@ public interface LiquidacionRepository {
      */
     Liquidacion insertar(Liquidacion liquidacion, List<LineaDeLiquidacion> lineas);
 
+    /**
+     * Una liquidación por el número que lleva impreso. Cómo se escriba —con espacios, en
+     * minúsculas— lo normaliza el adaptador con {@code NumeroImpreso} (#515). Vacío si no existe o
+     * es de otra municipalidad.
+     */
     Optional<Liquidacion> porNumero(String numero);
 
     /**
@@ -40,6 +45,10 @@ public interface LiquidacionRepository {
      */
     void bloquear(long liquidacionId);
 
+    /**
+     * Una liquidación por su identificador, sin su detalle: las líneas son {@link #lineasDe}. Vacío
+     * si no existe o es de otra municipalidad.
+     */
     Optional<Liquidacion> findById(long id);
 
     /** Las líneas de una liquidación, ordenadas por ejercicio y unidad. */

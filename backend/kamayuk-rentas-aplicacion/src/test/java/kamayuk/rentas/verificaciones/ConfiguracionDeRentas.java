@@ -476,6 +476,16 @@ public final class ConfiguracionDeRentas implements ConfiguracionDeLasVerificaci
                 // Reconstruye saldo_proyectado desde el libro (#23). Es un cache derivado: no
                 // modifica ningun dato, lo recalcula. El libro no se toca.
                 ".cuentacorriente.aplicacion.ReconstruirSaldo.deContribuyente(long)",
+                // Y la reconstruccion de quien no tiene libro (#641): pone a cero las filas de
+                // saldo_proyectado de un contribuyente sin ningun asiento, que es lo que el libro
+                // dice de el. El mismo cache y el mismo motivo; el libro tampoco se toca. Y lo que
+                // habia en la fila no se pierde sin rastro: solo se pone a cero un contribuyente
+                // que la conciliacion de esa misma pasada acaba de escribir, cifra a cifra, en una
+                // linea ERROR, y solo si su proyeccion sigue diciendo exactamente eso —se comprueba
+                // en la transaccion que escribe—. Lo que llegue o cambie entre medias no se toca,
+                // y queda en la fila para que lo informe la conciliacion siguiente.
+                ".cuentacorriente.aplicacion.ReconstruirSaldo.ponerACeroSinLibro(long,"
+                        + " java.util.List)",
                 // La lista de predios SIN declaracion jurada (ADR-0015 §2.3, #344). Es una
                 // CONSULTA.
                 // Lo unico que escribe es su propia fila de ACCESO, y esa observacion no la puede

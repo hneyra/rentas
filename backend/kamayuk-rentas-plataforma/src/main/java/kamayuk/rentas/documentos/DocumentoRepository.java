@@ -13,11 +13,19 @@ import kamayuk.rentas.dominio.Ejercicio;
  */
 public interface DocumentoRepository {
 
+    /**
+     * El documento de ese tipo, ejercicio y numero, tal como se escribio al emitirlo: el numero se
+     * compara en crudo. Vacio si no se emitio o es de otra municipalidad.
+     */
     Optional<DocumentoEmitido> porNumero(String tipo, Ejercicio ejercicio, String numero);
 
     /** Todo lo emitido sobre algo: los recibos de un contribuyente, los valores de un predio. */
     List<DocumentoEmitido> de(String tipo, String referencia);
 
+    /**
+     * Registra la emision y la devuelve con su identificador. Solo un documento nuevo: uno ya
+     * emitido no se vuelve a emitir, y si sus datos estaban mal se emite otro.
+     */
     DocumentoEmitido insertar(DocumentoEmitido documento);
 
     /** Suma una reimpresion. No toca nada mas, y la base lo comprueba. */

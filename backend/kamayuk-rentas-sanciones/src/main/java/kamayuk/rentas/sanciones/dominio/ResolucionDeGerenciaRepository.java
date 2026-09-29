@@ -30,8 +30,13 @@ public interface ResolucionDeGerenciaRepository {
      */
     ResolucionDeGerencia registrar(ResolucionDeGerencia resolucion);
 
+    /**
+     * La resolución con ese número, comparado tal como llega: el adaptador no lo pasa por {@code
+     * NumeroImpreso}. Vacío si no existe o es de otra municipalidad.
+     */
     Optional<ResolucionDeGerencia> porNumero(String numero);
 
+    /** Una resolución por su identificador. Vacío si no existe o es de otra municipalidad. */
     Optional<ResolucionDeGerencia> porId(long id);
 
     /**

@@ -20,8 +20,13 @@ import kamayuk.rentas.compartido.Paginacion;
  */
 public interface InternamientoRepository {
 
+    /**
+     * Inserta el ingreso al depósito y lo devuelve con su identificador. Solo uno nuevo: lo que le
+     * pasa después al vehículo son movimientos, no correcciones.
+     */
     Internamiento registrar(Internamiento internamiento);
 
+    /** Un internamiento por su identificador. Vacío si no existe o es de otra municipalidad. */
     Optional<Internamiento> porId(long id);
 
     /**
@@ -33,6 +38,11 @@ public interface InternamientoRepository {
      */
     Optional<Internamiento> vigenteDePlaca(String placa);
 
+    /**
+     * Agrega un movimiento al internamiento —una liberación o un abandono— y lo devuelve releído.
+     * Una segunda liberación o un segundo abandono del mismo internamiento los rechaza la base, con
+     * {@code internamiento_liberacion_uq} e {@code internamiento_abandono_uq}.
+     */
     MovimientoDeInternamiento registrar(MovimientoDeInternamiento movimiento);
 
     /** Los movimientos de un internamiento, del más antiguo al más reciente. */

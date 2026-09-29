@@ -26,10 +26,16 @@ import kamayuk.rentas.dominio.Dinero;
  */
 public interface ReglaDeAgregacion {
 
+    /** {@code RT-} y tres digitos, el mismo de NEG-05, como en {@link ReglaTributaria}. */
     IdentificadorDeRegla identificador();
 
+    /**
+     * Desde que ejercicio rige, y hasta cual. Una agregacion ya usada en una emision tampoco se
+     * modifica: se crea otra con su vigencia (ARQ-09 §1.3).
+     */
     RangoDeEjercicios vigencia();
 
+    /** Enunciado y norma citada (RNF-090). */
     String descripcion();
 
     /** El concepto que se toma de cada partida. Cada una debe haberlo calculado. */

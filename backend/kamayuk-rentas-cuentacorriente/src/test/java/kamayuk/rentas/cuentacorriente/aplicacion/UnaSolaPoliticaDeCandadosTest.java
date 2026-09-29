@@ -256,6 +256,16 @@ class UnaSolaPoliticaDeCandadosTest {
         public void proyectar(SaldoProyectado saldo) {
             throw new UnsupportedOperationException("con el libro vacio no se proyecta nada");
         }
+
+        @Override
+        public List<Long> contribuyentesConSaldoSinLibro(long despuesDe, int cuantos) {
+            throw new UnsupportedOperationException("ninguno de los dos recorre el padron");
+        }
+
+        @Override
+        public int ponerACeroSinLibro(long contribuyenteId, Instant calculadoEn) {
+            throw new UnsupportedOperationException("ninguno de los dos repara la proyeccion");
+        }
     }
 
     /** Un libro sin asientos: {@code deLaObligacion} contesta vacio y lo demas no se usa. */
