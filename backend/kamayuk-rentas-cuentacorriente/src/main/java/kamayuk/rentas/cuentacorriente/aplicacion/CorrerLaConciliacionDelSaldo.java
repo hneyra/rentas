@@ -63,7 +63,10 @@ import org.springframework.stereotype.Component;
  * tuvo asiento. Cuenta igual para el codigo de salida. Y se repara distinto: reconstruir no
  * reescribe nada de quien no tiene libro, asi que con {@value #RECONSTRUIR}{@code =true} sus filas
  * se ponen a cero con {@link ReconstruirPadron#ponerACeroSinLibro}, que es lo que el libro dice de
- * el, y no se borran, porque {@code kamayuk_app} no puede.
+ * el, y no se borran, porque {@code kamayuk_app} no puede. Solo las de los contribuyentes que esta
+ * misma pasada acaba de escribir en una linea ERROR, y solo si siguen diciendo lo que la linea
+ * dice: la cifra que se pone a cero no queda en ningun otro sitio. Lo que llegue o cambie entre
+ * medias no se toca, y queda en la fila para que lo informe la conciliacion siguiente.
  *
  * <h2>Sale distinto de cero si algo queda sin cuadrar, y al reves que la anti-entropia</h2>
  *
@@ -183,7 +186,10 @@ public class CorrerLaConciliacionDelSaldo implements ApplicationRunner, ExitCode
                         ultimo);
             }
             if (!antes.sinLibro().isEmpty()) {
-                long puestas = padron.ponerACeroSinLibro();
+                // Lo que acaba de salir en las lineas ERROR de arriba, y nada mas: un recorrido
+                // nuevo del padron pondria a cero una fila llegada entretanto sin que ninguna
+                // linea dijera que cifra tenia.
+                long puestas = padron.ponerACeroSinLibro(antes);
                 log.warn(
                         "Municipalidad {}: {} fila(s) de saldo de contribuyentes sin ningun asiento"
                                 + " puestas a cero, que es lo que dice el libro",
@@ -198,7 +204,9 @@ public class CorrerLaConciliacionDelSaldo implements ApplicationRunner, ExitCode
             for (String linea : lineasDe(municipalidad, despues)) {
                 // Lo que ni reparando cuadra es otra cosa —una fila distinta de cero de una
                 // obligacion que el libro de un contribuyente CON asientos no tiene, que ni la
-                // reconstruccion ni la puesta a cero reescriben—, y se dice aparte.
+                // reconstruccion ni la puesta a cero reescriben; o una fila sin libro que llego o
+                // cambio despues de conciliar, que la puesta a cero no toco porque ninguna linea
+                // decia aun su cifra—, y se dice aparte.
                 String sigue = "sigue sin cuadrar tras reparar: " + linea;
                 log.error("{}", sigue);
                 pendientes.add(sigue);

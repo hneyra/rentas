@@ -58,8 +58,14 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>El cursor del libro solo da los contribuyentes <b>con</b> asientos. Hasta #641 eso dejaba
  * fuera, dicho aqui mismo, a uno <i>sin ningun asiento</i> y con filas en la proyeccion —restos de
  * una migracion, o una fila escrita sin su asiento—: {@link ReconstruirSaldo#conciliar} lo habria
- * informado, pero ese cursor no llegaba a el, y el estado de cuenta ensenaba una cifra que el libro
- * no respalda sin que nada lo dijera.
+ * informado, pero ese cursor no llegaba a el, y la conciliacion no lo veia.
+ *
+ * <p>Lo que esa fila ensena fuera de aqui <b>no es una cifra</b> —medido en la revision de #641, y
+ * al reves de lo que el issue suponia—: en el codigo de este sistema nadie lee {@code
+ * insoluto_saldo} salvo la conciliacion, y {@link ConsultarDeuda#porContribuyente} usa la
+ * proyeccion solo como indice y saca el importe del libro. Lo que si ensena es un renglon de
+ * importe cero en el estado de cuenta, con la fase de la fila y filtrable por ella, y la puesta a
+ * cero no lo quita (ver {@link ReconstruirSaldo#ponerACeroSinLibro}).
  *
  * <p>Por eso {@link #conciliar} hace <b>dos</b> recorridos con el mismo bucle: el del libro, y el
  * de {@link SaldoRepository#contribuyentesConSaldoSinLibro}, que da los contribuyentes con alguna
@@ -70,9 +76,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>La reconstruccion no los repara: solo reescribe las obligaciones que el libro tiene, y {@code
  * kamayuk_app} no puede borrar una fila de {@code saldo_proyectado} (V1 le concede {@code SELECT,
  * INSERT, UPDATE}). Los repara {@link #ponerACeroSinLibro}, con un {@code UPDATE} que deja sus
- * filas a cero, que es lo que el libro dice de ellos. Un contribuyente <b>con</b> asientos y una
- * fila de mas, de una obligacion que su libro no tiene, sigue siendo cosa del primer recorrido: se
- * informa si no dice cero, y la reconstruccion no la toca.
+ * filas a cero, que es lo que el libro dice de ellos; y solo a los que una conciliacion acaba de
+ * informar, no volviendo a recorrer este padron. Un contribuyente <b>con</b> asientos y una fila de
+ * mas, de una obligacion que su libro no tiene, sigue siendo cosa del primer recorrido: se informa
+ * si no dice cero, y la reconstruccion no la toca.
  */
 @Service
 public class ReconstruirPadron {
@@ -134,21 +141,32 @@ public class ReconstruirPadron {
     }
 
     /**
-     * Pone a cero la proyeccion de cada contribuyente que no tiene ningun asiento, cada uno en su
-     * propia transaccion (#641).
+     * Pone a cero la proyeccion de los contribuyentes sin ningun asiento que {@code informada} trae
+     * en {@link Conciliacion#sinLibro}, <b>y de ninguno mas</b>, cada uno en su propia transaccion
+     * (#641).
      *
      * <p>Es la reparacion del segundo recorrido de {@link #conciliar}, y como {@link #reconstruir}
      * la pide quien lee el informe: no la llama la conciliacion.
      *
+     * <p><b>No vuelve a recorrer el padron</b>, y no es por ahorrarse la vuelta: lo que se pone a
+     * cero no se puede reconstruir desde ningun sitio, y lo unico que queda de su cifra es la linea
+     * ERROR que la conciliacion escribio. Una fila sin libro que apareciera entre esa conciliacion
+     * y esta reparacion no tiene linea, y un segundo recorrido la pondria a cero sin que ningun
+     * informe dijera cuanto decia. Asi, lo que llega tarde se queda como esta y lo informa la
+     * conciliacion siguiente. Y cada contribuyente solo se toca si su proyeccion sigue diciendo lo
+     * que se informo de el: lo comprueba {@link ReconstruirSaldo#ponerACeroSinLibro}, en la misma
+     * transaccion que escribe.
+     *
+     * @param informada la conciliacion cuyas lineas ERROR ya se escribieron
      * @return cuantas filas quedaron a cero
      */
-    public long ponerACeroSinLibro() {
-        long[] puestas = {0};
-        recorrer(
-                0L,
-                saldos::contribuyentesConSaldoSinLibro,
-                contribuyenteId -> puestas[0] += reconstruir.ponerACeroSinLibro(contribuyenteId));
-        return puestas[0];
+    public long ponerACeroSinLibro(Conciliacion informada) {
+        long puestas = 0;
+        for (Map.Entry<Long, List<Divergencia>> suyas : informada.sinLibro().entrySet()) {
+            // Fuera de toda transaccion: cada llamada atraviesa el proxy y abre la suya.
+            puestas += reconstruir.ponerACeroSinLibro(suyas.getKey(), suyas.getValue());
+        }
+        return puestas;
     }
 
     /** Concilia cada contribuyente de un padron y devuelve los que no cuadran, en su orden. */

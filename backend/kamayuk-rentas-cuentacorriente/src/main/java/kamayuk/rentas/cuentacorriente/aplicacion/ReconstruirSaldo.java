@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import kamayuk.rentas.cuentacorriente.dominio.Asiento;
 import kamayuk.rentas.cuentacorriente.dominio.AsientoRepository;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeSaldo;
@@ -129,14 +130,24 @@ public class ReconstruirSaldo {
     }
 
     /**
-     * Pone a cero la proyeccion de un contribuyente que <b>no tiene ningun asiento</b>, y devuelve
-     * cuantas filas cambio (#641).
+     * Pone a cero la proyeccion de un contribuyente que <b>no tiene ningun asiento</b>, si sigue
+     * diciendo exactamente lo que se informo de el, y devuelve cuantas filas cambio (#641).
      *
      * <p>Es la reparacion que {@link #deContribuyente} no puede hacer: esa reescribe las
      * obligaciones que el libro tiene, y de un contribuyente sin libro no reescribe nada. Y no se
      * puede borrar la fila —{@code kamayuk_app} no tiene {@code DELETE} sobre {@code
      * saldo_proyectado}, y la regla 4 no se negocia—, asi que se deja diciendo lo que dice el
      * libro: cero.
+     *
+     * <h4>Solo lo que ya salio en una linea ERROR</h4>
+     *
+     * <p>{@code informadas} es lo que {@link #conciliar} dijo de el en la pasada que ahora repara,
+     * y que {@link CorrerLaConciliacionDelSaldo} acaba de escribir, cifra a cifra, en su linea
+     * ERROR. Si su proyeccion ya no dice eso —le aparecio otra fila, o una cifra cambio—, no se
+     * toca <b>ninguna</b> de sus filas: ponerlas a cero borraria algo que ninguna linea dijo. La
+     * conciliacion de despues de reparar lo informa con lo que diga entonces, y lo repara una
+     * pasada posterior. Se comparan como conjuntos: el orden de dos filas de la misma cuota con
+     * distinta unidad no lo fija ninguna consulta.
      *
      * <h4>Por que a cero basta para que cuadre</h4>
      *
@@ -148,6 +159,15 @@ public class ReconstruirSaldo {
      * obligacion. La fase y el ultimo asiento de la fila se quedan como estaban: no hay ningun
      * asiento del que sacarlos, y la conciliacion no los mira.
      *
+     * <h4>Y lo que NO arregla: el renglon del estado de cuenta</h4>
+     *
+     * <p>{@link ConsultarDeuda#porContribuyente} usa la proyeccion como <b>indice</b> —que
+     * obligaciones tiene el contribuyente, y en que fase— y saca el importe del libro. Una fila sin
+     * asientos sale alli como un renglon de importe cero con la fase de la fila, y se puede filtrar
+     * por ella; y sigue saliendo igual despues de ponerla a cero, porque la fila se queda y su fase
+     * tambien. Esta reparacion deja la proyeccion de acuerdo con el libro; ese renglon es otro
+     * defecto, y no lo quita.
+     *
      * <h4>{@code REPEATABLE READ}, por el primer asiento que llegue a la vez</h4>
      *
      * <p>La sentencia comprueba ella misma que el contribuyente sigue sin asientos. Con {@code READ
@@ -157,10 +177,17 @@ public class ReconstruirSaldo {
      * y pone a cero un saldo que el libro ya respalda. Con una sola instantanea para toda la
      * transaccion, esa fila cambiada despues de tomarla hace fallar la escritura con {@code 40001}
      * en vez de pisarla: la municipalidad sale como no conciliada, y la siguiente pasada la ve con
-     * su asiento.
+     * su asiento. Y es la misma instantanea la que hace valer la comparacion de arriba: el {@code
+     * UPDATE} ve exactamente lo que se comparo, una fila modificada despues lo hace fallar igual, y
+     * una insertada despues no la ve.
      */
     @Transactional(isolation = Isolation.REPEATABLE_READ)
-    public int ponerACeroSinLibro(long contribuyenteId) {
+    public int ponerACeroSinLibro(long contribuyenteId, List<Divergencia> informadas) {
+        // Desde dentro y sin pasar por el proxy, a proposito: la lectura tiene que ser de ESTA
+        // transaccion, con su instantanea, y no de una propia.
+        if (!Set.copyOf(conciliar(contribuyenteId)).equals(Set.copyOf(informadas))) {
+            return 0;
+        }
         return saldos.ponerACeroSinLibro(contribuyenteId, reloj.instant());
     }
 }
