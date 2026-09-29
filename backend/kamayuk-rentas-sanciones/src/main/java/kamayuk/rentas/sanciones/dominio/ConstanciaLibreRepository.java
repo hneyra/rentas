@@ -16,6 +16,10 @@ public interface ConstanciaLibreRepository {
 
     ConstanciaLibre registrar(ConstanciaLibre constancia);
 
+    /**
+     * Una constancia por su número impreso. Como se escriba —con espacios, en minúsculas— lo
+     * normaliza el adaptador con {@code NumeroImpreso} (#637): quien llama no lo copia.
+     */
     Optional<ConstanciaLibre> porNumero(String numero);
 
     /** El padrón de constancias emitidas ({@code transito_padron_constancias}). */

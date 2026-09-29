@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Placa;
 import kamayuk.rentas.persistencia.OrdenSeguro;
@@ -92,7 +93,7 @@ public class ConstanciaLibreRepositoryJdbc extends RepositorioJdbc
     @Override
     public Optional<ConstanciaLibre> porNumero(String numero) {
         return jdbc().sql("SELECT " + COLUMNAS + DESDE + " WHERE c.numero = :numero")
-                .param("numero", numero.strip())
+                .param("numero", NumeroImpreso.formaDeBusqueda(numero))
                 .query(ConstanciaLibreRepositoryJdbc::mapear)
                 .optional();
     }

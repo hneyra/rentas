@@ -23,6 +23,9 @@ import java.util.Objects;
  * coactivo —que en {@code porNumero} solo se recortaba: en minusculas no existia—. Y el codigo CIIU
  * del catalogo de giros, que no lo imprime la municipalidad pero se teclea para buscarlo igual. El
  * ejecutor del filtro coactivo no: es un nombre, y se compara contra {@code upper()} en el motor.
+ *
+ * <p><b>Y dos que no estaban en ninguna de las dos listas (#637)</b>: la liquidacion de costas y la
+ * constancia libre, cuyo {@code porNumero} tambien solo recortaba.
  */
 public final class NumeroImpreso {
 

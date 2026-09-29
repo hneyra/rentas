@@ -17,6 +17,7 @@ import kamayuk.rentas.coactiva.dominio.ObligacionDeCostas;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.NumeroImpreso;
 
 /**
  * Liquidaciones de costas en memoria, para las pruebas que no necesitan base (#42).
@@ -73,7 +74,9 @@ public final class CostasEnMemoria implements LiquidacionDeCostasRepository {
 
     @Override
     public Optional<LiquidacionDeCostas> porNumero(String numero) {
-        return porId.values().stream().filter(l -> l.numero().equals(numero.strip())).findFirst();
+        return porId.values().stream()
+                .filter(l -> l.numero().equals(NumeroImpreso.formaDeBusqueda(numero)))
+                .findFirst();
     }
 
     @Override

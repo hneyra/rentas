@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -932,6 +933,40 @@ class ValoresMasivosYReportesJdbcTest {
             assertThat(pagina.contenido().get(0).numero()).isEqualTo(emitida.constancia().numero());
             assertThat(pagina.contenido().get(0).verificadaAl())
                     .isEqualTo(LocalDate.of(2026, 4, 20));
+        }
+
+        /**
+         * {@code porNumero} <b>solo recortaba</b>, y quedo fuera de las listas de #515 y de #629:
+         * «cli-2026-000001» tecleado como se lee no existia (#637). El padron si la encontraba,
+         * porque {@code CriterioDeConstancias} sube el numero a mayusculas.
+         */
+        @Test
+        @DisplayName(
+                "#637 — la constancia se busca por su numero como se teclea: recortado y en"
+                        + " minusculas")
+        void elNumeroSeBuscaComoSeTeclea() {
+            String numero =
+                    enTransaccion(
+                                    () ->
+                                            emitirConstancia.emitir(
+                                                    peticionDe(
+                                                            "ZZZ-637", LocalDate.of(2026, 4, 20)),
+                                                    FormatoDeDocumento.PDF,
+                                                    PORQUE))
+                            .constancia()
+                            .numero();
+            String tecleado = " " + numero.toLowerCase(Locale.ROOT) + "  ";
+
+            assertThat(numero)
+                    .as(
+                            "se guarda en su forma de busqueda —lo compone `EmitirDocumento`, en"
+                                    + " mayusculas—: si no, normalizar lo tecleado no la"
+                                    + " encontraria")
+                    .isEqualTo(numero.strip().toUpperCase(Locale.ROOT));
+            assertThat(enTransaccion(() -> constancias.porNumero(tecleado)))
+                    .map(ConstanciaLibre::numero)
+                    .as("porNumero recortaba y comparaba en crudo: en minusculas no la encontraba")
+                    .contains(numero);
         }
     }
 
