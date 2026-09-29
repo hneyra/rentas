@@ -48,3 +48,51 @@ export const LO_QUE_CONTESTO_LA_ANULACION = {
   licencia: 'anulacion.licencia',
   expediente: 'anulacion.expediente',
 } as const;
+
+/**
+ * La `clave` del acto que registra la diligencia de la resolucion de un RECURSO de transito (#638):
+ * `POST /transito/descargos/{nDeExpediente}/resolucion/notificacion`, desde `tra-pap`.
+ */
+export const NOTIFICAR_LA_RESOLUCION = 'notificar-resolucion-del-recurso';
+
+/**
+ * **La forma de la notificacion: lo que se LEE y lo que VIAJA** (#638).
+ *
+ * El desplegable del acto envia la opcion tal cual la escribe la definicion —si se tradujera,
+ * cambiar de idioma cambiaria lo que se envia—, y el backend lee el NOMBRE de su enumerado
+ * `ModalidadDeNotificacion`: sin traducirlo aqui, `PeticionesDeSanciones.enumeradoDe` contesta 422
+ * a cualquier cosa que se elija. Por eso las dos mitades viven en UN mapa: la definicion saca de
+ * aqui sus opciones —en este orden, y la primera es la que el acto deja elegida— y `datos/actos.ts`
+ * saca de aqui lo que manda. Escritas en dos listas, una opcion que no casara viajaria vacia.
+ *
+ * Los rotulos son los de «Forma de notificación» de `val-val`, que el artboard ya escribe para la
+ * misma lista del art. 104 del TUO del Codigo Tributario. Que los valores sigan siendo los del
+ * enumerado lo vigila `verificaciones/el-acto-escribe-lo-que-la-hoja-declara.test.ts`, que lee el
+ * `.java`.
+ */
+export const FORMAS_DE_NOTIFICACION: Readonly<Record<string, string>> = {
+  'Personal en domicilio fiscal': 'PERSONAL',
+  'Con certificación de negativa': 'NEGATIVA',
+  'Cedulón': 'CEDULON',
+  'Publicación': 'PUBLICACION',
+  'Electrónica': 'CORREO',
+};
+
+/**
+ * **El resultado de la diligencia: lo que se LEE y lo que VIAJA** (#638), por lo mismo que
+ * `FORMAS_DE_NOTIFICACION`, contra `ResultadoDeNotificacion`. Solo «No ubicado» deja el plazo sin
+ * abrir: la negativa a recibir surte efecto (art. 104 a).
+ */
+export const RESULTADOS_DE_LA_DILIGENCIA: Readonly<Record<string, string>> = {
+  'Notificado': 'NOTIFICADO',
+  'No ubicado': 'NO_UBICADO',
+  'Rechazado': 'RECHAZADO',
+};
+
+/** Lo que contesto la diligencia, por nombre, para la tarjeta de lo hecho. */
+export const LO_QUE_CONTESTO_LA_DILIGENCIA = {
+  numero: 'diligencia.numero',
+  resolucion: 'diligencia.resolucion',
+  direccion: 'diligencia.direccion',
+  resultado: 'diligencia.resultado',
+} as const;

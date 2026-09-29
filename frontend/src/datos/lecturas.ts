@@ -1868,6 +1868,54 @@ export interface ActoDeEdificacion {
   readonly valorDeObraNoDisponible: string | null;
 }
 
+/**
+ * **Lo que contesta una diligencia de notificacion de una resolucion de gerencia**, de
+ * `POST /transito/descargos/{nDeExpediente}/resolucion/notificacion` (#638). Es `DiligenciaResource`,
+ * la misma forma que devuelven las otras dos rutas que notifican una resolucion.
+ *
+ * `numero` es el de la cedula —el de la resolucion y el intento, `RGR-…/2`—, y `direccion` la
+ * que el backend uso: la escrita, o el domicilio fiscal vigente del obligado a la fecha de la
+ * diligencia si no se escribio ninguna. `exigibleDesde` llega **nulo** cuando la diligencia no surte
+ * efecto (`NO_UBICADO`): el plazo no se abre. `modalidad` y `resultado` llegan con el NOMBRE de su
+ * enumerado, que es lo que la tarjeta de lo hecho lee.
+ */
+export interface DiligenciaDeUnaResolucion {
+  readonly id: number;
+  readonly resolucion: string;
+  readonly numero: string;
+  readonly intento: number;
+  readonly fechaDeNotificacion: string;
+  readonly modalidad: string;
+  readonly resultado: string;
+  readonly notificador: string;
+  readonly direccion: string;
+  readonly recibidoPor: string | null;
+  readonly acuse: string | null;
+  readonly exigibleDesde: string | null;
+  readonly abreElPlazoDeLaSancionadora: boolean;
+}
+
+/**
+ * **Lo que se escribe de una diligencia**: el cuerpo de `PeticionDeNotificacionDeResolucion` menos
+ * la observacion, que va aparte (#638). Los cuatro primeros los exige el backend (422 sin ellos);
+ * los opcionales que no se escribieron no viajan.
+ */
+export interface DiligenciaQueSeRegistra {
+  /** ISO, `aaaa-mm-dd`: no anterior a la resolucion ni posterior a hoy (el backend lo rechaza con 422). */
+  readonly fechaDeNotificacion: string;
+  /** El NOMBRE de `ModalidadDeNotificacion`: `PERSONAL`, `CEDULON`, `PUBLICACION`, `CORREO`, `NEGATIVA`. */
+  readonly modalidad: string;
+  /** El NOMBRE de `ResultadoDeNotificacion`: `NOTIFICADO`, `NO_UBICADO`, `RECHAZADO`. */
+  readonly resultado: string;
+  readonly notificador: string;
+  /** Sin ella, el domicilio fiscal vigente del obligado a la fecha de la diligencia. */
+  readonly direccion?: string;
+  readonly recibidoPor?: string;
+  readonly documentoDelReceptor?: string;
+  readonly vinculo?: string;
+  readonly acuse?: string;
+}
+
 // ── Las rutas, escritas una vez ─────────────────────────────────────────────────────────────
 
 /**
@@ -2348,6 +2396,13 @@ export const RUTAS = {
   anulacionDeEdificacion: (expediente: string) =>
     `/licencias/edificacion/${encodeURIComponent(expediente)}/anulacion`,
   /**
+   * La diligencia de la resolucion que resolvio UN recurso de transito, por el expediente del
+   * recurso (#638). Es una ESCRITURA: la llama `notificarLaResolucionDelRecurso`, y nadie la pide
+   * para pintar una pantalla.
+   */
+  notificacionDeLaResolucionDelRecurso: (expediente: string) =>
+    `/transito/descargos/${encodeURIComponent(expediente)}/resolucion/notificacion`,
+  /**
    * El resumen de papeletas del ejercicio en curso, **agrupado por ano** (#184).
    *
    * <h2>`?agrupadoPor=ANO` escrito, aunque sea el valor por omision</h2>
@@ -2562,5 +2617,39 @@ export async function anularLicenciaDeEdificacion(
   return solicitar<ActoDeEdificacion>(RUTAS.anulacionDeEdificacion(expediente), {
     metodo: "POST",
     cuerpo: { motivo, observacion },
+  });
+}
+
+/**
+ * **Registra la diligencia de la resolucion que resolvio un recurso de transito** (#638). Es la
+ * tercera escritura de esta interfaz y el segundo ACTO del interprete: la llama el manejador de
+ * `notificar-resolucion-del-recurso` en `datos/actos.ts`, desde `tra-pap`.
+ *
+ * <h2>Lo que manda, y lo que deja al backend</h2>
+ *
+ * El cuerpo es `PeticionDeNotificacionDeResolucion`: la diligencia —fecha, forma, resultado y
+ * notificador, que el backend exige, y los cinco opcionales que se hayan escrito— y `observacion`,
+ * regla 10, que como en las otras dos **es un parametro obligatorio de esta funcion**. El recurso va
+ * en la RUTA, y la resolucion la busca el backend por el: solo la de tipo `RECURSO` que lo resolvio.
+ *
+ * Lo que contesta cuando no la acepta se ensena con sus palabras: **404** si el recurso no existe o
+ * todavia no se resolvio por su ruta —el acto lo dice con las suyas, ver `datos/actos.ts`—, y
+ * **422** si falta un dato, la fecha es anterior a la resolucion o posterior a hoy, o no hay donde
+ * notificar. Ninguno de esos limites se copia aqui. La ruta no contesta 409: una segunda diligencia
+ * no es un conflicto, es el intento siguiente.
+ *
+ * @param expediente el expediente con que se registro el recurso; va en la RUTA
+ * @param diligencia lo que se escribio de la diligencia, con la forma y el resultado ya traducidos al
+ *     nombre de su enumerado
+ * @param observacion por que se registra. Sin ella la operacion no se puede ni escribir
+ */
+export async function notificarLaResolucionDelRecurso(
+  expediente: string,
+  diligencia: DiligenciaQueSeRegistra,
+  observacion: string,
+): Promise<DiligenciaDeUnaResolucion> {
+  return solicitar<DiligenciaDeUnaResolucion>(RUTAS.notificacionDeLaResolucionDelRecurso(expediente), {
+    metodo: "POST",
+    cuerpo: { ...diligencia, observacion },
   });
 }

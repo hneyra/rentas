@@ -199,6 +199,22 @@ function alFallar(
 }
 
 /**
+ * **Lo que un acto dice cuando su escritura contesta 404**, si no vale el peldano de por omision
+ * (#638). Es a un acto lo que `Conector.noEncontrado` es a una lectura (#237).
+ *
+ * El peldano `no-encontrado` de la escalera habla de la CUENTA —«puede ser valida en el emisor de
+ * identidad y no estar dada de alta en esta municipalidad»—, que es el 404 de la cadena de
+ * identidad. El de una escritura que nombra algo en su ruta es otro: **eso que nombra no existe**,
+ * o no esta en el estado en que se puede escribir. Solo el titulo y el remedio son del acto: el
+ * detalle sigue siendo lo que dijo el backend, que nombra lo que buscaba, y la clasificacion —que
+ * no es una averia— sigue saliendo de la escalera.
+ */
+export interface FrasesDelNoEncontrado {
+  readonly titulo: string;
+  readonly remedio: string;
+}
+
+/**
  * **Lo que se dice cuando el backend NO acepta un acto**, con la misma escalera (#629).
  *
  * Un acto del interprete no pinta su rechazo con una `Ausencia` —eso es el hueco de un campo—: lo
@@ -212,18 +228,23 @@ function alFallar(
  * **Sin `reintentar`**, a proposito: reintentar un acto es volver a pulsar su boton, con lo escrito
  * todavia en el formulario, y ofrecer otro boton que haga lo mismo seria ofrecer insistir sobre un
  * 409 que va a contestar lo mismo.
+ *
+ * **Y un 404 con las palabras del acto, si las tiene** (#638): ver `FrasesDelNoEncontrado`. Sin
+ * ellas, el peldano de la escalera, como hasta ahora.
  */
 function alRechazarElActo(
   error: unknown,
   t: (clave: string, datos?: Readonly<Record<string, unknown>>) => string,
+  noEncontrado?: FrasesDelNoEncontrado,
 ): EstadoDeUnaLectura {
   const peldano = peldanoDe(error);
+  const suyas = peldano.clave === 'no-encontrado' ? noEncontrado : undefined;
   return {
     estado: 'fallo',
     peldano: {
-      titulo: t(peldano.titulo),
+      titulo: t(suyas?.titulo ?? peldano.titulo),
       detalle: t(peldano.detalle),
-      remedio: t(peldano.remedio),
+      remedio: t(suyas?.remedio ?? peldano.remedio),
     },
     // `mal` solo cuando algo se rompio: un 409 o un 422 son el backend funcionando.
     tono: peldano.esAveria ? 'mal' : 'atencion',

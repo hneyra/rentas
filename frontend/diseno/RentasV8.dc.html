@@ -522,7 +522,8 @@ const ARBOL = [
         ['BASE', '/transito/papeletas', 'PapeletasController'],
         ['BASE', '/transito/papeletas/busqueda', 'BusquedaDePapeletasController'],
         ['BASE', '/transito/papeletas/{numero}/actos', 'ActosDeLaPapeletaController'],
-        ['BASE', '/transito/descargos', 'DescargosController']],
+        ['BASE', '/transito/descargos', 'DescargosController'],
+        ['POST', '/transito/descargos/{nDeExpediente}/resolucion/notificacion', 'Notificación de la resolución de un recurso']],
         [['Command', 'La búsqueda por placa o número, que es como se entra a esta pantalla']]],
       ['tra-veh', 'Vehículos y depósito', [
         ['BASE', '/transito/internamientos', 'InternamientosController'],

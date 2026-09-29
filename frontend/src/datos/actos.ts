@@ -11,25 +11,36 @@ import type {
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import {
   ANULAR_LA_LICENCIA,
+  FORMAS_DE_NOTIFICACION,
   LO_QUE_CONTESTO_LA_ANULACION,
+  LO_QUE_CONTESTO_LA_DILIGENCIA,
+  NOTIFICAR_LA_RESOLUCION,
+  RESULTADOS_DE_LA_DILIGENCIA,
   opcionQueLoPide,
   puedeHacerlo,
 } from '../pantallas/actos.ts';
-import { ANULAR_LA_LICENCIA_DE_EDIFICACION, tieneElPrivilegio } from '../permisos.ts';
-import { anularLicenciaDeEdificacion } from './lecturas.ts';
+import {
+  ANULAR_LA_LICENCIA_DE_EDIFICACION,
+  NOTIFICAR_LA_RESOLUCION_DEL_RECURSO,
+  tieneElPrivilegio,
+} from '../permisos.ts';
+import { anularLicenciaDeEdificacion, notificarLaResolucionDelRecurso } from './lecturas.ts';
 import { usePermisosDeLaSesion } from './useCatalogoPermitido.ts';
-import { alRechazarElActo } from './useDatosDeLaHoja.ts';
+import { alRechazarElActo, type FrasesDelNoEncontrado } from './useDatosDeLaHoja.ts';
 
 /**
  * **Quien atiende los actos de cada hoja** (#629). Es a las escrituras lo que `CONECTORES` es a las
  * lecturas: el interprete de `@kamayuk/ui` dibuja el acto desde su definicion y lo NOMBRA por su
  * `clave`; lo que se manda, a donde, y que se dice cuando el backend no lo acepta es de aqui.
  *
- * <h2>Uno, y es la anulacion de la licencia de edificacion</h2>
+ * <h2>Dos: la anulacion de la licencia de edificacion y la notificacion de un recurso</h2>
  *
  * `POST /licencias/edificacion/{expediente}/anulacion` existe desde #455 y la pantalla no la
  * ofrecia. Es la segunda escritura de esta interfaz —la primera es el ejercicio de la barra, #391—
  * y la primera que es un ACTO del interprete, con su observacion obligatoria **en el tipo**.
+ *
+ * `POST /transito/descargos/{nDeExpediente}/resolucion/notificacion` la publico #629 y tampoco la
+ * ofrecia nadie: es la tercera escritura y el segundo acto (#638), desde `tra-pap`.
  *
  * <h2>Lo que cada escritura declara</h2>
  *
@@ -40,11 +51,14 @@ import { alRechazarElActo } from './useDatosDeLaHoja.ts';
  *   boton que abre el acto sale IMPEDIDO y dice por que a quien no lo tiene, en vez de ofrecerle
  *   una puerta que contesta 403.
  * · **`escribir`** — manda el envio y devuelve lo que la tarjeta de lo hecho ensena, por nombre.
+ * · **`noEncontrado`** — que decir si contesta 404, cuando el peldano de la escalera —que habla de
+ *   la cuenta— no es lo que ese 404 significa (#638). Ver `FrasesDelNoEncontrado`.
  */
 interface EscrituraDeUnActo {
   readonly operacion: string;
   readonly permiso: { readonly codigo: string; readonly privilegio: string; readonly nombre: string };
   readonly escribir: (envio: EnvioDeUnActo) => Promise<ReadonlyMap<string, string>>;
+  readonly noEncontrado?: FrasesDelNoEncontrado;
 }
 
 /** Lo que el interprete manda de un campo: texto, o `false` de una casilla. Aqui solo hay texto. */
@@ -78,9 +92,83 @@ const ANULAR_LA_LICENCIA_DE_UN_FUE: EscrituraDeUnActo = {
   },
 };
 
+/** Lo escrito en un campo opcional, recortado; `undefined` si se dejo en blanco, y entonces no viaja. */
+function opcionalDe(envio: EnvioDeUnActo, nombre: string): string | undefined {
+  const escrito = textoDe(envio, nombre).trim();
+  return escrito === '' ? undefined : escrito;
+}
+
+/**
+ * Lo que VIAJA de un desplegable cuyo rotulo no es lo que el backend lee: el nombre del enumerado.
+ *
+ * Las opciones salen del mismo mapa, asi que lo elegido siempre esta en el. Si un dia no estuviera,
+ * viaja **lo elegido tal cual** y no un `''`: el 422 del backend nombra entonces el campo y el
+ * valor que no admite, que es la pista buena, en vez de «falta» sobre algo que se eligio.
+ */
+function enumeradoDe(envio: EnvioDeUnActo, nombre: string, mapa: Readonly<Record<string, string>>): string {
+  const elegido = textoDe(envio, nombre);
+  return mapa[elegido] ?? elegido;
+}
+
+/**
+ * `tra-pap` — notificar la resolucion que resolvio un recurso de transito (#638).
+ *
+ * El recurso y la diligencia salen del formulario del acto; la forma y el resultado, **traducidos
+ * al nombre de su enumerado** con los mismos mapas de los que la definicion saca sus opciones. Los
+ * opcionales en blanco no viajan: sin `direccion`, el backend diligencia en el domicilio fiscal
+ * vigente del obligado. Lo que se ensena al terminar es la cedula que quedo —su numero, la
+ * resolucion y la direccion **tal como las devolvio el backend**— y su resultado, que decide si el
+ * plazo para impugnarla corre.
+ *
+ * **Su 404 no es el de la cuenta**: `NotificarResolucionDeGerencia#registrarLaDelRecurso` lo
+ * contesta cuando el recurso no existe o todavia no se resolvio por su ruta —«en esta ruta, las dos
+ * cosas son lo mismo»—, y eso se arregla con otro expediente o resolviendolo primero, no revisando
+ * con que cuenta se entro.
+ */
+const NOTIFICAR_LA_RESOLUCION_DE_UN_RECURSO: EscrituraDeUnActo = {
+  operacion: 'POST /transito/descargos/{nDeExpediente}/resolucion/notificacion',
+  permiso: NOTIFICAR_LA_RESOLUCION_DEL_RECURSO,
+  escribir: async (envio) => {
+    const direccion = opcionalDe(envio, 'direccion');
+    const recibidoPor = opcionalDe(envio, 'recibidoPor');
+    const documentoDelReceptor = opcionalDe(envio, 'documentoDelReceptor');
+    const vinculo = opcionalDe(envio, 'vinculo');
+    const acuse = opcionalDe(envio, 'acuse');
+    const diligencia = await notificarLaResolucionDelRecurso(
+      textoDe(envio, 'expediente').trim(),
+      {
+        fechaDeNotificacion: textoDe(envio, 'fechaDeNotificacion'),
+        modalidad: enumeradoDe(envio, 'modalidad', FORMAS_DE_NOTIFICACION),
+        resultado: enumeradoDe(envio, 'resultado', RESULTADOS_DE_LA_DILIGENCIA),
+        notificador: textoDe(envio, 'notificador').trim(),
+        ...(direccion === undefined ? {} : { direccion }),
+        ...(recibidoPor === undefined ? {} : { recibidoPor }),
+        ...(documentoDelReceptor === undefined ? {} : { documentoDelReceptor }),
+        ...(vinculo === undefined ? {} : { vinculo }),
+        ...(acuse === undefined ? {} : { acuse }),
+      },
+      envio.observacion,
+    );
+    return new Map([
+      [LO_QUE_CONTESTO_LA_DILIGENCIA.numero, diligencia.numero],
+      [LO_QUE_CONTESTO_LA_DILIGENCIA.resolucion, diligencia.resolucion],
+      [LO_QUE_CONTESTO_LA_DILIGENCIA.direccion, diligencia.direccion],
+      [LO_QUE_CONTESTO_LA_DILIGENCIA.resultado, diligencia.resultado],
+    ]);
+  },
+  noEncontrado: {
+    titulo: 'Ese recurso no tiene resolución que notificar',
+    remedio:
+      'No es una avería, y reintentar no lo cambia. Revise el expediente: si es el del recurso, primero ' +
+      'hay que dictar su resolución de recurso. Si se resolvió con la ordinaria o la sancionadora, se ' +
+      'notifica con ellas.',
+  },
+};
+
 /** Los actos de cada hoja, por la `clave` con que su definicion los nombra. */
 export const ACTOS_DE_LAS_HOJAS: Partial<Record<ClaveDeHoja, Readonly<Record<string, EscrituraDeUnActo>>>> = {
   'aut-sol': { [ANULAR_LA_LICENCIA]: ANULAR_LA_LICENCIA_DE_UN_FUE },
+  'tra-pap': { [NOTIFICAR_LA_RESOLUCION]: NOTIFICAR_LA_RESOLUCION_DE_UN_RECURSO },
 };
 
 /** Lo que una hoja con actos le suma a su pantalla. */
@@ -131,7 +219,9 @@ export function useActosDeLaHoja(clave: ClaveDeHoja): LoQueLaHojaHace {
         setContestado(dicho);
         return dicho;
       } catch (fallo: unknown) {
-        setRechazos((antes) => new Map(antes).set(claveDelActo, alRechazarElActo(fallo, t)));
+        setRechazos((antes) =>
+          new Map(antes).set(claveDelActo, alRechazarElActo(fallo, t, escritura.noEncontrado)),
+        );
         throw fallo;
       }
     };

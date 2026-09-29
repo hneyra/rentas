@@ -28,14 +28,15 @@ import {
 const TODAS: readonly Hoja[] = ARBOL.flatMap((modulo) => [...modulo.hojas]);
 
 describe('el cruce contra lo que el backend sirve', () => {
-  it('EL CENTINELA: hay cuarenta hojas y treinta y ocho operaciones servidas', () => {
+  it('EL CENTINELA: hay cuarenta hojas y treinta y nueve operaciones servidas', () => {
     // Sin esto, un arbol vacio o unas `YA_SERVIDAS` vacias dejarian todo lo de abajo pasando
     // sobre la nada — y la respuesta seria «ninguna pantalla tiene datos», que ademas parece
     // razonable. La trigesimo octava es la anulacion de la licencia de edificacion (#629): una
     // ESCRITURA, que no cambia ninguna frase de este archivo —`operacionesUtiles` solo cuenta las
-    // de lectura—, y `aut-sol` sigue diciendo «solo escribe».
+    // de lectura—, y `aut-sol` sigue diciendo «solo escribe». La trigesimo novena es otra, la
+    // notificacion de la resolucion de un recurso (#638), y por lo mismo no cambia nada de `tra-pap`.
     expect(TODAS).toHaveLength(40);
-    expect(YA_SERVIDAS).toHaveLength(38);
+    expect(YA_SERVIDAS).toHaveLength(39);
   });
 
   it('cruza por RUTA, no por verbo: dos servidas las declara el artboard como `BASE`', () => {

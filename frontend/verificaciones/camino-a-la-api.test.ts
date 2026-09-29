@@ -103,7 +103,7 @@ describe('AC4 — la raiz de la API es UNA, escrita en tres sitios que tienen qu
 });
 
 describe('AC7 — lo que se declara servido tiene que publicarlo el backend', () => {
-  it('las treinta y ocho: I-1, I-3, I-4, #168, #170, #167, #169, #181, #179, #180, #184, #215, #237, #272 y #629', () => {
+  it('las treinta y nueve: I-1, I-3, I-4, #168, #170, #167, #169, #181, #179, #180, #184, #215, #237, #272, #629 y #638', () => {
     // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
     // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff. La
     // lista crece de una en una porque encenderlas todas a la vez seria cambiar todas las
@@ -155,10 +155,13 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
       // #629 (#455). La segunda ESCRITURA de la lista, y la primera que es un acto del interprete:
       // anular la licencia de edificacion desde `aut-sol`. Ver el caso de abajo.
       'POST /licencias/edificacion/{expediente}/anulacion',
+      // #638. La tercera ESCRITURA, y el segundo acto: la diligencia de la resolucion de un recurso
+      // desde `tra-pap`. Ver el caso de abajo.
+      'POST /transito/descargos/{nDeExpediente}/resolucion/notificacion',
     ]);
   });
 
-  it('y las escrituras son DOS: la del ejercicio y, desde #629, la anulacion de la licencia de edificacion', () => {
+  it('y las escrituras son TRES: la del ejercicio y, desde #629 y #638, dos actos del interprete', () => {
     // Las escrituras cambian datos y quedan auditadas, asi que encender una no es como
     // encender una lectura: si algun dia son cinco, esta cifra lo dice en la revision. I-4
     // enciende seis rutas y ninguna escribe — el expediente todavia no guarda nada. Y #168
@@ -189,9 +192,14 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
     // diferencia con todas las de arriba, que se quedaron fuera por lo contrario: habria que
     // escribir para poder dibujar. Que el acto escriba lo que la hoja declara lo vigila
     // `el-acto-escribe-lo-que-la-hoja-declara.test.ts`.
+    //
+    // **#638 enciende la tercera**, por lo mismo: `POST /transito/descargos/{nDeExpediente}/resolucion/notificacion`
+    // es el acto «Registrar la diligencia» de `tra-pap`, y ninguna lectura la pide. Sigue fuera
+    // `POST /transito/descargos`, que presentaria un recurso: esa no la ofrece ningun acto.
     expect(YA_SERVIDAS.filter((o) => o.metodo !== 'GET').map((o) => o.ruta)).toEqual([
       '/seguridad/sesion/ejercicio',
       '/licencias/edificacion/{expediente}/anulacion',
+      '/transito/descargos/{nDeExpediente}/resolucion/notificacion',
     ]);
   });
 

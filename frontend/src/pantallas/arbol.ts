@@ -372,6 +372,16 @@ export const ARBOL = [
             nota: 'ActosDeLaPapeletaController',
           },
           { verbo: 'BASE', ruta: '/transito/descargos', nota: 'DescargosController' },
+          // **La notificacion de la resolucion de un recurso** (#638). El backend la sirve desde
+          // #629 y la pantalla no la ofrecia: hoy es el acto «Registrar la diligencia» de esta hoja
+          // (`definiciones/transito.ts`), y la escribe `datos/actos.ts`. Se declara aqui Y en el
+          // artboard a la vez, como la anulacion de `aut-sol` (#455): `pantallas-del-artboard`
+          // compara las dos fuentes.
+          {
+            verbo: 'POST',
+            ruta: '/transito/descargos/{nDeExpediente}/resolucion/notificacion',
+            nota: 'Notificación de la resolución de un recurso',
+          },
         ],
         piezasDeclaradas: [
           {
