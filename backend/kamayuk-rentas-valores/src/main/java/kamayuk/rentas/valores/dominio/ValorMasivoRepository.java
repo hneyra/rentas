@@ -22,6 +22,10 @@ public interface ValorMasivoRepository {
      */
     ValorMasivo iniciar(ValorMasivo corrida, List<Long> contribuyenteIds);
 
+    /**
+     * La cabecera de la corrida, sin sus items: esos se leen con {@link #itemsPendientes} y {@link
+     * #itemsGenerados}. Vacio si no existe o es de otra municipalidad.
+     */
     Optional<ValorMasivo> porId(long id);
 
     /**

@@ -55,6 +55,10 @@ public class ImportarVehiculos {
         this.referencias = referencias;
     }
 
+    /**
+     * Da de alta un vehiculo por fila y devuelve cuantos entraron y por que se rechazo cada una de
+     * las demas. La {@code observacion} va en la auditoria de cada alta: es el motivo de la carga.
+     */
     public InformeDeImportacion importar(Reader archivo, Observacion observacion) {
         List<FilaCsv> filas = leer(archivo);
         List<FilaRechazada> rechazadas = new ArrayList<>();

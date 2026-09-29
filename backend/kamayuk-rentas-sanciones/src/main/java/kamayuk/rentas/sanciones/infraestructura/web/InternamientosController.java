@@ -285,17 +285,6 @@ public class InternamientosController {
             @Nullable String motivo,
             @Nullable String formato) {}
 
-    /**
-     * El cuerpo de una liberación. <b>Lista blanca</b>: lo que no está aquí no entra.
-     *
-     * @param observacion por qué se libera (regla 10, RNF-052)
-     * @param fechaDeLiberacion el día de la entrega
-     * @param reciboDeCustodia el recibo con que se pagó la custodia, como está impreso
-     * @param personaQueRetira quién retira el vehículo
-     * @param documentoDeQuienRetira su documento de identidad
-     * @param soatVigenteAcreditado si se acreditó el SOAT vigente
-     * @param formato en qué formato sale el acta; por omisión PDF
-     */
     /** Lo que la pantalla manda para declarar el abandono (#454). */
     public record PeticionDeAbandono(
             @Nullable String observacion,
@@ -325,6 +314,17 @@ public class InternamientosController {
         }
     }
 
+    /**
+     * El cuerpo de una liberación. <b>Lista blanca</b>: lo que no está aquí no entra.
+     *
+     * @param observacion por qué se libera (regla 10, RNF-052)
+     * @param fechaDeLiberacion el día de la entrega
+     * @param reciboDeCustodia el recibo con que se pagó la custodia, como está impreso
+     * @param personaQueRetira quién retira el vehículo
+     * @param documentoDeQuienRetira su documento de identidad
+     * @param soatVigenteAcreditado si se acreditó el SOAT vigente
+     * @param formato en qué formato sale el acta; por omisión PDF
+     */
     public record PeticionDeLiberacion(
             @Nullable String observacion,
             @Nullable String fechaDeLiberacion,

@@ -26,6 +26,12 @@ public class RegistrarVehiculo {
         this.auditoria = auditoria;
     }
 
+    /**
+     * Da de alta el vehiculo si es nuevo, o reescribe su ficha si ya existe, y audita la ficha que
+     * queda. Hoy solo lo llama la carga del padron, con vehiculos nuevos: una actualizacion por
+     * aqui se auditaria sin lo que habia, que es lo que #421 corrigio en contribuyentes y
+     * contactos.
+     */
     @Transactional
     public Vehiculo registrar(Vehiculo vehiculo, Observacion observacion) {
         boolean esAlta = vehiculo.esNuevo();

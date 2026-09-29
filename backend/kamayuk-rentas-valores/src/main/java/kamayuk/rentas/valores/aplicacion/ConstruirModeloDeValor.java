@@ -42,6 +42,13 @@ public class ConstruirModeloDeValor {
         this.contribuyentes = contribuyentes;
     }
 
+    /**
+     * El documento del valor, con su detalle y el nombre del contribuyente, leidos en una sola
+     * transaccion corta.
+     *
+     * @throws IllegalStateException si el valor no existe: quien llama lo saco de una corrida que
+     *     lo dio por generado, asi que es un defecto y no una respuesta
+     */
     @Transactional(readOnly = true)
     public ModeloDeDocumento de(long valorId) {
         Valor valor =

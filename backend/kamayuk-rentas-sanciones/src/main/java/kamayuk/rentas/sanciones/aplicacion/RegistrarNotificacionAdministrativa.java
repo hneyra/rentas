@@ -51,6 +51,13 @@ public class RegistrarNotificacionAdministrativa {
         this.auditoria = auditoria;
     }
 
+    /**
+     * Emite la notificación y audita su alta.
+     *
+     * @param contribuyenteId quien responde, si ya se sabe; si viene, tiene que existir
+     * @param plazoDias el plazo para subsanar; sin él la notificación no vence nunca
+     * @throws ContribuyenteInexistente si el contribuyente nombrado no está en el padrón
+     */
     @Transactional
     public NotificacionAdministrativa registrar(
             String numero,

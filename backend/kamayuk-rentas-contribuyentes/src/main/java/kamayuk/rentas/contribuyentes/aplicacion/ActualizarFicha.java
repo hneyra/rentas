@@ -179,6 +179,11 @@ public class ActualizarFicha {
         return baja;
     }
 
+    /**
+     * Alta de un responsable solidario: quien responde por la deuda del contribuyente desde la
+     * fecha del vinculo. Se audita con la descripcion completa del vinculo, porque es lo que una
+     * cobranza a ese tercero tiene que poder ensenar despues.
+     */
     @Transactional
     public ResponsableSolidario registrarResponsable(
             ResponsableSolidario responsable, Observacion observacion) {

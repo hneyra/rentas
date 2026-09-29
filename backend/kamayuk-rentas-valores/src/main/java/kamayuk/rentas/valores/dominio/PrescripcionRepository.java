@@ -21,6 +21,11 @@ public interface PrescripcionRepository {
      */
     Prescripcion insertar(Prescripcion prescripcion);
 
+    /**
+     * La declaracion entera por su identificador: con el computo de cada ejercicio y los hechos
+     * alegados, que la relacion de {@link #buscar} no trae. Vacio si no existe o es de otra
+     * municipalidad.
+     */
     Optional<Prescripcion> porId(long id);
 
     /**

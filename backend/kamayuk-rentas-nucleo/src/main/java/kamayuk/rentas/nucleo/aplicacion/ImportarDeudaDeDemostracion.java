@@ -74,6 +74,10 @@ public class ImportarDeudaDeDemostracion {
         this.referencias = referencias;
     }
 
+    /**
+     * Pide al libro un cargo por fila y devuelve cuantos entraron y por que se rechazo cada una de
+     * las demas. La {@code observacion} acompana a cada cargo: es el motivo de la carga entera.
+     */
     public InformeDeImportacion importar(Reader archivo, Observacion observacion) {
         List<FilaCsv> filas = leer(archivo);
         List<FilaRechazada> rechazadas = new ArrayList<>();

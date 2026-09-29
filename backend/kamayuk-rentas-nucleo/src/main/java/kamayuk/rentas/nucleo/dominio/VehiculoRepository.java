@@ -23,6 +23,10 @@ public interface VehiculoRepository {
      */
     Optional<Vehiculo> findByPlaca(Placa placa);
 
+    /**
+     * Un vehiculo por su identificador, que no cambia cuando cambia la placa: es el enlace de sus
+     * papeletas y de su historial. Vacio si no existe o es de otra municipalidad.
+     */
     Optional<Vehiculo> findById(long id);
 
     /** El padron vehicular que pide el criterio, paginado, con el titular ya resuelto (#25). */

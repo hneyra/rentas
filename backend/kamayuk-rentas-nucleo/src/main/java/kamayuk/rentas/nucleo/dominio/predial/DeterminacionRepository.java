@@ -16,6 +16,10 @@ import kamayuk.rentas.dominio.Ejercicio;
  */
 public interface DeterminacionRepository {
 
+    /**
+     * La cabecera de una determinacion por su identificador, sin su detalle por predio: ese es
+     * {@link #detalleDe}. Vacio si no existe o es de otra municipalidad.
+     */
     Optional<Determinacion> findById(long id);
 
     /**

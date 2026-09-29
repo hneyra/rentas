@@ -26,6 +26,7 @@ public interface DescargoRepository {
     /** El descargo con ese número de expediente, si existe en esta municipalidad. */
     Optional<Descargo> porNumeroDeExpediente(String numeroExpediente);
 
+    /** Un descargo por su identificador. Vacío si no existe o es de otra municipalidad. */
     Optional<Descargo> porId(long id);
 
     /** Los descargos presentados contra una papeleta, del más antiguo al más reciente. */

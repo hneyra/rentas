@@ -17,6 +17,10 @@ import kamayuk.rentas.dominio.Ejercicio;
  */
 public interface AsientoRepository {
 
+    /**
+     * Un asiento por su identificador: lo que {@code RegistrarAsiento#reversar} lee para asentar su
+     * opuesto. Vacio si no existe o es de otra municipalidad.
+     */
     Optional<Asiento> findById(long id);
 
     /**

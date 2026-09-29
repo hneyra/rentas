@@ -48,6 +48,10 @@ public class ConsultaDeLaFichaDelContribuyente {
         this.ficha = ficha;
     }
 
+    /**
+     * La ficha del contribuyente tal como era en {@code cuando}, leida en una sola transaccion.
+     * Vacia si el contribuyente no existe o es de otra municipalidad.
+     */
     @Transactional(readOnly = true)
     public Optional<Ficha> de(long contribuyenteId, LocalDate cuando) {
         return padron.findById(contribuyenteId)

@@ -14,11 +14,16 @@ import kamayuk.rentas.compartido.Paginacion;
  */
 public interface ConstanciaLibreRepository {
 
+    /**
+     * Inserta la constancia recién emitida y la devuelve con su identificador. Solo una nueva: una
+     * ya emitida no se corrige, se deja sin efecto con otra.
+     */
     ConstanciaLibre registrar(ConstanciaLibre constancia);
 
     /**
      * Una constancia por su número impreso. Como se escriba —con espacios, en minúsculas— lo
-     * normaliza el adaptador con {@code NumeroImpreso} (#637): quien llama no lo copia.
+     * normaliza el adaptador con {@code NumeroImpreso} (#637): quien llama no lo copia. Vacío si
+     * no existe o es de otra municipalidad.
      */
     Optional<ConstanciaLibre> porNumero(String numero);
 

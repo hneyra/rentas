@@ -19,7 +19,16 @@ public interface CuotaDeArbitrioRepository {
     /** Si ya existe una cuota para ese predio, servicio, ejercicio y periodo. */
     boolean existe(long predioId, Servicio servicio, Ejercicio ejercicio, int periodo);
 
+    /**
+     * Inserta la cuota y la devuelve con su identificador. Una segunda cuota del mismo predio,
+     * servicio, ejercicio y periodo la rechaza {@code det_arbitrio_uq}, se haya preguntado antes
+     * {@link #existe} o no.
+     */
     CuotaDeArbitrio insertar(CuotaDeArbitrio cuota);
 
+    /**
+     * Las cuotas del ejercicio del criterio, paginadas; con {@code codigoPredial}, solo las del
+     * predio que lleva ese codigo de referencia catastral en la proyeccion local de catastro.
+     */
     Pagina<CuotaDeArbitrio> buscar(CriterioDeArbitrio criterio, Paginacion paginacion);
 }

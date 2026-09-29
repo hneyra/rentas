@@ -79,12 +79,28 @@ public class AplicarUnEventoDeIdentidad extends RepositorioJdbc {
         this.reloj = reloj;
     }
 
+    /**
+     * Lo que paso con un evento que se aplico o que no hacia falta aplicar: los tres se acusan en
+     * el buzon. Los otros dos desenlaces son excepciones porque quien llama los trata aparte:
+     * {@link NoSePuedeAplicar} lo aparta antes de acusarlo, y {@link TodaviaNo} no se acusa
+     * mientras la politica de lo que no avanza lo siga esperando (#377).
+     */
     public enum Aplicacion {
         APLICADO,
         YA_APLICADO,
         IGNORADO_AJENO
     }
 
+    /**
+     * Aplica el evento a la copia local y lo marca como aplicado, las dos cosas en la misma
+     * transaccion nueva.
+     *
+     * @throws NoSePuedeAplicar si no se podra aplicar nunca: quien llama lo aparta, lo acusa y
+     *     avisa
+     * @throws TodaviaNo si falta algo que otro evento traera: no se acusa y el buzon lo vuelve a
+     *     servir, hasta que lleva esperando mas de lo que la politica de lo que no avanza consiente
+     *     y quien llama lo aparta y lo acusa (#377)
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Aplicacion aplicar(EventoDeIdentidadRecibido evento) {
         TipoDeEventoDeIdentidad tipo = evento.tipo();

@@ -24,8 +24,22 @@ public interface FuenteDeEventosDeIdentidad {
     /** Confirma que estos eventos ya no hace falta volver a servir. */
     Acuse acusar(List<UUID> eventoIds);
 
+    /**
+     * Lo que el buzon sirvio en una lectura.
+     *
+     * @param eventos los servidos, en el orden del emisor
+     * @param quedan cuantos quedaban sin acusar <b>cuando se sirvieron</b>, estos incluidos: para
+     *     saber cuantos quedan despues de acusarlos se lee el {@link Acuse}
+     */
     record Lote(List<EventoDeIdentidadRecibido> eventos, long quedan) {}
 
+    /**
+     * Lo que el buzon contesto al acuse.
+     *
+     * @param recibidos cuantos identificadores le llegaron
+     * @param escritos cuantos acuses escribio: uno que ya estaba acusado no se escribe otra vez
+     * @param quedan cuantos quedan sin acusar despues de este
+     */
     record Acuse(int recibidos, int escritos, long quedan) {}
 
     /** El buzon no se pudo leer o acusar. Transitorio: se reintenta la vuelta siguiente. */

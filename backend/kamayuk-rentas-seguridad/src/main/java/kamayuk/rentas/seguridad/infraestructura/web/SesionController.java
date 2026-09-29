@@ -306,6 +306,10 @@ public class SesionController {
      */
     public record CambioDeEjercicio(int ejercicio, @Nullable String observacion) {}
 
+    /**
+     * La sesion tras cambiar su ejercicio de trabajo. {@code inicio} sale con la hora de la
+     * municipalidad y su desfase, como toda hora que este sistema publica (#188).
+     */
     public record SesionResource(
             long id, long usuarioId, OffsetDateTime inicio, @Nullable Integer ejercicioDeTrabajo) {
 

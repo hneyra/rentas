@@ -21,12 +21,25 @@ import kamayuk.rentas.compartido.Paginacion;
  */
 public interface LecturaDeLaCopiaLocal {
 
+    /**
+     * Los modulos del catalogo, paginados: lo que {@code GET /seguridad/modulos} publica para que
+     * {@code rentas-web} arme su arbol. Los siembra la implantacion, no el buzon.
+     */
     Pagina<Modulo> modulos(Paginacion paginacion);
 
+    /** Los accesos del catalogo —opciones de menu y politicas—, paginados, como los modulos. */
     Pagina<Acceso> accesos(Paginacion paginacion);
 
+    /**
+     * Una cuenta de la copia local por su identificador. Hoy no la llama nadie: la sesion pregunta
+     * por la cuenta del token, con {@link #usuarioPorCuenta}.
+     */
     Optional<Usuario> usuario(long id);
 
+    /**
+     * La cuenta con ese nombre, tal como la trae el token, vigente o no: decidir si puede entrar es
+     * de quien pregunta. Vacio si la copia no la tiene.
+     */
     Optional<Usuario> usuarioPorCuenta(String cuenta);
 
     /**

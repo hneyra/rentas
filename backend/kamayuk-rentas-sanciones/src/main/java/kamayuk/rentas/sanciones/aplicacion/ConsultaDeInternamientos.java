@@ -29,6 +29,10 @@ public class ConsultaDeInternamientos {
         this.internamientos = internamientos;
     }
 
+    /**
+     * Una página de los internamientos que cumplen el criterio, con los días de depósito contados a
+     * {@code aLaFecha}, que cada fila lleva consigo.
+     */
     @Transactional(readOnly = true)
     public Pagina<InternamientoEnConsulta> listar(
             CriterioDeInternamiento criterio, LocalDate aLaFecha, Paginacion paginacion) {

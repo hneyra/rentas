@@ -38,6 +38,14 @@ public class SubsanarNotificacion {
         this.auditoria = auditoria;
     }
 
+    /**
+     * Pasa la notificación de {@code EMITIDA} a subsanada, si {@code fechaSubsanacion} cae dentro
+     * del plazo —el último día incluido—, y audita el cambio.
+     *
+     * @throws NotificacionInexistente si no hay ninguna con ese número
+     * @throws EstadoInvalido si ya no está {@code EMITIDA}
+     * @throws FueraDePlazo si el plazo venció antes de esa fecha
+     */
     @Transactional
     public NotificacionAdministrativa subsanar(
             String numero, LocalDate fechaSubsanacion, Observacion observacion) {

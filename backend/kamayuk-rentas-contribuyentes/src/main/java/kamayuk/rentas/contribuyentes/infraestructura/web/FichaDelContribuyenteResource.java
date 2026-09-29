@@ -47,13 +47,6 @@ public record FichaDelContribuyenteResource(
     }
 
     /**
-     * Un domicilio, con su tramo de vigencia entero.
-     *
-     * <p>{@code vigenciaHasta} nulo es el que rige hoy. El historial trae tambien los cerrados: no
-     * se borra nada (regla 4), y {@code documentoOrigen} es lo que sostiene la notificacion si
-     * alguien la impugna.
-     */
-    /**
      * Los tres datos personales que el expediente dibuja y la grilla no publica (#552).
      *
      * <p>Van <b>aqui</b> y no en {@link ContribuyenteResource}, y la diferencia importa: aquel es
@@ -79,6 +72,13 @@ public record FichaDelContribuyenteResource(
         }
     }
 
+    /**
+     * Un domicilio, con su tramo de vigencia entero.
+     *
+     * <p>{@code vigenciaHasta} nulo es el que rige hoy. El historial trae tambien los cerrados: no
+     * se borra nada (regla 4), y {@code documentoOrigen} es lo que sostiene la notificacion si
+     * alguien la impugna.
+     */
     public record DomicilioResource(
             long id,
             String tipo,

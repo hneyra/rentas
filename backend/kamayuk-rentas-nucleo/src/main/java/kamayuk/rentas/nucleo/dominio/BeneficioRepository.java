@@ -15,8 +15,16 @@ import kamayuk.rentas.compartido.Paginacion;
  */
 public interface BeneficioRepository {
 
+    /**
+     * Un beneficio por su identificador: el que se lee para cesarlo. Vacio si no existe o es de
+     * otra municipalidad.
+     */
     Optional<Beneficio> findById(long id);
 
+    /**
+     * La consulta de beneficios (RF-029), paginada. Los criterios se combinan con Y, y {@code
+     * vigentesA} filtra los que rigen a esa fecha, no los ultimos (regla 9).
+     */
     Pagina<Beneficio> buscar(CriterioDeBeneficio criterio, Paginacion paginacion);
 
     /**
@@ -41,6 +49,11 @@ public interface BeneficioRepository {
      */
     List<Beneficio> vigentesDelContribuyente(long contribuyenteId, LocalDate fecha);
 
+    /**
+     * Da de alta el beneficio y lo devuelve con su identificador. La base no impide que se solape
+     * con otro del mismo ambito —tipo, tributo, predio y vehiculo—: lo comprueba antes {@code
+     * RegistrarBeneficio}, con {@link #delContribuyente}.
+     */
     Beneficio insertar(Beneficio beneficio);
 
     /** Guarda el cese: la unica escritura que admite un beneficio ya guardado. */

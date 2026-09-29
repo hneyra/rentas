@@ -21,6 +21,10 @@ public interface CorridaDeValoresRepository {
      */
     CorridaDeValores iniciar(CorridaDeValores corrida, List<Long> papeletaIds);
 
+    /**
+     * La cabecera de la corrida, sin sus candidatos: esos se leen por lotes con {@link
+     * #pendientes}. Vacío si no existe o es de otra municipalidad.
+     */
     Optional<CorridaDeValores> porId(long corridaId);
 
     /**

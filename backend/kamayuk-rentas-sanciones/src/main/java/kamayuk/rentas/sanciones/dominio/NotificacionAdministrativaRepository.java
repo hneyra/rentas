@@ -22,8 +22,18 @@ public interface NotificacionAdministrativaRepository {
      */
     NotificacionAdministrativa insertar(NotificacionAdministrativa notificacion);
 
+    /**
+     * La notificación con ese número impreso, normalizado con {@code NumeroImpreso} (#515). Vacío
+     * si no existe o es de otra municipalidad.
+     */
     Optional<NotificacionAdministrativa> porNumero(String numero);
 
+    /**
+     * Las notificaciones cuyo plazo ya estaba vencido a {@code vencidasAl} y siguen {@code EMITIDA}
+     * —u otro estado, si el criterio lo pide—, paginadas ({@code adm_notificaciones_vencidas}). La
+     * frontera del plazo es la de {@link NotificacionAdministrativa}, escrita en SQL por ella
+     * misma: el último día todavía se subsana, y el reporte no puede ofrecer multarlo.
+     */
     Pagina<NotificacionAdministrativa> buscarVencidas(
             CriterioDeNotificacion criterio, Paginacion paginacion);
 

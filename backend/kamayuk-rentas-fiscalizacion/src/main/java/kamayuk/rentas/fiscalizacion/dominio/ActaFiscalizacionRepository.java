@@ -2,6 +2,14 @@ package kamayuk.rentas.fiscalizacion.dominio;
 
 import org.jspecify.annotations.Nullable;
 
+/**
+ * Las actas de fiscalizacion: lo que el fiscalizador encontro en la visita. Ningun metodo recibe la
+ * municipalidad (regla 2): la filtra la politica RLS.
+ *
+ * <p>Se insertan y se anulan, y nada mas: desde {@code V19} {@code kamayuk_app} solo puede mover
+ * {@code estado}, asi que lo medido en campo no se corrige en la base. Una visita que hay que
+ * repetir es otra acta, con la version siguiente de la misma unidad.
+ */
 public interface ActaFiscalizacionRepository {
 
     /**

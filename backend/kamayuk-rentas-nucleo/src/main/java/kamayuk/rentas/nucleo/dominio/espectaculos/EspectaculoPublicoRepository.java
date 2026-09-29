@@ -16,6 +16,7 @@ public interface EspectaculoPublicoRepository {
     /** Inserta el evento y devuelve la fila guardada, con su {@code id}. */
     EspectaculoPublico insertar(EspectaculoPublico evento);
 
+    /** Un evento por su identificador. Vacío si no existe o es de otra municipalidad. */
     Optional<EspectaculoPublico> findById(long id);
 
     /**
